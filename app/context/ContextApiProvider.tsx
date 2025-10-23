@@ -1,21 +1,34 @@
 'use client';
 
 import { createClient } from '@/utils/supabase/client';
-import { Session } from '@supabase/supabase-js';
+import { Session, User } from '@supabase/supabase-js';
 import React, { useState, useEffect, createContext, useContext } from 'react';
 
 interface ContextProps {
   session: Session | null;
+  user: User | null;
   loading: boolean;
+  refreshAuth: () => Promise<void>;
 }
 
 const AuthContext = createContext<ContextProps | undefined>(undefined);
 
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
-  const [loading, setLoading] = useState<boolean>(false);
+  const [loading, setLoading] = useState<boolean>(true);
   const [session, setSession] = useState<Session | null>(null);
+  const [user, setUser] = useState<User | null>(null);
 
   const supabase = createClient();
+
+  const refreshAuth = async () => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      setSession(session);
+      setUser(session?.user ?? null);
+    } catch (error) {
+      console.error('Error refreshing auth', error);
+    }
+  };
 
   useEffect(() => {
     const init = async () => {
@@ -23,6 +36,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       try {
         const { data: { session } } = await supabase.auth.getSession();
         setSession(session);
+        setUser(session?.user ?? null);
       } catch (error) {
         console.error('Error getting session', error);
       } finally {
@@ -34,15 +48,17 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
+      setUser(session?.user ?? null);
+      setLoading(false);
     });
 
     return () => {
       subscription.unsubscribe();
     };
-  }, [supabase]);
+  }, []);
 
   return (
-    <AuthContext.Provider value={{ loading, session }}>
+    <AuthContext.Provider value={{ loading, session, user, refreshAuth }}>
       {children}
     </AuthContext.Provider>
   );
