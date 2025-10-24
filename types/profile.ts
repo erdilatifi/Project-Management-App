@@ -5,11 +5,13 @@ export const timezones = ['utc-5', 'utc', 'utc+1', 'utc+2', 'utc+3', 'utc+5.5', 
 export const themes = ['light', 'dark', 'system'] as const;
 export const emailFrequencies = ['instant', 'hourly', 'daily', 'weekly'] as const;
 export const taskViews = ['board', 'list', 'calendar'] as const;
+export const availabilityStatuses = ['available', 'busy', 'away', 'offline'] as const;
 
 export type Timezone = typeof timezones[number];
 export type Theme = typeof themes[number];
 export type EmailFrequency = typeof emailFrequencies[number];
 export type TaskView = typeof taskViews[number];
+export type AvailabilityStatus = typeof availabilityStatuses[number];
 
 // Form Schemas
 export const profileSchema = z.object({
@@ -31,7 +33,8 @@ export const preferencesSchema = z.object({
   defaultTaskView: z.enum(taskViews),
   startTime: z.string(),
   endTime: z.string(),
-  theme: z.enum(themes)
+  theme: z.enum(themes),
+  availability: z.enum(availabilityStatuses)
 });
 
 export const privacySchema = z.object({
@@ -66,7 +69,8 @@ export const DEFAULT_PREFERENCES: z.infer<typeof preferencesSchema> = {
   defaultTaskView: 'board',
   startTime: '09:00',
   endTime: '17:00',
-  theme: 'system'
+  theme: 'system',
+  availability: 'available'
 };
 
 export const DEFAULT_PRIVACY: z.infer<typeof privacySchema> = {

@@ -17,6 +17,12 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { toast } from "sonner";
+import WorkSettings from "@/components/profile/WorkSettings";
+import NotificationPreferences from "@/components/profile/NotificationPreferences";
+import StatsSummary from "@/components/profile/StatsSummary";
+import NotificationsList from "@/components/notifications/NotificationsList";
+import TasksPanel from "@/components/profile/TasksPanel";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 const schema = z.object({
   full_name: z.string().min(1, "Full name is required").max(120),
@@ -282,7 +288,22 @@ export default function ProfilePage() {
   }
 
   return (
-    <div className="mx-auto max-w-[1200px] p-6">
+    <div className="mx-auto max-w-[1200px] p-6 space-y-6">
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-semibold">Profile</h1>
+      </div>
+
+      <Tabs defaultValue="personal" className="space-y-6">
+        <TabsList>
+          <TabsTrigger value="personal">Personal</TabsTrigger>
+          <TabsTrigger value="work">Work</TabsTrigger>
+          <TabsTrigger value="preferences">Preferences</TabsTrigger>
+          <TabsTrigger value="notifications">Notifications</TabsTrigger>
+          <TabsTrigger value="tasks">Tasks</TabsTrigger>
+          <TabsTrigger value="overview">Overview</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="personal">
       <Card className="p-6 lg:min-w-[700px] space-y-6">
         <CardTitle className="text-2xl font-semibold">Profile</CardTitle>
 
@@ -290,11 +311,9 @@ export default function ProfilePage() {
           {errorMsg && <div className="text-sm text-red-600">{errorMsg}</div>}
 
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-6" noValidate>
-            {/* Avatar */}
             <div className="flex items-center gap-4">
               <div className="h-20 w-20 overflow-hidden rounded-full bg-muted flex items-center justify-center">
                 {previewUrl ? (
-                  // eslint-disable-next-line @next/next/no-img-element
                   <img
                     src={previewUrl}
                     alt="Avatar"
@@ -378,6 +397,54 @@ export default function ProfilePage() {
           </form>
         </CardContent>
       </Card>
+        </TabsContent>
+
+        <TabsContent value="work">
+      <Card className="p-6 lg:min-w-[700px] space-y-6">
+        <CardTitle className="text-xl font-semibold">Work Settings</CardTitle>
+        <CardContent>
+          <WorkSettings />
+        </CardContent>
+      </Card>
+        </TabsContent>
+
+        <TabsContent value="preferences">
+          <Card className="p-6 lg:min-w-[700px] space-y-6">
+            <CardTitle className="text-xl font-semibold">Notifications & Preferences</CardTitle>
+            <CardContent>
+              <NotificationPreferences />
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="notifications">
+          <Card className="p-6 lg:min-w-[700px] space-y-6">
+            <CardTitle className="text-xl font-semibold">Notifications</CardTitle>
+            <CardContent>
+              <NotificationsList />
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="tasks">
+          <Card className="p-6 lg:min-w-[700px] space-y-6">
+            <CardTitle className="text-xl font-semibold">Tasks</CardTitle>
+            <CardContent>
+              <TasksPanel />
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="overview">
+          <Card className="p-6 lg:min-w-[700px] space-y-6">
+            <CardTitle className="text-xl font-semibold">Overview</CardTitle>
+            <CardContent>
+              <StatsSummary />
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+      </Tabs>
 
       {/* Confirm Remove Avatar Dialog */}
       <Dialog open={removeOpen} onOpenChange={setRemoveOpen}>
@@ -412,3 +479,5 @@ export default function ProfilePage() {
     </div>
   );
 }
+
+

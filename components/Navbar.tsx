@@ -4,6 +4,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { IoIosMenu, IoIosClose } from 'react-icons/io';
 import { LogIn, LogOut, Loader2, User } from 'lucide-react';
+import NotificationsBell from '@/components/notifications/NotificationsBell';
 import { SignOut } from '@/app/actions/AuthActions';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
@@ -204,6 +205,7 @@ useEffect(() => {
                     </div>
                   ) : user ? (
                     <div className="flex items-center gap-4">
+                      <NotificationsBell />
                       <AvatarChip />
                       <Button
                         onClick={handleSignOut}
