@@ -19,7 +19,7 @@ type ProfileRow = {
 const Navbar = () => {
   const router = useRouter();
   const pathname = usePathname();
-  const supabase = createClient();
+  const supabase = useMemo(() => createClient(), []);
   const { user, loading: isLoading, refreshAuth } = useAuth();
 
   const [isMobile, setIsMobile] = useState(false);

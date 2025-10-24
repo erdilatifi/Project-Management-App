@@ -14,10 +14,10 @@ import { toast } from "sonner";
 
 export default function NotificationsList() {
   const { user } = useAuth();
-  const supabase = createClient();
+  const supabase = React.useMemo(() => createClient(), []);
   const [loading, setLoading] = useState(false);
   const [items, setItems] = useState<NotificationRow[]>([]);
-  const [subscribed, setSubscribed] = useState(false);
+  const subscribedRef = React.useRef(false);
 
   const unread = useMemo(() => items.filter((n) => !n.is_read).length, [items]);
 
@@ -41,7 +41,7 @@ export default function NotificationsList() {
   }, [user?.id, load]);
 
   useEffect(() => {
-    if (!user?.id || subscribed) return;
+    if (!user?.id || subscribedRef.current) return;
     const channel = supabase
       .channel("profile-notifications")
       .on(
@@ -53,12 +53,12 @@ export default function NotificationsList() {
         }
       )
       .subscribe();
-    setSubscribed(true);
+    subscribedRef.current = true;
     return () => {
       supabase.removeChannel(channel);
-      setSubscribed(false);
+      subscribedRef.current = false;
     };
-  }, [supabase, user?.id, subscribed]);
+  }, [supabase, user?.id]);
 
   const toggleRead = async (id: number, next: boolean) => {
     try {
@@ -122,4 +122,3 @@ export default function NotificationsList() {
     </div>
   );
 }
-

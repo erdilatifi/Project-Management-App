@@ -14,12 +14,12 @@ import {
 import { toast } from "sonner";
 
 export default function NotificationsBell() {
-  const supabase = createClient();
+  const supabase = useMemo(() => createClient(), []);
   const { user } = useAuth();
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [items, setItems] = useState<NotificationRow[]>([]);
-  const [hasSubscribed, setHasSubscribed] = useState(false);
+  const subscribedRef = useRef(false);
   const panelRef = useRef<HTMLDivElement | null>(null);
 
   const unreadCount = useMemo(() => items.filter((n) => !n.is_read).length, [items]);
@@ -45,7 +45,7 @@ export default function NotificationsBell() {
 
   // Realtime subscription to new notifications for this user
   useEffect(() => {
-    if (!user?.id || hasSubscribed) return;
+    if (!user?.id || subscribedRef.current) return;
     const channel = supabase
       .channel("realtime-notifications")
       .on(
@@ -58,12 +58,12 @@ export default function NotificationsBell() {
       )
       .subscribe();
 
-    setHasSubscribed(true);
+    subscribedRef.current = true;
     return () => {
       supabase.removeChannel(channel);
-      setHasSubscribed(false);
+      subscribedRef.current = false;
     };
-  }, [supabase, user?.id, hasSubscribed]);
+  }, [supabase, user?.id]);
 
   // Close panel when clicking outside
   useEffect(() => {
@@ -163,4 +163,3 @@ export default function NotificationsBell() {
     </div>
   );
 }
-
