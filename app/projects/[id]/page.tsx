@@ -158,7 +158,7 @@ export default function ProjectDetailsPage() {
         ) : (
           <Card className="overflow-hidden rounded-2xl border border-neutral-200 bg-white shadow-sm">
             {/* Toolbar */}
-            <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between px-6 py-5 bg-gradient-to-b from-white to-neutral-50/60">
+            <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between px-6 py-5 bg-linear-to-b from-white to-neutral-50/60">
               <div className="flex items-center gap-3">
                 <h1 className="text-2xl font-semibold text-neutral-900 tracking-tight">{project.name}</h1>
                 {dirty && (

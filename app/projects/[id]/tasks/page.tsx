@@ -421,7 +421,7 @@ function Column(props: ColumnProps) {
     >
       {/* tinted header */}
       <div
-        className={`sticky top-0 z-10 -mb-1 bg-gradient-to-b ${statusTint[props.columnId]} px-4 pt-3 pb-2 border-b border-neutral-200`}
+        className={`sticky top-0 z-10 -mb-1 bg-linear-to-b ${statusTint[props.columnId]} px-4 pt-3 pb-2 border-b border-neutral-200`}
       >
         <div className="flex items-center justify-between gap-2">
           <div className="text-neutral-900 font-medium">{props.label}</div>
@@ -479,8 +479,9 @@ interface TaskCardProps {
 
 function TaskCard(props: TaskCardProps) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({ id: props.task.id });
-  const style: CSSProperties =
-    transform ? { transform: `translate3d(${transform.x}px, ${transform.y}px, 0)` } : undefined;
+  const style: CSSProperties | undefined = transform
+  ? { transform: `translate3d(${transform.x}px, ${transform.y}px, 0)` }
+  : undefined;
 
   const priorityValue = props.task.priority ? String(props.task.priority) : "none";
 
