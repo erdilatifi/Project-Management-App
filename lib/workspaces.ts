@@ -1,0 +1,247 @@
+"use client"
+
+import { createClient } from '@/utils/supabase/client'
+import type { SupabaseClient, User } from '@supabase/supabase-js'
+import type {
+  Invitation,
+  Message,
+  MessageThread,
+  Notification as AppNotification,
+  Member,
+} from '@/types/workspaces'
+
+function requireUser(user: User | null): asserts user is User {
+  if (!user) throw new Error('You must be signed in')
+}
+
+function randToken(len = 10): string {
+  const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789abcdefghijkmnopqrstuvwxyz'
+  let out = ''
+  crypto.getRandomValues(new Uint8Array(len)).forEach((v) => (out += alphabet[v % alphabet.length]))
+  return out
+}
+
+export async function inviteUserToWorkspace(workspaceId: string, email: string): Promise<{ invitation: Invitation; token: string }>
+{
+  const supabase = createClient()
+  const {
+    data: { user },
+    error: authErr,
+  } = await supabase.auth.getUser()
+  if (authErr) throw new Error(authErr.message)
+  requireUser(user)
+
+  const token = randToken(12)
+  const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
+
+  const { data, error } = await supabase
+    .from('workspace_invitations')
+    .insert({
+      workspace_id: workspaceId,
+      email: email.trim().toLowerCase(),
+      invited_by: user.id,
+      token,
+      status: 'pending',
+      expires_at: expiresAt,
+    } as any)
+    .select('*')
+    .single<Invitation>()
+
+  if (error) throw new Error(error.message)
+  return { invitation: data!, token }
+}
+
+export async function acceptInvitation(token: string): Promise<{ workspace: { id: string; name: string; owner_id: string } }>
+{
+  const supabase = createClient()
+  const {
+    data: { user },
+    error: authErr,
+  } = await supabase.auth.getUser()
+  if (authErr) throw new Error(authErr.message)
+  requireUser(user)
+
+  const { data: invite, error: invErr } = await supabase
+    .from('workspace_invitations')
+    .select('*, workspaces!inner(id, name, owner_id)')
+    .eq('token', token)
+    .eq('status', 'pending')
+    .gt('expires_at', new Date().toISOString())
+    .maybeSingle<any>()
+
+  if (invErr) throw new Error(invErr.message)
+  if (!invite) throw new Error('Invitation not found or expired')
+
+  // Optional: enforce email match if available on the user
+  const userEmail = user.email?.toLowerCase()
+  if (userEmail && invite.email && invite.email.toLowerCase() !== userEmail) {
+    throw new Error('This invitation is for a different email')
+  }
+
+  const workspaceId = invite.workspace_id as string
+  const ownerId = invite.workspaces.owner_id as string
+
+  // Upsert member role
+  const { error: upsertErr } = await supabase
+    .from('workspace_members')
+    .upsert(
+      { workspace_id: workspaceId, user_id: user.id, role: 'member' } as any,
+      { onConflict: 'workspace_id,user_id' }
+    )
+  if (upsertErr) throw new Error(upsertErr.message)
+
+  // Mark invitation accepted
+  const { error: statusErr } = await supabase
+    .from('workspace_invitations')
+    .update({ status: 'accepted' })
+    .eq('id', invite.id)
+  if (statusErr) throw new Error(statusErr.message)
+
+  // Notifications for self and owner
+  const notifications: Array<Partial<AppNotification>> = [
+    {
+      user_id: user.id,
+      type: 'invite',
+      ref_id: invite.id,
+      workspace_id: workspaceId,
+      title: 'Joined workspace',
+      body: `You joined ${invite.workspaces.name}`,
+      is_read: false,
+    },
+  ]
+  if (ownerId && ownerId !== user.id) {
+    notifications.push({
+      user_id: ownerId,
+      type: 'invite',
+      ref_id: invite.id,
+      workspace_id: workspaceId,
+      title: 'Invitation accepted',
+      body: `${userEmail ?? 'A user'} accepted your invitation`,
+      is_read: false,
+    })
+  }
+  await supabase.from('notifications').insert(notifications as any)
+
+  return { workspace: { id: invite.workspaces.id, name: invite.workspaces.name, owner_id: ownerId } }
+}
+
+export async function searchUsersByEmailLike(term: string): Promise<Array<{ id: string; email: string }>> {
+  const supabase = createClient()
+  const t = term.trim().toLowerCase()
+  if (!t) return []
+  // In development, read from auth.users directly
+  const { data, error } = await (supabase as SupabaseClient)
+    .from('auth.users' as any)
+    .select('id, email')
+    .ilike('email', `%${t}%`)
+    .limit(10)
+  if (error) throw new Error(error.message)
+  return (data ?? []).filter((u: any) => !!u.email)
+}
+
+export async function createThread(workspaceId: string, title?: string): Promise<MessageThread> {
+  const supabase = createClient()
+  const {
+    data: { user },
+    error: authErr,
+  } = await supabase.auth.getUser()
+  if (authErr) throw new Error(authErr.message)
+  requireUser(user)
+
+  const { data: thread, error } = await supabase
+    .from('message_threads')
+    .insert({ workspace_id: workspaceId, title: title ?? null, created_by: user.id } as any)
+    .select('*')
+    .single<MessageThread>()
+  if (error) throw new Error(error.message)
+
+  // ensure creator is a participant
+  await supabase
+    .from('thread_participants')
+    .upsert({ thread_id: thread.id, user_id: user.id, is_admin: true } as any, { onConflict: 'thread_id,user_id' })
+
+  return thread
+}
+
+export async function sendMessage(threadId: string, workspaceId: string, body: string): Promise<Message> {
+  const supabase = createClient()
+  const {
+    data: { user },
+    error: authErr,
+  } = await supabase.auth.getUser()
+  if (authErr) throw new Error(authErr.message)
+  requireUser(user)
+  const text = body.trim()
+  if (!text) throw new Error('Message cannot be empty')
+
+  const { data: message, error } = await supabase
+    .from('messages')
+    .insert({ thread_id: threadId, workspace_id: workspaceId, author_id: user.id, body: text } as any)
+    .select('*')
+    .single<Message>()
+  if (error) throw new Error(error.message)
+
+  // Determine recipients: participants if present, else all workspace members
+  const { data: parts } = await supabase
+    .from('thread_participants')
+    .select('user_id')
+    .eq('thread_id', threadId)
+  let recipients: string[] = []
+  if (parts && parts.length > 0) {
+    recipients = parts.map((p: any) => p.user_id as string)
+  } else {
+    const { data: members, error: memErr } = await supabase
+      .from('workspace_members')
+      .select('user_id')
+      .eq('workspace_id', workspaceId)
+    if (memErr) throw new Error(memErr.message)
+    recipients = (members ?? []).map((m: any) => m.user_id as string)
+  }
+  recipients = recipients.filter((id) => id && id !== user.id)
+  if (recipients.length) {
+    const rows = recipients.map((uid) => ({
+      user_id: uid,
+      type: 'message',
+      ref_id: message.id,
+      workspace_id: workspaceId,
+      title: 'New message',
+      body: text.slice(0, 140),
+      is_read: false,
+    }))
+    await supabase.from('notifications').insert(rows as any)
+  }
+  return message
+}
+
+export async function assignTask(taskId: string, assigneeId: string): Promise<{ id: string }>
+{
+  const supabase = createClient()
+  const {
+    data: { user },
+    error: authErr,
+  } = await supabase.auth.getUser()
+  if (authErr) throw new Error(authErr.message)
+  requireUser(user)
+
+  const { data: task, error } = await supabase
+    .from('tasks')
+    .update({ assignee_id: assigneeId } as any)
+    .eq('id', taskId)
+    .select('id, workspace_id, title')
+    .maybeSingle<any>()
+  if (error) throw new Error(error.message)
+  if (!task) throw new Error('Task not found')
+
+  await supabase.from('notifications').insert({
+    user_id: assigneeId,
+    type: 'task_assigned',
+    ref_id: taskId,
+    workspace_id: task.workspace_id ?? null,
+    title: 'Task assigned',
+    body: task.title ? `You were assigned: ${task.title}` : null,
+    is_read: false,
+  } as any)
+
+  return { id: taskId }
+}
+

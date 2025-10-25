@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
@@ -11,7 +11,7 @@ import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import CreateWorkspaceDialog from "@/components/workspaces/CreateWorkspaceDialog";
-import { Search, RefreshCcw, Trash2, X } from "lucide-react";
+import { Search, RefreshCcw, Trash2, X, Users, MessageSquare } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -283,12 +283,21 @@ export default function WorkspacesPage() {
 
                 <Separator className="bg-neutral-200" />
 
-                <div className="p-3 flex items-center justify-end">
-                  <Link
-                    href={`/projects`}
-                    className="inline-flex items-center text-xs font-medium text-neutral-700 hover:text-neutral-900 px-2 py-1.5 rounded-lg hover:bg-neutral-100 transition-colors"
-                  >
-                    View projects
+                <div className="p-3 flex items-center justify-end gap-2">
+                  <Link href={`/workspaces/${w.id}/people`}>
+                    <Button variant="outline" size="sm" className="h-7 rounded-lg border-neutral-300">
+                      <Users className="w-4 h-4 mr-1.5" /> People
+                    </Button>
+                  </Link>
+                  <Link href={`/workspaces/${w.id}/messages`}>
+                    <Button variant="outline" size="sm" className="h-7 rounded-lg border-neutral-300">
+                      <MessageSquare className="w-4 h-4 mr-1.5" /> Messages
+                    </Button>
+                  </Link>
+                  <Link href={`/projects`}>
+                    <Button variant="ghost" size="sm" className="h-7 rounded-lg">
+                      View projects
+                    </Button>
                   </Link>
                 </div>
               </Card>
@@ -310,7 +319,7 @@ export default function WorkspacesPage() {
                 Cancel
               </Button>
               <Button variant="destructive" onClick={onDeleteConfirmed} disabled={deleting}>
-                {deleting ? "Deleting…" : "Delete"}
+                {deleting ? "Deletingâ€¦" : "Delete"}
               </Button>
             </DialogFooter>
           </DialogContent>
@@ -319,3 +328,5 @@ export default function WorkspacesPage() {
     </div>
   );
 }
+
+

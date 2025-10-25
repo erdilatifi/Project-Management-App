@@ -13,7 +13,9 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
-import { Pencil, Trash2, Plus, GripVertical } from "lucide-react";
+import { Pencil, Trash2, Plus, GripVertical, User as UserIcon } from "lucide-react";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { assignTask } from "@/lib/workspaces";
 import {
   DndContext,
   DragEndEvent,
@@ -84,6 +86,9 @@ export default function ProjectTasksBoardPage() {
   const [newTitle, setNewTitle] = useState("");
   const [userId, setUserId] = useState<string | null>(null);
   const [activeId, setActiveId] = useState<UniqueIdentifier | null>(null);
+  const [workspaceId, setWorkspaceId] = useState<string | null>(null);
+  const [members, setMembers] = useState<Array<{ id: string; email: string }>>([]);
+  const [assigneeFilter, setAssigneeFilter] = useState<string>("all");
 
   // Editing state per task
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -129,6 +134,33 @@ export default function ProjectTasksBoardPage() {
         setUserId(data.user?.id ?? null);
       } catch {}
       await load();
+      // load project workspace and its members for assignee picker
+      try {
+        const { data: proj } = await supabase
+          .from("projects")
+          .select("workspace_id")
+          .eq("id", projectId)
+          .maybeSingle<{ workspace_id: string }>();
+        if (proj?.workspace_id) {
+          setWorkspaceId(proj.workspace_id);
+          const { data: wms } = await supabase
+            .from("workspace_members")
+            .select("user_id")
+            .eq("workspace_id", proj.workspace_id);
+          const ids = (wms ?? []).map((r: any) => r.user_id as string);
+          if (ids.length) {
+            const { data: users } = await (supabase as any)
+              .from("auth.users")
+              .select("id, email")
+              .in("id", ids);
+            setMembers(((users ?? []) as any[]).map((u) => ({ id: u.id as string, email: (u.email as string) ?? "user" })));
+          } else {
+            setMembers([]);
+          }
+        }
+      } catch {
+        // ignore
+      }
     };
     init();
   }, [supabase, load]);
@@ -263,6 +295,21 @@ export default function ProjectTasksBoardPage() {
     }
   };
 
+  const onAssign = async (id: string, assigneeId: string | null) => {
+    const prev = items.find((t) => t.id === id);
+    setItems((cur) => cur.map((t) => (t.id === id ? { ...t, assignee_id: assigneeId } : t)));
+    try {
+      if (assigneeId) {
+        await assignTask(id, assigneeId);
+      } else {
+        await updateTask(id, { assignee_id: null });
+      }
+    } catch (e) {
+      setItems((cur) => cur.map((t) => (t.id === id ? { ...t, assignee_id: prev?.assignee_id ?? null } : t)));
+      toast.error((e instanceof Error ? e.message : String(e)) || "Failed to assign task");
+    }
+  };
+
   // UI helpers ----------------------------------------------------------------
   const submitNew = async () => {
     const title = newTitle.trim();
@@ -304,7 +351,22 @@ export default function ProjectTasksBoardPage() {
             <h1 className="text-3xl font-semibold text-neutral-900 tracking-tight">Project Tasks</h1>
             <p className="text-sm text-neutral-600 mt-1">Drag cards between columns to update status.</p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2 text-sm">
+              <span className="text-neutral-700">Assignee:</span>
+              <Select value={assigneeFilter} onValueChange={(v) => setAssigneeFilter(v)}>
+                <SelectTrigger className="h-9 w-[200px] bg-white text-neutral-900 border-neutral-300 rounded-xl">
+                  <SelectValue placeholder="All" />
+                </SelectTrigger>
+                <SelectContent className="bg-white text-neutral-900 border-neutral-200 max-h-64">
+                  <SelectItem value="all">All</SelectItem>
+                  <SelectItem value="none">Unassigned</SelectItem>
+                  {members.map((m) => (
+                    <SelectItem key={m.id} value={m.id}>{m.email}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
             <Input
               value={newTitle}
               onChange={(e) => setNewTitle(e.target.value)}
@@ -353,7 +415,13 @@ export default function ProjectTasksBoardPage() {
                   key={col.id}
                   columnId={col.id}
                   label={col.label}
-                  tasks={items.filter((t) => (t.status ?? "todo") === col.id)}
+                  tasks={items.filter((t) => {
+                    const inCol = (t.status ?? "todo") === col.id
+                    if (!inCol) return false
+                    if (assigneeFilter === 'all') return true
+                    if (assigneeFilter === 'none') return !t.assignee_id
+                    return t.assignee_id === assigneeFilter
+                  })}
                   onEdit={startEdit}
                   onDelete={confirmDelete}
                   editingId={editingId}
@@ -364,6 +432,8 @@ export default function ProjectTasksBoardPage() {
                   onSaveEdit={saveEdit}
                   savingEdit={savingEdit}
                   onChangePriority={onChangePriority}
+                  members={members}
+                  onAssign={onAssign}
                 />
               ))}
             </div>
@@ -408,6 +478,8 @@ interface ColumnProps {
   setEditDescription: (v: string) => void;
   onSaveEdit: (id: string) => void;
   savingEdit: boolean;
+  members: Array<{ id: string; email: string }>;
+  onAssign: (id: string, assigneeId: string | null) => void;
 }
 
 function Column(props: ColumnProps) {
@@ -452,6 +524,8 @@ function Column(props: ColumnProps) {
                 setEditDescription={props.setEditDescription}
                 onSave={() => props.onSaveEdit(t.id)}
                 saving={props.savingEdit}
+                members={props.members}
+                onAssign={props.onAssign}
               />
             ))
           )}
@@ -475,6 +549,8 @@ interface TaskCardProps {
   setEditDescription: (v: string) => void;
   onSave: () => void;
   saving: boolean;
+  members: Array<{ id: string; email: string }>;
+  onAssign: (id: string, assigneeId: string | null) => void;
 }
 
 function TaskCard(props: TaskCardProps) {
@@ -484,6 +560,7 @@ function TaskCard(props: TaskCardProps) {
   : undefined;
 
   const priorityValue = props.task.priority ? String(props.task.priority) : "none";
+  const assigneeValue = props.task.assignee_id ?? "none";
 
   return (
     <div
@@ -504,6 +581,16 @@ function TaskCard(props: TaskCardProps) {
                 <div className="text-neutral-900 font-medium leading-5 line-clamp-2">{props.task.title}</div>
                 {props.task.description ? (
                   <div className="mt-1 text-sm text-neutral-700 line-clamp-3">{props.task.description}</div>
+                ) : null}
+                {props.task.assignee_id ? (
+                  <div className="mt-2 inline-flex items-center gap-2 rounded-full border border-neutral-200 bg-neutral-50 px-2 py-0.5 text-xs text-neutral-700">
+                    <Avatar className="h-5 w-5">
+                      <AvatarFallback>{(props.members.find(m => m.id === props.task.assignee_id)?.email?.[0]?.toUpperCase() ?? '?')}</AvatarFallback>
+                    </Avatar>
+                    <span className="max-w-[140px] truncate">
+                      {props.members.find(m => m.id === props.task.assignee_id)?.email ?? 'User'}
+                    </span>
+                  </div>
                 ) : null}
               </div>
             </div>
@@ -535,6 +622,21 @@ function TaskCard(props: TaskCardProps) {
                   <SelectItem value="3">P3</SelectItem>
                   <SelectItem value="4">P4</SelectItem>
                   <SelectItem value="5">P5</SelectItem>
+                </SelectContent>
+              </Select>
+            </span>
+
+            <span className="inline-flex items-center gap-1 rounded-full border px-2 py-0.5 bg-neutral-50 border-neutral-200">
+              <UserIcon className="w-3.5 h-3.5" />
+              <Select value={assigneeValue} onValueChange={(v) => props.onAssign(props.task.id, v === "none" ? null : v)}>
+                <SelectTrigger className="h-6 w-[180px] border-transparent bg-transparent text-current px-1 focus-visible:ring-0 focus:outline-none">
+                  <SelectValue placeholder="Unassigned" />
+                </SelectTrigger>
+                <SelectContent className="bg-white text-neutral-900 border-neutral-200 max-h-64">
+                  <SelectItem value="none">Unassigned</SelectItem>
+                  {props.members.map((m) => (
+                    <SelectItem key={m.id} value={m.id}>{m.email}</SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </span>

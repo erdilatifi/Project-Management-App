@@ -3,8 +3,8 @@ import Link from 'next/link';
 import React, { useEffect, useMemo, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { IoIosMenu, IoIosClose } from 'react-icons/io';
-import { LogIn, LogOut, Loader2, User } from 'lucide-react';
-import NotificationsBell from '@/components/notifications/NotificationsBell';
+import { LogIn, LogOut, Loader2, User, Home, PanelsTopLeft, FolderKanban } from 'lucide-react';
+import NotificationBell from '@/components/notifications/NotificationBell';
 import { SignOut } from '@/app/actions/AuthActions';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
@@ -147,7 +147,12 @@ useEffect(() => {
             isActive ? 'text-white' : 'text-neutral-200 hover:text-white'
           }`}
         >
-          {name}
+          <span className="inline-flex items-center gap-1">
+            {name === 'Home' && <Home className="w-4 h-4" />}
+            {name === 'Workspaces' && <PanelsTopLeft className="w-4 h-4" />}
+            {name === 'Projects' && <FolderKanban className="w-4 h-4" />}
+            <span>{name}</span>
+          </span>
         </Link>
         <span
           className={`pointer-events-none absolute -bottom-1 left-0  bg-white transition-all duration-200 ease-out ${
@@ -206,7 +211,7 @@ useEffect(() => {
                     </div>
                   ) : user ? (
                     <div className="flex items-center gap-4">
-                      <NotificationsBell />
+                      <NotificationBell />
                       <AvatarChip />
                       <Button
                         onClick={handleSignOut}
