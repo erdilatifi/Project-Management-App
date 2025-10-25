@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 import Link from 'next/link';
 import React, { useEffect, useMemo, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
@@ -124,6 +124,7 @@ useEffect(() => {
 
   const navLinks = [
     { name: 'Home', path: '/' },
+    { name: 'Workspaces', path: '/workspaces' },
     { name: 'Projects', path: '/projects' },
     { name: 'Tasks', path: '/tasks' },
     { name: 'Profile', path: '/profile' },
@@ -172,7 +173,7 @@ useEffect(() => {
         </div>
       )}
       <span className="text-sm font-medium hidden lg:block">
-        {profileLoading ? '…' : displayName}
+        {profileLoading ? 'â€¦' : displayName}
       </span>
     </div>
   );
@@ -201,7 +202,7 @@ useEffect(() => {
                   {isLoading ? (
                     <div className="flex items-center gap-2 text-neutral-300">
                       <Loader2 className="w-4 h-4 animate-spin" />
-                      <span className="text-sm">Loading…</span>
+                      <span className="text-sm">Loadingâ€¦</span>
                     </div>
                   ) : user ? (
                     <div className="flex items-center gap-4">
@@ -217,7 +218,7 @@ useEffect(() => {
                         {isSigningOut ? (
                           <>
                             <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                            Signing out…
+                            Signing outâ€¦
                           </>
                         ) : (
                           <>
@@ -285,7 +286,7 @@ useEffect(() => {
                 {isLoading ? (
                   <div className="flex items-center justify-center gap-2 text-neutral-300 py-2">
                     <Loader2 className="w-4 h-4 animate-spin" />
-                    <span className="text-sm">Loading…</span>
+                    <span className="text-sm">Loadingâ€¦</span>
                   </div>
                 ) : user ? (
                   <div className="flex flex-col gap-3">
@@ -303,7 +304,7 @@ useEffect(() => {
                         </div>
                       )}
                       <span className="text-sm font-medium">
-                        {profileLoading ? '…' : displayName}
+                        {profileLoading ? 'â€¦' : displayName}
                       </span>
                     </div>
                     <Button
@@ -318,7 +319,7 @@ useEffect(() => {
                       {isSigningOut ? (
                         <>
                           <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                          Signing out…
+                          Signing outâ€¦
                         </>
                       ) : (
                         <>
