@@ -1,11 +1,13 @@
 "use client"
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, useCallback } from 'react'
 import { useParams } from 'next/navigation'
-import InviteUser from '@/components/workspaces/InviteUser'
+import { InviteUser } from '@/components/workspaces/InviteUser'
 import { createClient } from '@/utils/supabase/client'
 import type { Member } from '@/types/workspaces'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import { toast } from 'sonner'
+import { getWorkspaceRole } from '@/utils/permissions'
 
 export default function WorkspacePeoplePage() {
   const { id } = useParams<{ id: string }>()
@@ -13,6 +15,7 @@ export default function WorkspacePeoplePage() {
   const supabase = useMemo(() => createClient(), [])
   const [rows, setRows] = useState<Member[]>([])
   const [loading, setLoading] = useState(true)
+  const [canManage, setCanManage] = useState(false)
 
   useEffect(() => {
     const load = async () => {
@@ -30,10 +33,11 @@ export default function WorkspacePeoplePage() {
       let emailMap: Record<string, string> = {}
       let avatarMap: Record<string, string | null> = {}
       if (ids.length) {
-        const [{ data: users }, { data: profs }] = await Promise.all([
-          (supabase as any).from('auth.users').select('id, email').in('id', ids),
-          supabase.from('profiles').select('id, avatar_url').in('id', ids),
-        ])
+        const { data: users } = await (supabase as any).rpc('get_auth_users_by_ids', { ids })
+        const { data: profs } = await supabase
+          .from('profiles')
+          .select('id, avatar_url')
+          .in('id', ids)
         emailMap = Object.fromEntries((users ?? []).map((u: any) => [u.id, u.email]))
         avatarMap = Object.fromEntries((profs ?? []).map((p: any) => [p.id, p.avatar_url ?? null]))
       }
@@ -50,6 +54,29 @@ export default function WorkspacePeoplePage() {
     }
     load()
   }, [supabase, workspaceId])
+
+  useEffect(() => {
+    (async () => {
+      const { isAdmin } = await getWorkspaceRole(workspaceId)
+      setCanManage(isAdmin)
+    })()
+  }, [workspaceId])
+
+  const removeMember = useCallback(async (uid: string) => {
+    if (!canManage) return
+    try {
+      const { error } = await supabase
+        .from('workspace_members')
+        .delete()
+        .eq('workspace_id', workspaceId)
+        .eq('user_id', uid)
+      if (error) throw error
+      setRows((cur) => cur.filter((m) => m.user_id !== uid))
+      toast.success('Member removed')
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Failed to remove member')
+    }
+  }, [canManage, supabase, workspaceId])
 
   return (
     <div className="p-6 space-y-6 w-full">
@@ -86,7 +113,15 @@ export default function WorkspacePeoplePage() {
                     <span className="truncate">{m.email}</span>
                   </div>
                   <div className="uppercase text-[11px] tracking-wide text-neutral-600">{m.role}</div>
-                  <div className="text-neutral-400 text-xs">Owner-managed</div>
+                  <div className="text-neutral-400 text-xs">
+                    {canManage && m.role !== 'owner' ? (
+                      <button className="text-xs px-2 h-7 rounded border border-neutral-300 bg-white hover:bg-neutral-50" onClick={() => removeMember(m.user_id)}>
+                        Remove
+                      </button>
+                    ) : (
+                      'Owner-managed'
+                    )}
+                  </div>
                 </li>
               ))}
             </ul>

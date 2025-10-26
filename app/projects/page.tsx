@@ -19,6 +19,7 @@ import { Search, RefreshCcw, FolderPlus, ChevronLeft, ChevronRight, X } from "lu
 export default function ProjectsPage() {
   const supabase = useMemo(() => createClient(), []);
   const [booting, setBooting] = useState(true);
+  const [userId, setUserId] = useState<string | null>(null);
   const {
     items,
     loading,
@@ -44,6 +45,7 @@ export default function ProjectsPage() {
       try {
         const { data: userRes } = await supabase.auth.getUser();
         const uid = userRes.user?.id;
+        setUserId(uid ?? null);
         if (!uid) {
           setBooting(false);
           return;
@@ -225,11 +227,13 @@ export default function ProjectsPage() {
                           </div>
                         </div>
 
-                        <EditProjectMenu
-                          project={{ id: p.id, name: p.name, description: p.description }}
-                          onUpdated={onUpdated}
-                          onDeleted={(id) => setItems((cur) => cur.filter((it) => it.id !== id))}
-                        />
+                        {userId && p.created_by === userId ? (
+                          <EditProjectMenu
+                            project={{ id: p.id, name: p.name, description: p.description }}
+                            onUpdated={onUpdated}
+                            onDeleted={(id) => setItems((cur) => cur.filter((it) => it.id !== id))}
+                          />
+                        ) : null}
                       </div>
 
                       {p.description ? (

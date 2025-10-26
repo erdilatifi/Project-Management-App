@@ -31,6 +31,19 @@ export async function inviteUserToWorkspace(workspaceId: string, email: string):
   if (authErr) throw new Error(authErr.message)
   requireUser(user)
 
+  // Permission: only workspace owner/admin can invite
+  const { data: membership } = await supabase
+    .from('workspace_members')
+    .select('role')
+    .eq('workspace_id', workspaceId)
+    .eq('user_id', user.id)
+    .maybeSingle<{ role: 'owner' | 'admin' | 'member' | 'viewer' }>()
+  const role = membership?.role ?? null
+  const isAdmin = role === 'owner' || role === 'admin'
+  if (!isAdmin) {
+    throw new Error('Not allowed')
+  }
+
   const token = randToken(12)
   const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
 
@@ -61,82 +74,21 @@ export async function acceptInvitation(token: string): Promise<{ workspace: { id
   if (authErr) throw new Error(authErr.message)
   requireUser(user)
 
-  const { data: invite, error: invErr } = await supabase
-    .from('workspace_invitations')
-    .select('*, workspaces!inner(id, name, owner_id)')
-    .eq('token', token)
-    .eq('status', 'pending')
-    .gt('expires_at', new Date().toISOString())
-    .maybeSingle<any>()
-
-  if (invErr) throw new Error(invErr.message)
-  if (!invite) throw new Error('Invitation not found or expired')
-
-  // Optional: enforce email match if available on the user
-  const userEmail = user.email?.toLowerCase()
-  if (userEmail && invite.email && invite.email.toLowerCase() !== userEmail) {
-    throw new Error('This invitation is for a different email')
-  }
-
-  const workspaceId = invite.workspace_id as string
-  const ownerId = invite.workspaces.owner_id as string
-
-  // Upsert member role
-  const { error: upsertErr } = await supabase
-    .from('workspace_members')
-    .upsert(
-      { workspace_id: workspaceId, user_id: user.id, role: 'member' } as any,
-      { onConflict: 'workspace_id,user_id' }
-    )
-  if (upsertErr) throw new Error(upsertErr.message)
-
-  // Mark invitation accepted
-  const { error: statusErr } = await supabase
-    .from('workspace_invitations')
-    .update({ status: 'accepted' })
-    .eq('id', invite.id)
-  if (statusErr) throw new Error(statusErr.message)
-
-  // Notifications for self and owner
-  const notifications: Array<Partial<AppNotification>> = [
-    {
-      user_id: user.id,
-      type: 'invite',
-      ref_id: invite.id,
-      workspace_id: workspaceId,
-      title: 'Joined workspace',
-      body: `You joined ${invite.workspaces.name}`,
-      is_read: false,
-    },
-  ]
-  if (ownerId && ownerId !== user.id) {
-    notifications.push({
-      user_id: ownerId,
-      type: 'invite',
-      ref_id: invite.id,
-      workspace_id: workspaceId,
-      title: 'Invitation accepted',
-      body: `${userEmail ?? 'A user'} accepted your invitation`,
-      is_read: false,
-    })
-  }
-  await supabase.from('notifications').insert(notifications as any)
-
-  return { workspace: { id: invite.workspaces.id, name: invite.workspaces.name, owner_id: ownerId } }
+  // Use secure RPC to accept invitation and create membership server-side
+  const { data, error } = await (supabase as any).rpc('accept_workspace_invitation', { invite_token: token })
+  if (error) throw new Error(error.message)
+  const row = (Array.isArray(data) ? data[0] : data) as { workspace_id: string; name: string; owner_id: string }
+  if (!row) throw new Error('Invitation not found or expired')
+  return { workspace: { id: row.workspace_id, name: row.name, owner_id: row.owner_id } }
 }
 
 export async function searchUsersByEmailLike(term: string): Promise<Array<{ id: string; email: string }>> {
   const supabase = createClient()
-  const t = term.trim().toLowerCase()
+  const t = term.trim()
   if (!t) return []
-  // In development, read from auth.users directly
-  const { data, error } = await (supabase as SupabaseClient)
-    .from('auth.users' as any)
-    .select('id, email')
-    .ilike('email', `%${t}%`)
-    .limit(10)
+  const { data, error } = await (supabase as SupabaseClient).rpc('search_auth_users', { q: t })
   if (error) throw new Error(error.message)
-  return (data ?? []).filter((u: any) => !!u.email)
+  return (data ?? []).filter((u: any) => !!u.email && !!u.id)
 }
 
 export async function createThread(workspaceId: string, title?: string): Promise<MessageThread> {
@@ -223,6 +175,29 @@ export async function assignTask(taskId: string, assigneeId: string): Promise<{ 
   if (authErr) throw new Error(authErr.message)
   requireUser(user)
 
+  // Load task to determine workspace
+  const { data: taskRow, error: taskErr } = await supabase
+    .from('tasks')
+    .select('id, workspace_id, title')
+    .eq('id', taskId)
+    .maybeSingle<{ id: string; workspace_id: string | null; title: string | null }>()
+  if (taskErr) throw new Error(taskErr.message)
+  if (!taskRow) throw new Error('Task not found')
+
+  const workspaceId = taskRow.workspace_id as string | null
+  if (!workspaceId) throw new Error('Task workspace unknown')
+
+  // Permission: only owner/admin can assign
+  const { data: membership } = await supabase
+    .from('workspace_members')
+    .select('role')
+    .eq('workspace_id', workspaceId)
+    .eq('user_id', user.id)
+    .maybeSingle<{ role: 'owner' | 'admin' | 'member' | 'viewer' }>()
+  const role = membership?.role ?? null
+  const isAdmin = role === 'owner' || role === 'admin'
+  if (!isAdmin) throw new Error('Not allowed')
+
   const { data: task, error } = await supabase
     .from('tasks')
     .update({ assignee_id: assigneeId } as any)
@@ -244,4 +219,3 @@ export async function assignTask(taskId: string, assigneeId: string): Promise<{ 
 
   return { id: taskId }
 }
-

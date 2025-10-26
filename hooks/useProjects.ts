@@ -45,18 +45,37 @@ export function useProjects(initial: Partial<LoadParams> = {}) {
       setLoading(true);
       setError(null);
       try {
+        const { data: userRes } = await supabase.auth.getUser();
+        const uid = userRes.user?.id ?? null;
         const from = (p - 1) * size;
         const to = from + size - 1;
 
-        // Base query with filters
+        // Build filters without relying on PostgREST join relationships
         let query = supabase
           .from("projects")
-          .select("id, workspace_id, name, description, created_by, created_at, is_archived", {
-            count: "exact",
-          })
+          .select(
+            "id, workspace_id, name, description, created_by, created_at, is_archived",
+            { count: "exact" }
+          )
           .order("created_at", { ascending: false });
 
-        if (ws) query = query.eq("workspace_id", ws);
+        if (ws) {
+          query = query.eq("workspace_id", ws);
+        } else if (uid) {
+          const { data: memberships, error: memErr } = await supabase
+            .from("workspace_members")
+            .select("workspace_id")
+            .eq("user_id", uid);
+          if (memErr) throw memErr;
+          const wsIds = (memberships ?? []).map((r: any) => r.workspace_id as string);
+          if (wsIds.length === 0) {
+            setItems([]);
+            setTotal(0);
+            setLoading(false);
+            return;
+          }
+          query = query.in("workspace_id", wsIds);
+        }
         if (q && q.trim().length) {
           const like = `%${q.trim()}%`;
           query = query.or(
@@ -66,7 +85,16 @@ export function useProjects(initial: Partial<LoadParams> = {}) {
 
         const { data, error, count } = await query.range(from, to);
         if (error) throw error;
-        setItems(data ?? []);
+        const rows = (data ?? []).map((r: any) => ({
+          id: r.id,
+          workspace_id: r.workspace_id,
+          name: r.name,
+          description: r.description,
+          created_by: r.created_by,
+          created_at: r.created_at,
+          is_archived: r.is_archived ?? null,
+        })) as ProjectRow[];
+        setItems(rows);
         setTotal(count ?? 0);
       } catch (e: any) {
         setError(e?.message ?? "Failed to load projects");
@@ -128,4 +156,3 @@ export function useProjects(initial: Partial<LoadParams> = {}) {
     setItems, // allow optimistic updates
   } as const;
 }
-

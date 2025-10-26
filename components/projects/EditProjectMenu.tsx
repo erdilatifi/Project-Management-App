@@ -37,7 +37,12 @@ export default function EditProjectMenu({ project, onUpdated, onDeleted }: Props
       if (data && onUpdated) onUpdated(data as any);
       setOpen(false);
     } catch (e: any) {
-      toast.error(e?.message ?? "Failed to update project");
+      const msg = e?.message || 'Failed to update project'
+      if (String(msg).toLowerCase().includes('permission') || String(msg).toLowerCase().includes('not allowed')) {
+        toast.error('Not allowed')
+      } else {
+        toast.error(msg)
+      }
     } finally {
       setSaving(false);
     }
@@ -55,7 +60,12 @@ export default function EditProjectMenu({ project, onUpdated, onDeleted }: Props
       toast.success("Project archived");
       if (data && onUpdated) onUpdated(data as any);
     } catch (e: any) {
-      toast.error(e?.message ?? "Failed to archive project");
+      const msg = e?.message || 'Failed to archive project'
+      if (String(msg).toLowerCase().includes('permission') || String(msg).toLowerCase().includes('not allowed')) {
+        toast.error('Not allowed')
+      } else {
+        toast.error(msg)
+      }
     }
   };
 
@@ -74,7 +84,12 @@ export default function EditProjectMenu({ project, onUpdated, onDeleted }: Props
       setDeleteOpen(false);
       setOpen(false);
     } catch (e: any) {
-      toast.error(e?.message ?? "Failed to delete project");
+      const msg = e?.message || 'Failed to delete project'
+      if (String(msg).toLowerCase().includes('permission') || String(msg).toLowerCase().includes('not allowed')) {
+        toast.error('Not allowed')
+      } else {
+        toast.error(msg)
+      }
     } finally {
       setDeleting(false);
     }

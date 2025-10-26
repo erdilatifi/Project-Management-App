@@ -89,6 +89,7 @@ export default function ProjectTasksBoardPage() {
   const [workspaceId, setWorkspaceId] = useState<string | null>(null);
   const [members, setMembers] = useState<Array<{ id: string; email: string }>>([]);
   const [assigneeFilter, setAssigneeFilter] = useState<string>("all");
+  const [canAssign, setCanAssign] = useState<boolean>(false);
 
   // Editing state per task
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -149,13 +150,27 @@ export default function ProjectTasksBoardPage() {
             .eq("workspace_id", proj.workspace_id);
           const ids = (wms ?? []).map((r: any) => r.user_id as string);
           if (ids.length) {
-            const { data: users } = await (supabase as any)
-              .from("auth.users")
-              .select("id, email")
-              .in("id", ids);
-            setMembers(((users ?? []) as any[]).map((u) => ({ id: u.id as string, email: (u.email as string) ?? "user" })));
+            try {
+              const { data: users } = await (supabase as any).rpc('get_auth_users_by_ids', { ids })
+              setMembers(((users ?? []) as any[]).map((u) => ({ id: u.id as string, email: (u.email as string) ?? 'user' })))
+            } catch {
+              setMembers([])
+            }
           } else {
             setMembers([]);
+          }
+
+          // Determine assign permission (owner/admin only)
+          try {
+            const { data: me } = await supabase
+              .from('workspace_members')
+              .select('role')
+              .eq('workspace_id', proj.workspace_id)
+              .maybeSingle<{ role: 'owner'|'admin'|'member'|'viewer' }>()
+            const role = me?.role ?? null
+            setCanAssign(role === 'owner' || role === 'admin')
+          } catch {
+            setCanAssign(false)
           }
         }
       } catch {
@@ -238,7 +253,12 @@ export default function ProjectTasksBoardPage() {
       if (error) throw error;
       setItems((cur) => cur.map((t) => (t.id === id ? data : t)));
     } catch (e: unknown) {
-      toast.error((e instanceof Error ? e.message : String(e)) || "Failed to update task");
+      const msg = (e instanceof Error ? e.message : String(e)) || "Failed to update task";
+      if (msg.toLowerCase().includes('permission') || msg.toLowerCase().includes('not allowed')) {
+        toast.error('Not allowed');
+      } else {
+        toast.error(msg);
+      }
       throw e;
     }
   };
@@ -251,7 +271,12 @@ export default function ProjectTasksBoardPage() {
       setItems((cur) => cur.filter((t) => t.id !== id));
       toast.success("Task deleted");
     } catch (e: unknown) {
-      toast.error((e instanceof Error ? e.message : String(e)) || "Failed to delete task");
+      const msg = (e instanceof Error ? e.message : String(e)) || "Failed to delete task";
+      if (msg.toLowerCase().includes('permission') || msg.toLowerCase().includes('not allowed')) {
+        toast.error('Not allowed');
+      } else {
+        toast.error(msg);
+      }
     } finally {
       setDeleting(false);
       setDeleteOpen(false);
@@ -306,7 +331,12 @@ export default function ProjectTasksBoardPage() {
       }
     } catch (e) {
       setItems((cur) => cur.map((t) => (t.id === id ? { ...t, assignee_id: prev?.assignee_id ?? null } : t)));
-      toast.error((e instanceof Error ? e.message : String(e)) || "Failed to assign task");
+      const msg = (e instanceof Error ? e.message : String(e)) || 'Failed to assign task';
+      if (msg.toLowerCase().includes('permission') || msg.toLowerCase().includes('not allowed')) {
+        toast.error('Not allowed');
+      } else {
+        toast.error(msg);
+      }
     }
   };
 
@@ -434,6 +464,8 @@ export default function ProjectTasksBoardPage() {
                   onChangePriority={onChangePriority}
                   members={members}
                   onAssign={onAssign}
+                  currentUserId={userId}
+                  canAssign={canAssign}
                 />
               ))}
             </div>
@@ -480,6 +512,8 @@ interface ColumnProps {
   savingEdit: boolean;
   members: Array<{ id: string; email: string }>;
   onAssign: (id: string, assigneeId: string | null) => void;
+  currentUserId: string | null;
+  canAssign: boolean;
 }
 
 function Column(props: ColumnProps) {
@@ -525,7 +559,9 @@ function Column(props: ColumnProps) {
                 onSave={() => props.onSaveEdit(t.id)}
                 saving={props.savingEdit}
                 members={props.members}
-                onAssign={props.onAssign}
+                onAssign={(assigneeId) => props.onAssign(t.id, assigneeId)}
+                currentUserId={props.currentUserId}
+                canAssign={props.canAssign}
               />
             ))
           )}
@@ -550,7 +586,9 @@ interface TaskCardProps {
   onSave: () => void;
   saving: boolean;
   members: Array<{ id: string; email: string }>;
-  onAssign: (id: string, assigneeId: string | null) => void;
+  onAssign: (assigneeId: string | null) => void;
+  currentUserId: string | null;
+  canAssign: boolean;
 }
 
 function TaskCard(props: TaskCardProps) {
@@ -561,6 +599,7 @@ function TaskCard(props: TaskCardProps) {
 
   const priorityValue = props.task.priority ? String(props.task.priority) : "none";
   const assigneeValue = props.task.assignee_id ?? "none";
+  const canEdit = !!props.currentUserId && props.currentUserId === props.task.created_by;
 
   return (
     <div
@@ -595,14 +634,16 @@ function TaskCard(props: TaskCardProps) {
               </div>
             </div>
 
-            <div className="flex items-center gap-2">
-              <button aria-label="Edit task" className="text-neutral-600 hover:text-neutral-900" onClick={props.onEdit}>
-                <Pencil className="h-4 w-4" />
-              </button>
-              <button aria-label="Delete task" className="text-neutral-600 hover:text-neutral-900" onClick={props.onDelete}>
-                <Trash2 className="h-4 w-4" />
-              </button>
-            </div>
+            {canEdit ? (
+              <div className="flex items-center gap-2">
+                <button aria-label="Edit task" className="text-neutral-600 hover:text-neutral-900" onClick={props.onEdit}>
+                  <Pencil className="h-4 w-4" />
+                </button>
+                <button aria-label="Delete task" className="text-neutral-600 hover:text-neutral-900" onClick={props.onDelete}>
+                  <Trash2 className="h-4 w-4" />
+                </button>
+              </div>
+            ) : null}
           </div>
 
           <div className="mt-3 flex items-center flex-wrap gap-2 text-xs text-neutral-600">
@@ -626,20 +667,22 @@ function TaskCard(props: TaskCardProps) {
               </Select>
             </span>
 
-            <span className="inline-flex items-center gap-1 rounded-full border px-2 py-0.5 bg-neutral-50 border-neutral-200">
-              <UserIcon className="w-3.5 h-3.5" />
-              <Select value={assigneeValue} onValueChange={(v) => props.onAssign(props.task.id, v === "none" ? null : v)}>
-                <SelectTrigger className="h-6 w-[180px] border-transparent bg-transparent text-current px-1 focus-visible:ring-0 focus:outline-none">
-                  <SelectValue placeholder="Unassigned" />
-                </SelectTrigger>
-                <SelectContent className="bg-white text-neutral-900 border-neutral-200 max-h-64">
-                  <SelectItem value="none">Unassigned</SelectItem>
-                  {props.members.map((m) => (
-                    <SelectItem key={m.id} value={m.id}>{m.email}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </span>
+            {props.canAssign ? (
+              <span className="inline-flex items-center gap-1 rounded-full border px-2 py-0.5 bg-neutral-50 border-neutral-200">
+                <UserIcon className="w-3.5 h-3.5" />
+                <Select value={assigneeValue} onValueChange={(v) => props.onAssign(v === "none" ? null : v)}>
+                  <SelectTrigger className="h-6 w-[180px] border-transparent bg-transparent text-current px-1 focus-visible:ring-0 focus:outline-none">
+                    <SelectValue placeholder="Unassigned" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-white text-neutral-900 border-neutral-200 max-h-64">
+                    <SelectItem value="none">Unassigned</SelectItem>
+                    {props.members.map((m) => (
+                      <SelectItem key={m.id} value={m.id}>{m.email}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </span>
+            ) : null}
 
             <span className="text-neutral-500">Created {new Date(props.task.created_at).toLocaleString()}</span>
           </div>

@@ -39,6 +39,7 @@ export default function WorkspacesPage() {
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [wsToDelete, setWsToDelete] = useState<WorkspaceRow | null>(null);
+  const [userId, setUserId] = useState<string | null>(null);
 
   const searchRef = useRef<HTMLInputElement>(null);
 
@@ -46,10 +47,31 @@ export default function WorkspacesPage() {
     setLoading(true);
     setError(null);
     try {
+      const { data: userRes } = await supabase.auth.getUser();
+      const uid = userRes.user?.id ?? null;
+
+      // Fetch memberships first and then filter workspaces by IDs
+      let ids: string[] | null = null;
+      if (uid) {
+        const { data: memberships, error: memErr } = await supabase
+          .from("workspace_members")
+          .select("workspace_id")
+          .eq("user_id", uid);
+        if (memErr) throw memErr;
+        ids = (memberships ?? []).map((r: any) => r.workspace_id as string);
+        if ((ids?.length ?? 0) === 0) {
+          setItems([]);
+          setLoading(false);
+          return;
+        }
+      }
+
       let query = supabase
         .from("workspaces")
         .select("id, name, slug, description, owner_id, created_at")
         .order("created_at", { ascending: false });
+
+      if (ids && ids.length) query = query.in("id", ids);
 
       if (search.trim()) {
         const like = `%${search.trim()}%`;
@@ -58,7 +80,16 @@ export default function WorkspacesPage() {
 
       const { data, error } = await query;
       if (error) throw error;
-      setItems(data ?? []);
+      // strip relation field when setting items
+      const out = (data ?? []).map((w: any) => ({
+        id: w.id,
+        name: w.name,
+        slug: w.slug,
+        description: w.description,
+        owner_id: w.owner_id,
+        created_at: w.created_at,
+      })) as WorkspaceRow[];
+      setItems(out);
     } catch (e: any) {
       setError(e?.message ?? "Failed to load workspaces");
     } finally {
@@ -70,6 +101,16 @@ export default function WorkspacesPage() {
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => {
+    const initUser = async () => {
+      try {
+        const { data } = await supabase.auth.getUser();
+        setUserId(data.user?.id ?? null);
+      } catch {}
+    };
+    initUser();
+  }, [supabase]);
 
   useEffect(() => {
     if (error) toast.error(error);
@@ -102,7 +143,12 @@ export default function WorkspacesPage() {
       setConfirmOpen(false);
       setWsToDelete(null);
     } catch (e: any) {
-      toast.error(e?.message ?? "Failed to delete workspace");
+      const msg = e?.message || "Failed to delete workspace";
+      if (msg.toLowerCase().includes("permission") || msg.toLowerCase().includes("not allowed")) {
+        toast.error("Not allowed");
+      } else {
+        toast.error(msg);
+      }
     } finally {
       setDeleting(false);
     }
@@ -224,7 +270,7 @@ export default function WorkspacesPage() {
                           name: ws.name,
                           slug: null,
                           description: null,
-                          owner_id: "",
+                          owner_id: userId ?? "",
                           created_at: new Date().toISOString()
                         },
                         ...cur
@@ -262,15 +308,17 @@ export default function WorkspacesPage() {
                     </div>
 
                     <div className="flex items-center gap-2 shrink-0">
-                      <Button
-                        variant="destructive"
-                        size="sm"
-                        onClick={() => onDelete(w)}
-                        className="rounded-lg"
-                        title={`Delete ${w.name}`}
-                      >
-                        <Trash2 className="mr-1.5 h-4 w-4" /> Delete
-                      </Button>
+                      {userId && userId === w.owner_id ? (
+                        <Button
+                          variant="destructive"
+                          size="sm"
+                          onClick={() => onDelete(w)}
+                          className="rounded-lg"
+                          title={`Delete ${w.name}`}
+                        >
+                          <Trash2 className="mr-1.5 h-4 w-4" /> Delete
+                        </Button>
+                      ) : null}
                     </div>
                   </div>
 
