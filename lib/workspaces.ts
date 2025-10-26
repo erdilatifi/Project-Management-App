@@ -198,6 +198,22 @@ export async function assignTask(taskId: string, assigneeId: string): Promise<{ 
   const isAdmin = role === 'owner' || role === 'admin'
   if (!isAdmin) throw new Error('Not allowed')
 
+  // Additional rule: admins cannot assign tasks to themselves
+  if (role === 'admin' && assigneeId === user.id) {
+    throw new Error('Admins cannot assign themselves')
+  }
+
+  // Validate that the target assignee is a member of this workspace
+  const { data: assigneeMembership } = await supabase
+    .from('workspace_members')
+    .select('user_id')
+    .eq('workspace_id', workspaceId)
+    .eq('user_id', assigneeId)
+    .maybeSingle<{ user_id: string }>()
+  if (!assigneeMembership) {
+    throw new Error('Assignee must be a member of the workspace')
+  }
+
   const { data: task, error } = await supabase
     .from('tasks')
     .update({ assignee_id: assigneeId } as any)

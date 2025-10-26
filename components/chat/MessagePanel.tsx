@@ -558,7 +558,7 @@ export default function MessagePanel({ threadId, workspaceId }: Props) {
                     </div>
                   ) : (
                     <>
-                      <div className="whitespace-pre-wrap break-words">{m.body}</div>
+                      <div className="whitespace-pre-wrap wrap-break-words">{m.body}</div>
                       <div className="mt-1 text-[10px] opacity-70 flex items-center gap-2">
                         <span>{formatTimeAgo(m.created_at)}</span>
                         {editedIds.has(m.id) && <span className="opacity-70">(edited)</span>}

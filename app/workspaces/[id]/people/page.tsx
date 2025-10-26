@@ -32,21 +32,39 @@ export default function WorkspacePeoplePage() {
       const ids = (members ?? []).map((m: any) => m.user_id)
       let emailMap: Record<string, string> = {}
       let avatarMap: Record<string, string | null> = {}
+      let nameMap: Record<string, string | null> = {}
       if (ids.length) {
         const { data: users } = await (supabase as any).rpc('get_auth_users_by_ids', { ids })
         const { data: profs } = await supabase
           .from('profiles')
-          .select('id, avatar_url')
+          .select('id, avatar_url, full_name')
           .in('id', ids)
         emailMap = Object.fromEntries((users ?? []).map((u: any) => [u.id, u.email]))
         avatarMap = Object.fromEntries((profs ?? []).map((p: any) => [p.id, p.avatar_url ?? null]))
+        nameMap = Object.fromEntries((profs ?? []).map((p: any) => [p.id, (p.full_name as string | null) ?? null]))
+
+        // Fallback: for any IDs still missing emails, try public view
+        const missingEmailIds = ids.filter((x) => !emailMap[x])
+        if (missingEmailIds.length) {
+          try {
+            const { data: more } = await supabase
+              .from('auth_users_public')
+              .select('id, email')
+              .in('id', missingEmailIds)
+            ;(more ?? []).forEach((u: any) => {
+              if (u?.id && u?.email && !emailMap[u.id]) emailMap[u.id] = u.email
+            })
+          } catch {
+            // ignore, best-effort
+          }
+        }
       }
       setRows(
         (members ?? []).map((m: any) => ({
           workspace_id: m.workspace_id,
           user_id: m.user_id,
           role: m.role,
-          email: emailMap[m.user_id] ?? 'user',
+          email: (nameMap[m.user_id]?.trim() || emailMap[m.user_id] || 'Unknown'),
           avatar_url: avatarMap[m.user_id] ?? null,
         }))
       )
