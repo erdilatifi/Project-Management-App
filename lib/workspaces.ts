@@ -186,16 +186,22 @@ export async function sendMessage(threadId: string, workspaceId: string, body: s
   }
   recipients = recipients.filter((id) => id && id !== user.id)
   if (recipients.length) {
-    const rows = recipients.map((uid) => ({
-      user_id: uid,
-      type: 'message',
-      ref_id: message.id,
-      workspace_id: workspaceId,
-      title: 'New message',
-      body: text.slice(0, 140),
-      is_read: false,
-    }))
-    await supabase.from('notifications').insert(rows as any)
+    const type = text.match(/@\w+/) ? 'message_mention' : 'message_new'
+    try {
+      await fetch('/api/notifications/fanout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type,
+          actorId: user.id,
+          recipients,
+          workspaceId,
+          threadId: threadId,
+          messageId: message.id,
+          meta: { actor_name: null, snippet: text.slice(0, 140) },
+        }),
+      })
+    } catch {}
   }
   return message
 }

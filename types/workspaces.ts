@@ -28,7 +28,7 @@ export type Message = {
   created_at: string
 }
 
-export type NotificationType = 'message' | 'task_assigned' | 'invite'
+export type NotificationType = 'message' | 'task_assigned' | 'invite' | 'task_update'
 
 export type Notification = {
   id: string

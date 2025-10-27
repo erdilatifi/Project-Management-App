@@ -128,7 +128,6 @@ useEffect(() => {
     { name: 'Projects', path: '/projects' },
     { name: 'Tasks', path: '/tasks' },
     { name: 'Profile', path: '/profile' },
-    { name: 'Dashboard', path: '/dashboard' },
   ];
 
   const displayName = useMemo(

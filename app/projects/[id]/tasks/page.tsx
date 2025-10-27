@@ -540,11 +540,45 @@ export default function ProjectTasksBoardPage() {
       )
       .single<TaskRow>();
     if (error) throw error;
+    try {
+      const actor = (await supabase.auth.getUser()).data.user?.id ?? 'system'
+      // Assignee notification (fanout)
+      if (data?.assignee_id && data.assignee_id !== userId) {
+        await fetch('/api/notifications/fanout', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            type: 'task_assigned',
+            actorId: actor,
+            recipients: [data.assignee_id],
+            workspaceId: data.workspace_id ?? workspaceId ?? null,
+            projectId: data.project_id,
+            taskId: data.id,
+            meta: { task_title: data.title },
+          }),
+        })
+      }
+      // Unassigned → notify admins/owners
+      const wsId = data?.workspace_id ?? workspaceId ?? null
+      if (wsId && !data?.assignee_id) {
+        const { data: admins } = await supabase
+          .from('workspace_members')
+          .select('user_id, role')
+          .eq('workspace_id', wsId)
+          .in('role', ['owner', 'admin'] as any)
+        const recipients = (admins ?? [])
+          .map((r: any) => String(r.user_id))
+          .filter((uid) => uid && uid !== userId)
+        if (recipients.length) {
+          await fetch('/api/notifications/fanout', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ type: 'task_created', actorId: actor, recipients, workspaceId: wsId, projectId: data.project_id, taskId: data.id, meta: { task_title: data.title } }) })
+        }
+      }
+    } catch {}
     return data;
   };
 
   const updateTask = async (id: string, patch: Partial<TaskRow>) => {
     try {
+      const prev = items.find((t) => t.id === id) || null;
       const { data, error } = await supabase
         .from("tasks")
         .update(patch)
@@ -555,6 +589,18 @@ export default function ProjectTasksBoardPage() {
         .single<TaskRow>();
       if (error) throw error;
       setItems((cur) => cur.map((t) => (t.id === id ? data : t)));
+      // Notify on status change (fanout)
+      if (prev && typeof patch.status !== "undefined" && prev.status !== data.status) {
+        const actor = (await supabase.auth.getUser()).data.user?.id ?? "system";
+        const recipients = new Set<string>();
+        if (data.assignee_id && data.assignee_id !== actor) recipients.add(data.assignee_id);
+        if (data.created_by && data.created_by !== actor) recipients.add(data.created_by);
+        if (recipients.size) {
+          try {
+            await fetch('/api/notifications/fanout', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ type: 'task_update', actorId: actor, recipients: Array.from(recipients), workspaceId: data.workspace_id ?? workspaceId ?? null, projectId: data.project_id, taskId: data.id, meta: { task_title: data.title } }) })
+          } catch {}
+        }
+      }
     } catch (e: unknown) {
       const msg =
         (e instanceof Error ? e.message : String(e)) || "Failed to update task";

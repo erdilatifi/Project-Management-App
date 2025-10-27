@@ -1,7 +1,7 @@
 import { createClient } from '@/utils/supabase/client'
 
 export type NotificationRow = {
-  id: number
+  id: string
   user_id: string
   type: string
   title: string
@@ -24,7 +24,7 @@ export async function fetchNotificationsForUser(userId: string, limit = 20) {
   return (data || []) as NotificationRow[]
 }
 
-export async function markNotificationRead(id: number, isRead = true) {
+export async function markNotificationRead(id: string, isRead = true) {
   const supabase = createClient()
   const { data, error } = await supabase
     .from('notifications')
@@ -56,4 +56,3 @@ export async function createNotification(input: Omit<NotificationRow, 'id' | 'cr
   if (error) throw error
   return data as NotificationRow
 }
-

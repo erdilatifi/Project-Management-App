@@ -312,9 +312,41 @@ export default function MessagePanel({ threadId, workspaceId }: Props) {
       return data as Message;
     },
     onError: (e: any) => toast.error(e?.message ?? "Failed to send message"),
-    onSuccess: (msg) => {
+    onSuccess: async (msg) => {
       setItems((cur) => (cur.some((x) => x.id === msg.id) ? cur : [...cur, msg]));
       setTimeout(scrollToBottom, 0);
+
+      // Fanout notifications to participants or workspace members (exclude author)
+      try {
+        const actor = userId;
+        if (!actor) return;
+        let recipients = participants.map((p) => p.id).filter((id) => id && id !== actor);
+        if (!recipients.length) {
+          const { data: members } = await supabase
+            .from('workspace_members')
+            .select('user_id')
+            .eq('workspace_id', workspaceId);
+          recipients = (members ?? [])
+            .map((m: any) => String(m.user_id))
+            .filter((id) => id && id !== actor);
+        }
+        if (recipients.length) {
+          const type = /@\w+/.test(msg.body) ? 'message_mention' : 'message_new';
+          await fetch('/api/notifications/fanout', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              type,
+              actorId: actor,
+              recipients,
+              workspaceId,
+              threadId,
+              messageId: msg.id,
+              meta: { actor_name: null, snippet: (msg.body || '').slice(0, 140) },
+            }),
+          });
+        }
+      } catch {}
     },
   });
 

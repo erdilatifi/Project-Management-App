@@ -7,31 +7,39 @@ import { useAuth } from '@/app/context/ContextApiProvider'
 import { formatTimeAgo } from '@/lib/time'
 import { Button } from '@/components/ui/button'
 import { toast } from 'sonner'
-import type { Notification as AppNotification } from '@/types/workspaces'
+import { subscribeToNotifications } from '@/lib/notifications/subscribe'
 import { useRouter } from 'next/navigation'
+
+type Item = {
+  id: string
+  type: string
+  title: string | null
+  body: string | null
+  created_at: string
+  is_read: boolean
+  workspace_id?: string | null
+  ref_id?: string | null
+}
 
 export default function NotificationBell() {
   const supabase = useMemo(() => createClient(), [])
   const { user } = useAuth()
   const router = useRouter()
   const [open, setOpen] = useState(false)
-  const [items, setItems] = useState<AppNotification[]>([])
+  const [items, setItems] = useState<Item[]>([])
   const subscribed = useRef(false)
 
   const load = useCallback(async () => {
     if (!user?.id) return
-    const { data, error } = await supabase
-      .from('notifications')
-      .select('*')
-      .eq('user_id', user.id)
-      .order('created_at', { ascending: false })
-      .limit(15)
-    if (error) {
-      console.error(error)
-      return
+    try {
+      const res = await fetch(`/api/notifications?limit=15`, { cache: 'no-store' })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json?.error || 'Failed to load notifications')
+      setItems(json.items as Item[])
+    } catch (e: any) {
+      toast.error(e?.message ?? 'Failed to load notifications')
     }
-    setItems((data ?? []) as AppNotification[])
-  }, [supabase, user?.id])
+  }, [user?.id])
 
   useEffect(() => {
     setItems([])
@@ -40,33 +48,46 @@ export default function NotificationBell() {
 
   useEffect(() => {
     if (!user?.id || subscribed.current) return
-    const channel = supabase
-      .channel('rt-notifications')
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'notifications', filter: `user_id=eq.${user.id}` }, (payload) => {
-        const n = payload.new as AppNotification
-        setItems((prev) => [n, ...prev].slice(0, 15))
-      })
-      .subscribe()
+    const unsubscribe = subscribeToNotifications(supabase as any, user.id, (p) => {
+      setItems((prev) => ([
+        { id: p.id, type: (p.type ?? 'message_new') as string, title: p.title ?? null, body: p.body ?? null, created_at: p.created_at, is_read: false },
+        ...prev,
+      ]).slice(0, 15))
+    })
     subscribed.current = true
     return () => {
-      supabase.removeChannel(channel)
+      unsubscribe()
       subscribed.current = false
     }
   }, [supabase, user?.id])
 
   const unread = items.filter((i) => !i.is_read).length
 
+
   const markAll = async () => {
     if (!user?.id || unread === 0) return
     const prev = items
     setItems((cur) => cur.map((n) => ({ ...n, is_read: true })))
-    const { error } = await supabase
-      .from('notifications')
-      .update({ is_read: true })
-      .eq('user_id', user.id)
-      .eq('is_read', false)
-    if (error) {
-      toast.error(error.message)
+    try {
+      const res = await fetch('/api/notifications/mark-all-read', { method: 'POST' })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json?.error || 'Failed to mark all read')
+    } catch (e: any) {
+      toast.error(e?.message ?? 'Failed to mark all read')
+      setItems(prev)
+    }
+  }
+
+  const clearAll = async () => {
+    if (!user?.id || items.length === 0) return
+    const prev = items
+    setItems([])
+    try {
+      const res = await fetch('/api/notifications/clear', { method: 'POST' })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json?.error || 'Failed to clear notifications')
+    } catch (e: any) {
+      toast.error(e?.message ?? 'Failed to clear notifications')
       setItems(prev)
     }
   }
@@ -74,23 +95,30 @@ export default function NotificationBell() {
   const markRead = async (id: string) => {
     const prev = items
     setItems((cur) => cur.map((n) => (n.id === id ? { ...n, is_read: true } : n)))
-    const { error } = await supabase.from('notifications').update({ is_read: true }).eq('id', id)
-    if (error) {
-      toast.error(error.message)
+    try {
+      const res = await fetch('/api/notifications/mark-read', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ids: [id] }) })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json?.error || 'Failed to mark read')
+    } catch (e: any) {
+      toast.error(e?.message ?? 'Failed to mark read')
       setItems(prev)
     }
   }
 
-  const onClickItem = async (n: AppNotification) => {
+  const onClickItem = async (n: Item) => {
     await markRead(n.id)
     switch (n.type) {
       case 'message':
-        router.push(`/workspaces/${n.workspace_id}/messages?thread=${n.ref_id}`)
+      case 'message_new':
+      case 'message_mention':
+        if (n.workspace_id && n.ref_id) router.push(`/workspaces/${n.workspace_id}/messages?thread=${n.ref_id}`)
         break
       case 'task_assigned':
+      case 'task_update':
         router.push(`/projects`)
         break
       case 'invite':
+      case 'workspace_invite':
         if (n.workspace_id) router.push(`/workspaces/${n.workspace_id}`)
         else router.push('/workspaces')
         break
@@ -100,14 +128,20 @@ export default function NotificationBell() {
     setOpen(false)
   }
 
-  const iconFor = (t: AppNotification['type']) => {
+  const iconFor = (t: string) => {
     switch (t) {
       case 'message':
+      case 'message_new':
+      case 'message_mention':
         return <MessageSquareText className="w-4 h-4" />
       case 'task_assigned':
+      case 'task_update':
         return <CheckSquare className="w-4 h-4" />
       case 'invite':
+      case 'workspace_invite':
         return <UserPlus className="w-4 h-4" />
+      default:
+        return <Bell className="w-4 h-4" />
     }
   }
 
@@ -126,15 +160,26 @@ export default function NotificationBell() {
         <div className="absolute right-0 mt-2 w-[360px] max-h-[480px] overflow-auto rounded-md border border-neutral-700 bg-black shadow-lg z-50">
           <div className="flex items-center justify-between p-2 border-b border-neutral-800">
             <div className="text-sm text-neutral-300">Notifications</div>
-            <Button
-              variant="outline"
-              size="sm"
-              className="h-7 text-xs border-neutral-700"
-              onClick={markAll}
-              disabled={unread === 0}
-            >
-              Mark all read
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-7 text-xs border-neutral-700"
+                onClick={markAll}
+                disabled={unread === 0}
+              >
+                Mark all read
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-7 text-xs border-neutral-700"
+                onClick={clearAll}
+                disabled={items.length === 0}
+              >
+                Clear all
+              </Button>
+            </div>
           </div>
           {items.length === 0 ? (
             <div className="p-3 text-sm text-neutral-400">No notifications</div>
@@ -151,6 +196,56 @@ export default function NotificationBell() {
                         <div className="ml-auto text-[11px] text-neutral-400 shrink-0">{formatTimeAgo(n.created_at)}</div>
                       </div>
                       {n.body ? <div className="text-xs text-neutral-300 mt-1 whitespace-pre-wrap">{n.body}</div> : null}
+                      {n.type === 'workspace_invite' && (
+                        <div className="mt-2 flex items-center gap-2">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-7 text-xs border-neutral-700"
+                            onClick={async (e) => {
+                              e.stopPropagation()
+                              try {
+                                const res = await fetch('/api/workspaces/invitations/accept', {
+                                  method: 'POST',
+                                  headers: { 'Content-Type': 'application/json' },
+                                  body: JSON.stringify({ workspaceId: n.workspace_id, notificationId: n.id }),
+                                })
+                                const json = await res.json()
+                                if (!res.ok) throw new Error(json?.error || 'Failed to accept invitation')
+                                await markRead(n.id)
+                                toast.success('Invitation accepted')
+                              } catch (err: any) {
+                                toast.error(err?.message ?? 'Failed to accept invitation')
+                              }
+                            }}
+                          >
+                            Accept
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-7 text-xs border-neutral-700"
+                            onClick={async (e) => {
+                              e.stopPropagation()
+                              try {
+                                const res = await fetch('/api/workspaces/invitations/decline', {
+                                  method: 'POST',
+                                  headers: { 'Content-Type': 'application/json' },
+                                  body: JSON.stringify({ workspaceId: n.workspace_id, notificationId: n.id }),
+                                })
+                                const json = await res.json()
+                                if (!res.ok) throw new Error(json?.error || 'Failed to decline invitation')
+                                await markRead(n.id)
+                                toast.success('Invitation declined')
+                              } catch (err: any) {
+                                toast.error(err?.message ?? 'Failed to decline invitation')
+                              }
+                            }}
+                          >
+                            Decline
+                          </Button>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </li>

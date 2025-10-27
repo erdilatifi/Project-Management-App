@@ -60,7 +60,7 @@ export default function NotificationsList() {
     };
   }, [supabase, user?.id]);
 
-  const toggleRead = async (id: number, next: boolean) => {
+  const toggleRead = async (id: string, next: boolean) => {
     try {
       setItems((prev) => prev.map((n) => (n.id === id ? { ...n, is_read: next } : n)));
       await markNotificationRead(id, next);

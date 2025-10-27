@@ -8,14 +8,17 @@ import type { Member } from '@/types/workspaces'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { toast } from 'sonner'
 import { getWorkspaceRole } from '@/utils/permissions'
+import { useRouter } from 'next/navigation'
 
 export default function WorkspacePeoplePage() {
   const { id } = useParams<{ id: string }>()
   const workspaceId = id as string
   const supabase = useMemo(() => createClient(), [])
+  const router = useRouter()
   const [rows, setRows] = useState<Member[]>([])
   const [loading, setLoading] = useState(true)
   const [canManage, setCanManage] = useState(false)
+  const [myRole, setMyRole] = useState<string | null>(null)
 
   useEffect(() => {
     const load = async () => {
@@ -75,8 +78,9 @@ export default function WorkspacePeoplePage() {
 
   useEffect(() => {
     (async () => {
-      const { isAdmin } = await getWorkspaceRole(workspaceId)
+      const { isAdmin, role } = await getWorkspaceRole(workspaceId)
       setCanManage(isAdmin)
+      setMyRole(role ?? null)
     })()
   }, [workspaceId])
 
@@ -91,16 +95,56 @@ export default function WorkspacePeoplePage() {
       if (error) throw error
       setRows((cur) => cur.filter((m) => m.user_id !== uid))
       toast.success('Member removed')
+      // Notify the removed user via fanout
+      try {
+        await fetch('/api/notifications/fanout', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            type: 'workspace_removed',
+            actorId: (await supabase.auth.getUser()).data.user?.id ?? 'system',
+            recipients: [uid],
+            workspaceId,
+            meta: {},
+          }),
+        })
+      } catch {}
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Failed to remove member')
     }
   }, [canManage, supabase, workspaceId])
 
+  const onLeave = useCallback(async () => {
+    try {
+      const res = await fetch('/api/workspaces/leave', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ workspaceId }),
+      })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json?.error || 'Failed to leave workspace')
+      toast.success('You left the workspace')
+      router.push('/workspaces')
+    } catch (e: any) {
+      toast.error(e?.message ?? 'Failed to leave workspace')
+    }
+  }, [workspaceId, router])
+
   return (
     <div className="p-6 space-y-6 w-full">
-      <div>
-        <h1 className="text-2xl font-semibold">People</h1>
-        <p className="text-sm text-neutral-500">Invite teammates and manage access.</p>
+      <div className="flex items-start justify-between">
+        <div>
+          <h1 className="text-2xl font-semibold">People</h1>
+          <p className="text-sm text-neutral-500">Invite teammates and manage access.</p>
+        </div>
+        {myRole && myRole !== 'owner' ? (
+          <button
+            className="text-xs px-3 py-2 rounded border border-neutral-300 bg-white hover:bg-neutral-50"
+            onClick={onLeave}
+          >
+            Leave workspace
+          </button>
+        ) : null}
       </div>
 
       <InviteUser workspaceId={workspaceId} />

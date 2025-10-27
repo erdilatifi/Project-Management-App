@@ -8,7 +8,6 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
 
 type Status = "todo" | "in_progress" | "done";
@@ -31,6 +30,52 @@ type ProjectRow = { id: string; name: string | null };
 
 const priorityLabel = (p?: number | null) => (p ? `P${p}` : "None");
 
+// Due-date helpers to match the project tasks page
+type DueCategory = "overdue" | "today" | "nextweek" | "none";
+type DueFilter = "all" | "today" | "nextweek" | "none";
+
+function startOfDay(d: Date) {
+  const dt = new Date(d);
+  dt.setHours(0, 0, 0, 0);
+  return dt;
+}
+function endOfDay(d: Date) {
+  const dt = new Date(d);
+  dt.setHours(23, 59, 59, 999);
+  return dt;
+}
+function plusDays(d: Date, days: number) {
+  const copy = new Date(d);
+  copy.setDate(copy.getDate() + days);
+  return copy;
+}
+function dueCategory(due_at?: string | null): DueCategory {
+  if (!due_at) return "none";
+  const now = new Date();
+  const todayStart = startOfDay(now);
+  const todayEnd = endOfDay(now);
+  const nextWeekEnd = endOfDay(plusDays(now, 7));
+  const due = new Date(due_at);
+  if (isNaN(due.getTime())) return "none";
+  if (due < todayStart) return "overdue";
+  if (due >= todayStart && due <= todayEnd) return "today";
+  if (due > todayEnd && due <= nextWeekEnd) return "nextweek";
+  return "none";
+}
+const dueBadgeClass = (cat: DueCategory) => {
+  switch (cat) {
+    case "overdue":
+      return "bg-red-50 text-red-700 border-red-200";
+    case "today":
+      return "bg-amber-50 text-amber-700 border-amber-200";
+    case "nextweek":
+      return "bg-blue-50 text-blue-700 border-blue-200";
+    case "none":
+    default:
+      return "bg-neutral-50 text-neutral-700 border-neutral-200";
+  }
+};
+
 export default function MyTasksPage() {
   const supabase = useMemo(() => createClient(), []);
 
@@ -41,6 +86,7 @@ export default function MyTasksPage() {
   const [statusFilter, setStatusFilter] = useState<"all" | Status>("all");
   const [search, setSearch] = useState("");
   const [groupBy, setGroupBy] = useState<"none" | "project" | "due">("none");
+  const [dueFilter, setDueFilter] = useState<DueFilter>("all");
 
   // No inline assignment controls on this page
 
@@ -102,7 +148,8 @@ export default function MyTasksPage() {
     const matchesQuery = !q
       ? true
       : t.title.toLowerCase().includes(q) || (t.description ?? "").toLowerCase().includes(q);
-    return matchesStatus && matchesQuery;
+    const matchesDue = dueFilter === "all" ? true : dueCategory(t.due_at) === dueFilter;
+    return matchesStatus && matchesQuery && matchesDue;
   });
 
   // No assignment handler; handled at task creation/board
@@ -135,30 +182,18 @@ export default function MyTasksPage() {
       });
       return Object.keys(by).map((k) => ({ key: k, label: projects[k]?.name ?? "Project", tasks: by[k] }));
     }
-    // due date buckets
-    const now = new Date();
-    const sow = startOfWeek(now);
-    const eow = endOfWeek(now);
-    const buckets: Record<string, { label: string; tasks: TaskRow[] }> = {
-      overdue: { label: "Overdue", tasks: [] },
+    // Due date buckets (overdue folded into Today)
+    const buckets: Record<Exclude<DueCategory, "overdue">, { label: string; tasks: TaskRow[] }> = {
       today: { label: "Due today", tasks: [] },
-      week: { label: "Due this week", tasks: [] },
-      later: { label: "Later", tasks: [] },
+      nextweek: { label: "Next week", tasks: [] },
       none: { label: "No due date", tasks: [] },
     };
     list.forEach((t) => {
-      if (!t.due_at) {
-        buckets.none.tasks.push(t);
-        return;
-      }
-      const due = new Date(t.due_at);
-      const isToday = due.toDateString() === now.toDateString();
-      if (due < new Date(now.toDateString())) buckets.overdue.tasks.push(t);
-      else if (isToday) buckets.today.tasks.push(t);
-      else if (due >= sow && due <= eow) buckets.week.tasks.push(t);
-      else buckets.later.tasks.push(t);
+      const cat = dueCategory(t.due_at);
+      const key = cat === "overdue" ? "today" : cat;
+      buckets[key].tasks.push(t);
     });
-    return ["overdue", "today", "week", "later", "none"].map((k) => ({ key: k, label: buckets[k].label, tasks: buckets[k].tasks }));
+    return (["today", "nextweek", "none"] as const).map((k) => ({ key: k, label: buckets[k].label, tasks: buckets[k].tasks }));
   };
   const groups = groupTasks(filtered);
 
@@ -186,6 +221,17 @@ export default function MyTasksPage() {
                 <SelectItem value="todo">To do</SelectItem>
                 <SelectItem value="in_progress">In progress</SelectItem>
                 <SelectItem value="done">Done</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={dueFilter} onValueChange={(v) => setDueFilter(v as DueFilter)}>
+              <SelectTrigger className="h-9 w-[180px] bg-white text-neutral-900 border-neutral-300 rounded-xl">
+                <SelectValue placeholder="All due dates" />
+              </SelectTrigger>
+              <SelectContent className="bg-white text-neutral-900 border-neutral-200">
+                <SelectItem value="all">All due dates</SelectItem>
+                <SelectItem value="today">Due today</SelectItem>
+                <SelectItem value="nextweek">Next week</SelectItem>
+                <SelectItem value="none">No due date</SelectItem>
               </SelectContent>
             </Select>
             <Select value={groupBy} onValueChange={(v) => setGroupBy(v as any)}>
@@ -238,6 +284,15 @@ export default function MyTasksPage() {
                                 <Badge variant="outline" className="border-neutral-200 text-neutral-700">
                                   {t.status === "in_progress" ? "In progress" : t.status === "done" ? "Done" : "To do"}
                                 </Badge>
+                                <Badge variant="outline" className={`${dueBadgeClass(dueCategory(t.due_at))}`}>
+                                  {(() => {
+                                    const cat = dueCategory(t.due_at);
+                                    if (cat === "overdue") return t.due_at ? `Due ${new Date(t.due_at).toLocaleDateString()}` : "Due";
+                                    if (cat === "today") return `Due today${t.due_at ? ` (${new Date(t.due_at).toLocaleDateString()})` : ""}`;
+                                    if (cat === "nextweek") return `Next week${t.due_at ? ` (${new Date(t.due_at).toLocaleDateString()})` : ""}`;
+                                    return t.due_at ? `Due ${new Date(t.due_at).toLocaleDateString()}` : "No due date";
+                                  })()}
+                                </Badge>
                                 {projects[t.project_id] ? (
                                   <Link
                                     href={`/projects/${t.project_id}/tasks`}
@@ -251,8 +306,7 @@ export default function MyTasksPage() {
                             </div>
                             {/* assignment control handled elsewhere */}
                           </div>
-                          <Separator className="my-4 bg-neutral-200" />
-                          <div className="text-xs text-neutral-500">Task ID: {t.id}</div>
+                          
                         </Card>
                       );
                     })}
