@@ -121,6 +121,11 @@
   }
 }
 
+/* Smooth anchor scrolling for landing page links */
+html {
+  scroll-behavior: smooth;
+}
+
 
 @keyframes slideDown {
   0% {

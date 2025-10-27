@@ -189,7 +189,7 @@ useEffect(() => {
           <div className="flex justify-between items-center py-3">
             {/* Logo */}
             <Link href="/" className="text-xl font-semibold tracking-wide text-white">
-              Project<span className="font-bold">Manager</span>
+              Flow<span className="font-bold">foundry</span>
             </Link>
 
             {/* Desktop */}
