@@ -451,7 +451,7 @@ export default function Page() {
                     { label: 'Blog', href: '#' },
                     { label: 'Careers', href: '#' },
                   ].map((link) => (
-                    <li key={link.href}>
+                    <li key={link.label}>
                       <Link href={link.href} className="text-sm text-muted-foreground transition-colors hover:text-foreground">
                         {link.label}
                       </Link>
