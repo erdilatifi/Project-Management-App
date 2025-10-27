@@ -28,7 +28,7 @@ import {
 } from "@/components/ui/dialog";
 
 import { toast } from "sonner";
-import { Pencil, Trash2, Plus, GripVertical, X } from "lucide-react";
+import { Pencil, Trash2, Plus, GripVertical, Calendar } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 
 import {
@@ -44,7 +44,7 @@ import {
 } from "@dnd-kit/core";
 
 /* ==========================================================================
-   Inline AssigneeSearchBar (no external deps beyond your UI Input + Button)
+   Inline AssigneeSearchBar for create-only (no per-card dropdown)
    ========================================================================== */
 
 type Candidate = { id: string; label: string };
@@ -52,10 +52,9 @@ type Candidate = { id: string; label: string };
 type SearchBarProps = {
   candidates: Candidate[];
   placeholder?: string;
-  /** "" = All (for filters), null = Unassigned, "<id>" = user id */
-  value: string | null | "";
-  onChange: (val: string | null | "") => void;
-  allowAll?: boolean;
+  /** null = Unassigned, "<id>" = user id */
+  value: string | null;
+  onChange: (val: string | null) => void;
   allowUnassigned?: boolean;
   className?: string;
 };
@@ -65,7 +64,6 @@ function AssigneeSearchBar({
   placeholder,
   value,
   onChange,
-  allowAll,
   allowUnassigned,
   className,
 }: SearchBarProps) {
@@ -76,14 +74,10 @@ function AssigneeSearchBar({
   const boxRef = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
 
-  // Reflect external value in the input
+  // Reflect external value into the input
   useEffect(() => {
-    if (value === "") {
-      setQ("");
-      return;
-    }
     if (value === null) {
-      setQ("Unassigned");
+      setQ(allowUnassigned ? "Unassigned" : "");
       return;
     }
     const match = candidates.find((c) => c.id === value);
@@ -92,7 +86,7 @@ function AssigneeSearchBar({
   }, [value, candidates]);
 
   useEffect(() => {
-    const id = setTimeout(() => setDebounced(q.trim().toLowerCase()), 180);
+    const id = setTimeout(() => setDebounced(q.trim().toLowerCase()), 160);
     return () => clearTimeout(id);
   }, [q]);
 
@@ -106,11 +100,6 @@ function AssigneeSearchBar({
   }, []);
 
   const options = useMemo(() => {
-    let opts: Array<{ key: string; label: string; id: string | null | "" }> =
-      [];
-    if (allowAll) opts.push({ key: "__all", label: "All", id: "" });
-    if (allowUnassigned) opts.push({ key: "__none", label: "Unassigned", id: null });
-
     const filtered = !debounced
       ? candidates.slice(0, 20)
       : candidates
@@ -118,19 +107,17 @@ function AssigneeSearchBar({
             c?.label ? c.label.toLowerCase().includes(debounced) : false
           )
           .slice(0, 20);
-
-    return opts.concat(filtered.map((c) => ({ key: c.id, label: c.label, id: c.id })));
-  }, [allowAll, allowUnassigned, candidates, debounced]);
+    return filtered.map((c) => ({ key: c.id, label: c.label, id: c.id }));
+  }, [candidates, debounced]);
 
   useEffect(() => {
     setActiveIndex(0);
   }, [options.length, open]);
 
-  const select = (id: string | null | "") => {
+  const select = (id: string | null) => {
     onChange(id);
     setOpen(false);
-    if (id === "") setQ("");
-    else if (id === null) setQ("Unassigned");
+    if (id === null) setQ(allowUnassigned ? "Unassigned" : "");
     else setQ(candidates.find((c) => c.id === id)?.label ?? "");
   };
 
@@ -169,20 +156,6 @@ function AssigneeSearchBar({
             }
           }}
         />
-        {!!q && (
-          <button
-            type="button"
-            aria-label="Clear"
-            onClick={() => {
-              setQ("");
-              onChange(allowAll ? "" : null);
-              inputRef.current?.focus();
-            }}
-            className="absolute right-2 top-1/2 -translate-y-1/2 text-neutral-500 hover:text-neutral-800"
-          >
-            <X className="h-4 w-4" />
-          </button>
-        )}
       </div>
 
       {open && (
@@ -191,6 +164,15 @@ function AssigneeSearchBar({
           className="absolute z-20 mt-1 w-full rounded-xl border border-neutral-200 bg-white shadow-lg overflow-hidden"
           onMouseDown={(e) => e.preventDefault()}
         >
+          {allowUnassigned && (
+            <button
+              type="button"
+              className="w-full text-left px-3 py-2 text-sm hover:bg-neutral-50"
+              onClick={() => select(null)}
+            >
+              Unassigned
+            </button>
+          )}
           {options.length === 0 ? (
             <div className="px-3 py-2 text-sm text-neutral-500">No results</div>
           ) : (
@@ -219,6 +201,68 @@ function AssigneeSearchBar({
 }
 
 /* ==========================================================================
+   Helpers: due date categorization
+   ========================================================================== */
+
+type DueCategory = "overdue" | "today" | "nextweek" | "none";
+
+function startOfDay(d: Date) {
+  const dt = new Date(d);
+  dt.setHours(0, 0, 0, 0);
+  return dt;
+}
+function endOfDay(d: Date) {
+  const dt = new Date(d);
+  dt.setHours(23, 59, 59, 999);
+  return dt;
+}
+function plusDays(d: Date, days: number) {
+  const copy = new Date(d);
+  copy.setDate(copy.getDate() + days);
+  return copy;
+}
+
+function dueCategory(due_at?: string | null): DueCategory {
+  if (!due_at) return "none";
+  const now = new Date();
+  const todayStart = startOfDay(now);
+  const todayEnd = endOfDay(now);
+  const nextWeekEnd = endOfDay(plusDays(now, 7));
+
+  const due = new Date(due_at);
+  if (isNaN(due.getTime())) return "none";
+
+  if (due < todayStart) return "overdue";
+  if (due >= todayStart && due <= todayEnd) return "today";
+  if (due > todayEnd && due <= nextWeekEnd) return "nextweek";
+  return "none";
+}
+
+function dueBadgeClass(cat: DueCategory) {
+  switch (cat) {
+    case "overdue":
+      return "bg-red-50 text-red-700 border-red-200";
+    case "today":
+      return "bg-amber-50 text-amber-700 border-amber-200";
+    case "nextweek":
+      return "bg-blue-50 text-blue-700 border-blue-200";
+    case "none":
+    default:
+      return "bg-neutral-50 text-neutral-700 border-neutral-200";
+  }
+}
+
+function formatDateShort(iso?: string | null) {
+  if (!iso) return "";
+  try {
+    const d = new Date(iso);
+    return d.toLocaleDateString();
+  } catch {
+    return "";
+  }
+}
+
+/* ==========================================================================
    Tasks Board Page
    ========================================================================== */
 
@@ -231,7 +275,7 @@ export type TaskRow = {
   title: string;
   description?: string | null;
   status: Status;
-  priority?: number | null; // 1–5
+  priority?: number | null; // 1-5
   assignee_id?: string | null;
   due_at?: string | null;
   created_by: string | null;
@@ -267,6 +311,8 @@ const priorityClass = (p?: number | null) => {
   }
 };
 
+type DueFilter = "all" | DueCategory;
+
 export default function ProjectTasksBoardPage() {
   const { id: projectIdParam } = useParams<{ id: string }>();
   const projectId = projectIdParam as string;
@@ -276,23 +322,23 @@ export default function ProjectTasksBoardPage() {
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
   const [newTitle, setNewTitle] = useState("");
+  const [createDue, setCreateDue] = useState<string>(""); // yyyy-mm-dd
+  const todayStr = useMemo(() => new Date().toISOString().slice(0,10), []);
   const [userId, setUserId] = useState<string | null>(null);
   const [activeId, setActiveId] = useState<UniqueIdentifier | null>(null);
   const [workspaceId, setWorkspaceId] = useState<string | null>(null);
   const [members, setMembers] = useState<Array<{ id: string; email: string }>>([]);
+  const [canCreate, setCanCreate] = useState<boolean>(false);
+  const [dueFilter, setDueFilter] = useState<DueFilter>("all");
 
-  /** Assignee filter: ""=all, null=unassigned, "<id>"=user */
-  const [assigneeFilter, setAssigneeFilter] = useState<string | null | "">("");
-
-  const [canAssign, setCanAssign] = useState<boolean>(false);
-
-  // New-task assignee (via search bar)
+  // Create-time assignee only
   const [createAssigneeId, setCreateAssigneeId] = useState<string | null>(null);
 
   // Editing state per task
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editTitle, setEditTitle] = useState<string>("");
   const [editDescription, setEditDescription] = useState<string>("");
+  const [editDue, setEditDue] = useState<string>("");
   const [savingEdit, setSavingEdit] = useState(false);
 
   // Delete confirm
@@ -338,13 +384,15 @@ export default function ProjectTasksBoardPage() {
   // bootstrap
   useEffect(() => {
     const init = async () => {
+      let currentUserId: string | null = null;
       try {
         const { data } = await supabase.auth.getUser();
-        setUserId(data.user?.id ?? null);
+        currentUserId = data.user?.id ?? null;
+        setUserId(currentUserId);
       } catch {}
       await load();
 
-      // load project workspace and its members for assignee picker
+      // load project workspace and its members for assignee picker + role
       try {
         const { data: proj } = await supabase
           .from("projects")
@@ -357,45 +405,72 @@ export default function ProjectTasksBoardPage() {
 
           const { data: wms } = await supabase
             .from("workspace_members")
-            .select("user_id, role")
+            .select("*")
             .eq("workspace_id", proj.workspace_id);
 
           const ids = (wms ?? []).map((r: any) => r.user_id as string);
-
           if (ids.length) {
+            // Determine if current user is admin or owner (no await inside .find)
+            const me = (wms ?? []).find(
+              (r: any) => String(r.user_id) === String(currentUserId)
+            );
+            setCanCreate(me?.role === "admin" || me?.role === "owner");
+
             try {
-              const { data: users } = await (supabase as any).rpc(
-                "get_auth_users_by_ids",
-                { ids }
+              // Prefer any saved label on workspace_members; fallback to app profiles
+              const wmLabelMap: Record<string, string | null> = Object.fromEntries(
+                (wms ?? []).map((r: any) => {
+                  const uid = String(r.user_id);
+                  const primary = (r.member_name as string | null) || (r.name as string | null) || (r.display_name as string | null);
+                  const fallback = (r.member_email as string | null) || (r.email as string | null) || null;
+                  const label = (primary && String(primary).trim()) || (fallback && String(fallback).trim()) || null;
+                  return [uid, label];
+                })
               );
-              const emailMap: Record<string, string> = Object.fromEntries(
-                ((users ?? []) as any[]).map((u: any) => [
-                  String(u.id),
-                  String(u.email ?? "User"),
-                ])
-              );
+
+              // Try app users.display_name
+              let displayMap: Record<string, string | null> = {};
+              try {
+                const missingForDisplay = ids.filter((id) => !wmLabelMap[id]);
+                if (missingForDisplay.length) {
+                  const { data: userProfiles } = await supabase
+                    .from("users")
+                    .select("id, display_name")
+                    .in("id", missingForDisplay);
+                  displayMap = Object.fromEntries(
+                    (userProfiles ?? []).map((u: any) => [
+                      String(u.id),
+                      (u.display_name as string | null) ?? null,
+                    ])
+                  );
+                }
+              } catch {
+                displayMap = {};
+              }
+
+              // Fallback to profiles.full_name
               let nameMap: Record<string, string | null> = {};
               try {
-                const { data: profs } = await supabase
-                  .from("profiles")
-                  .select("id, full_name")
-                  .in("id", ids);
-                nameMap = Object.fromEntries(
-                  (profs ?? []).map((p: any) => [
-                    String(p.id),
-                    (p.full_name as string | null) ?? null,
-                  ])
-                );
-              } catch {
-                nameMap = {};
-              }
+                const missingForName = ids.filter((id) => !wmLabelMap[id] && !displayMap[id]);
+                if (missingForName.length) {
+                  const { data: profs } = await supabase
+                    .from("profiles")
+                    .select("id, full_name")
+                    .in("id", missingForName);
+                  nameMap = Object.fromEntries(
+                    (profs ?? []).map((p: any) => [
+                      String(p.id),
+                      (p.full_name as string | null) ?? null,
+                    ])
+                  );
+                }
+              } catch {}
+
               setMembers(
-                ids.map((id) => ({
-                  id,
-                  email: nameMap[id]?.trim()
-                    ? `${nameMap[id]} — ${emailMap[id]}`
-                    : emailMap[id],
-                }))
+                ids.map((id) => {
+                  const username = (wmLabelMap[id]?.trim() || displayMap[id]?.trim() || nameMap[id]?.trim()) ?? null;
+                  return { id, email: username || "User" };
+                })
               );
             } catch {
               setMembers([]);
@@ -403,27 +478,8 @@ export default function ProjectTasksBoardPage() {
           } else {
             setMembers([]);
           }
-
-          // Determine assign permission (owner/admin only)
-          try {
-            const { data: me } = await supabase
-              .from("workspace_members")
-              .select("role")
-              .eq("workspace_id", proj.workspace_id)
-              .eq(
-                "user_id",
-                (await supabase.auth.getUser()).data.user?.id ?? ""
-              )
-              .maybeSingle<{ role: "owner" | "admin" | "member" | "viewer" }>();
-            const role = me?.role ?? null;
-            setCanAssign(role === "owner" || role === "admin");
-          } catch {
-            setCanAssign(false);
-          }
         }
-      } catch {
-        // ignore
-      }
+      } catch {}
     };
     init();
   }, [supabase, load, projectId]);
@@ -463,43 +519,28 @@ export default function ProjectTasksBoardPage() {
   }, [supabase, projectId]);
 
   // CRUD helpers --------------------------------------------------------------
-  const createTask = async (title: string, initialAssigneeId?: string | null) => {
-    if (!userId) {
-      toast.error("You must be signed in");
-      return;
+  const createTask = async (title: string, initialAssigneeId: string | null, dueLocal: string) => {
+    if (!canCreate) {
+      toast.error("Only owners/admins can add tasks.");
+      throw new Error("not_allowed");
     }
-    setCreating(true);
-    try {
-      const { data, error } = await supabase
-        .from("tasks")
-        .insert({
-          project_id: projectId,
-          title: title.trim(),
-          status: "todo",
-          created_by: userId,
-        })
-        .select(
-          "id, project_id, workspace_id, title, description, status, priority, assignee_id, due_at, created_by, created_at"
-        )
-        .single<TaskRow>();
-      if (error) throw error;
-      setItems((cur) => sortTasks([...cur, data]));
-      if (initialAssigneeId && canAssign) {
-        try {
-          await assignTask(data.id, initialAssigneeId, supabase);
-          setItems((cur) =>
-            cur.map((t) => (t.id === data.id ? { ...t, assignee_id: initialAssigneeId } : t))
-          );
-        } catch {}
-      }
-      toast.success("Task created");
-    } catch (e: unknown) {
-      toast.error(
-        (e instanceof Error ? e.message : String(e)) || "Failed to create task"
-      );
-    } finally {
-      setCreating(false);
-    }
+    const due_at = dueLocal ? new Date(dueLocal).toISOString() : null;
+    const { data, error } = await supabase
+      .from("tasks")
+      .insert({
+        project_id: projectId,
+        title: title.trim(),
+        status: "todo",
+        created_by: userId,
+        assignee_id: initialAssigneeId,
+        due_at,
+      })
+      .select(
+        "id, project_id, workspace_id, title, description, status, priority, assignee_id, due_at, created_by, created_at"
+      )
+      .single<TaskRow>();
+    if (error) throw error;
+    return data;
   };
 
   const updateTask = async (id: string, patch: Partial<TaskRow>) => {
@@ -532,9 +573,19 @@ export default function ProjectTasksBoardPage() {
   const deleteTask = async (id: string) => {
     setDeleting(true);
     try {
-      const { error } = await supabase.from("tasks").delete().eq("id", id);
-      if (error) throw error;
+      const target = items.find((t) => t.id === id);
+      if (target && target.created_by !== userId) {
+        toast.error("Only the creator can delete this task.");
+        return;
+      }
+      // optimistic remove
+      const prev = items;
       setItems((cur) => cur.filter((t) => t.id !== id));
+      const { error } = await supabase.from("tasks").delete().eq("id", id);
+      if (error) {
+        setItems(prev); // revert
+        throw error;
+      }
       toast.success("Task deleted");
     } catch (e: unknown) {
       const msg =
@@ -554,8 +605,11 @@ export default function ProjectTasksBoardPage() {
     }
   };
 
-  // DnD handlers --------------------------------------------------------------
+  // DnD handlers (assignee-only) ----------------------------------------------
   const onDragStart = (evt: DragStartEvent) => {
+    const draggedId = evt.active.id as string;
+    const t = items.find((x) => x.id === draggedId);
+    if (!t || t.assignee_id !== userId) return; // only current assignee can drag
     setActiveId(evt.active.id);
   };
 
@@ -565,13 +619,15 @@ export default function ProjectTasksBoardPage() {
     setActiveId(null);
     if (!overId) return;
 
+    const prev = items.find((t) => t.id === draggedId);
+    if (!prev || prev.assignee_id !== userId) return; // only assignee can move
+
     // Droppable ids are "column:<status>"
     const [, target] = overId.split(":");
     if (!target || !["todo", "in_progress", "done"].includes(target)) return;
 
     const nextStatus = target as Status;
-    const prev = items.find((t) => t.id === draggedId);
-    if (!prev || prev.status === nextStatus) return;
+    if (prev.status === nextStatus) return;
 
     // optimistic update
     setItems((cur) => cur.map((t) => (t.id === draggedId ? { ...t, status: nextStatus } : t)));
@@ -583,42 +639,91 @@ export default function ProjectTasksBoardPage() {
     }
   };
 
-  const onChangePriority = async (id: string, value: number | null) => {
-    const prev = items.find((t) => t.id === id);
-    setItems((cur) => cur.map((t) => (t.id === id ? { ...t, priority: value } : t)));
+  // UI helpers ----------------------------------------------------------------
+  const submitNew = async () => {
+    if (!canCreate) {
+      toast.error("Only owners/admins can add tasks.");
+      return;
+    }
+    const title = newTitle.trim();
+    if (!title) return;
+    const initialAssigneeId = createAssigneeId ?? null;
+    // Use date input value directly; quick-due select already maps into createDue
+    const dueLocal = createDue; // yyyy-mm-dd or empty
+    setNewTitle("");
+    setCreateAssigneeId(null);
+
+    // optimistic temp row
+    const tempId = `temp-${Date.now()}`;
+    const optimistic: TaskRow = {
+      id: tempId,
+      project_id: projectId,
+      workspace_id: workspaceId,
+      title,
+      description: null,
+      status: "todo",
+      priority: null,
+      assignee_id: initialAssigneeId,
+      due_at: dueLocal ? new Date(dueLocal).toISOString() : null,
+      created_by: userId,
+      created_at: new Date().toISOString(),
+    };
+    setItems((cur) => sortTasks([...cur, optimistic]));
+
     try {
-      await updateTask(id, { priority: value });
-    } catch {
+      const created = await createTask(title, initialAssigneeId, dueLocal);
+      // swap temp with real
       setItems((cur) =>
-        cur.map((t) => (t.id === id ? { ...t, priority: prev?.priority ?? null } : t))
+        sortTasks(cur.map((t) => (t.id === tempId ? created : t)))
       );
+      toast.success("Task created");
+    } catch (e) {
+      // remove temp row
+      setItems((cur) => cur.filter((t) => t.id !== tempId));
+      if ((e as Error)?.message !== "not_allowed") {
+        toast.error(e instanceof Error ? e.message : "Failed to create task");
+      }
     }
   };
 
-  // UI helpers ----------------------------------------------------------------
-  const submitNew = async () => {
-    const title = newTitle.trim();
-    if (!title) return;
-    const selected = createAssigneeId;
-    setNewTitle("");
-    await createTask(title, selected ?? null);
-    setCreateAssigneeId(null);
-  };
-
   const startEdit = (t: TaskRow) => {
+    if (t.created_by !== userId) {
+      toast.error("Only the creator can edit this task.");
+      return;
+    }
     setEditingId(t.id);
     setEditTitle(t.title);
     setEditDescription(t.description ?? "");
+    setEditDue(t.due_at ? new Date(t.due_at).toISOString().slice(0, 10) : "");
   };
 
+  // Make save optimistic for instant feedback (includes due date)
   const saveEdit = async (id: string) => {
     setSavingEdit(true);
+    const prev = items.find((t) => t.id === id);
+    if (prev && prev.created_by !== userId) {
+      toast.error("Only the creator can edit this task.");
+      setSavingEdit(false);
+      return;
+    }
+
+    const patch: Partial<TaskRow> = {
+      title: editTitle.trim() || "Untitled",
+      description: editDescription.trim() || null,
+      due_at: editDue ? new Date(editDue).toISOString() : null,
+    };
+
+    // optimistic
+    setItems((cur) => cur.map((t) => (t.id === id ? { ...t, ...patch } : t)));
+
     try {
-      await updateTask(id, {
-        title: editTitle.trim() || "Untitled",
-        description: editDescription.trim() || null,
-      });
+      await updateTask(id, patch);
       setEditingId(null);
+    } catch {
+      // revert on failure
+      if (prev) {
+        setItems((cur) => cur.map((t) => (t.id === id ? prev : t)));
+      }
     } finally {
       setSavingEdit(false);
     }
@@ -632,55 +737,108 @@ export default function ProjectTasksBoardPage() {
   // search-bar candidates
   const filterCandidates = members.map((m) => ({ id: m.id, label: m.email ?? "" }));
 
+  // derive filtered items by due category
+  const filteredItems = useMemo(() => {
+    if (dueFilter === "all") return items;
+    return items.filter((t) => dueCategory(t.due_at) === dueFilter);
+  }, [items, dueFilter]);
+
   return (
     <div className="min-h-screen pt-12 w-full bg-[radial-gradient(80rem_40rem_at_50%_-10%,rgba(0,0,0,0.06),transparent)]">
       <div className="mx-auto max-w-[1200px] px-6 lg:px-10 py-10">
         {/* Header */}
         <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex items-center gap-3 flex-wrap">
-            <div className="flex items-center gap-2 text-sm">
-              <span className="text-neutral-700">Assignee:</span>
-              <AssigneeSearchBar
-                candidates={filterCandidates}
-                value={assigneeFilter}
-                onChange={setAssigneeFilter}
-                allowAll
-                allowUnassigned
-                placeholder="Filter by assignee"
-                className="w-64"
-              />
-            </div>
+          {canCreate && (
+            <Card className="w-full p-3 rounded-xl border border-neutral-200 shadow-sm">
+              <div className="flex items-end gap-3 flex-wrap">
+                <div className="flex flex-col">
+                  <label className="text-xs text-neutral-600 mb-1">Task title</label>
+                  <Input
+                    value={newTitle}
+                    onChange={(e) => setNewTitle(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") submitNew();
+                    }}
+                    placeholder="Quick add a task..."
+                    aria-label="New task title"
+                    className="w-72 bg-white text-neutral-900 border-neutral-300 focus-visible:ring-2 focus-visible:ring-neutral-400 focus-visible:border-neutral-400 rounded-xl"
+                  />
+                </div>
 
-            <Input
-              value={newTitle}
-              onChange={(e) => setNewTitle(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") submitNew();
-              }}
-              placeholder="Quick add a task…"
-              aria-label="New task title"
-              className="w-72 bg-white text-neutral-900 border-neutral-300 focus-visible:ring-2 focus-visible:ring-neutral-400 focus-visible:border-neutral-400 rounded-xl"
-            />
+                <div className="flex flex-col">
+                  <label className="text-xs text-neutral-600 mb-1">Assign to</label>
+                  <AssigneeSearchBar
+                    candidates={filterCandidates}
+                    value={createAssigneeId}
+                    onChange={(val) => setCreateAssigneeId(val)}
+                    allowUnassigned
+                    placeholder="Assign to..."
+                    className="w-56"
+                  />
+                </div>
 
-            {canAssign ? (
-              <AssigneeSearchBar
-                candidates={filterCandidates}
-                value={createAssigneeId}
-                onChange={(val) => setCreateAssigneeId((val ?? null) as string | null)}
-                allowAll={false}
-                allowUnassigned
-                placeholder="Set assignee (optional)"
-                className="w-80"
-              />
-            ) : null}
+                <div className="flex items-center gap-3">
+                  <div className="flex flex-col">
+                    <label className="text-xs text-neutral-600 mb-1">Quick due</label>
+                    <select
+                      className="h-9 rounded-xl border border-neutral-300 bg-white text-neutral-900 px-2"
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        if (val === "today") {
+                          setCreateDue(todayStr);
+                        } else if (val === "nextweek") {
+                          const d = new Date();
+                          d.setDate(d.getDate() + 7);
+                          setCreateDue(d.toISOString().slice(0,10));
+                        } else if (val === "none") {
+                          setCreateDue("");
+                        }
+                      }}
+                      defaultValue=""
+                    >
+                      <option value="" disabled>Quick due...</option>
+                      <option value="today">Today</option>
+                      <option value="nextweek">Next week</option>
+                      <option value="none">No due date</option>
+                    </select>
+                  </div>
+                  <div className="flex flex-col">
+                    <label className="text-xs text-neutral-600 mb-1">Date</label>
+                    <Input
+                      type="date"
+                      min={todayStr}
+                      value={createDue}
+                      onChange={(e) => setCreateDue(e.target.value)}
+                      className="h-9 w-44 rounded-xl bg-white text-neutral-900 border-neutral-300"
+                    />
+                  </div>
+                </div>
 
-            <Button
-              onClick={submitNew}
-              disabled={creating}
-              className="rounded-xl border border-neutral-300 bg-white hover:bg-neutral-50 text-neutral-900 shadow-sm"
+                <Button
+                  onClick={submitNew}
+                  disabled={creating}
+                  className="rounded-xl border border-neutral-300 bg-white hover:bg-neutral-50 text-neutral-900 shadow-sm"
+                >
+                  <Plus className="mr-2 h-4 w-4" /> Add
+                </Button>
+              </div>
+            </Card>
+          )}
+
+          {/* Due filter */}
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-neutral-600">Filter:</span>
+            <select
+              value={dueFilter}
+              onChange={(e) => setDueFilter(e.target.value as DueFilter)}
+              className="h-9 rounded-xl border border-neutral-300 bg-white text-neutral-900 px-2"
             >
-              <Plus className="mr-2 h-4 w-4" /> Add
-            </Button>
+              <option value="all">All</option>
+              <option value="overdue">Overdue</option>
+              <option value="today">Due today</option>
+              <option value="nextweek">Next week</option>
+              <option value="none">No due date</option>
+            </select>
           </div>
         </div>
 
@@ -695,7 +853,7 @@ export default function ProjectTasksBoardPage() {
                 <div className="flex items-center justify-between">
                   <div className="text-neutral-900 font-medium">{c.label}</div>
                   <Badge variant="outline" className="border-neutral-200 text-neutral-600">
-                    …
+                    ...
                   </Badge>
                 </div>
                 <Separator className="my-3 bg-neutral-200" />
@@ -715,14 +873,7 @@ export default function ProjectTasksBoardPage() {
                   key={col.id}
                   columnId={col.id}
                   label={col.label}
-                  tasks={items.filter((t) => {
-                    const inCol = (t.status ?? "todo") === col.id;
-                    if (!inCol) return false;
-                    // "" = All, null = Unassigned, "<id>" = specific user
-                    if (assigneeFilter === "") return true;
-                    if (assigneeFilter === null) return !t.assignee_id;
-                    return t.assignee_id === assigneeFilter;
-                  })}
+                  tasks={filteredItems.filter((t) => (t.status ?? "todo") === col.id)}
                   onEdit={startEdit}
                   onDelete={confirmDelete}
                   editingId={editingId}
@@ -730,12 +881,29 @@ export default function ProjectTasksBoardPage() {
                   setEditTitle={setEditTitle}
                   editDescription={editDescription}
                   setEditDescription={setEditDescription}
+                  editDue={editDue}
+                  setEditDue={setEditDue}
                   onSaveEdit={saveEdit}
                   savingEdit={savingEdit}
-                  onChangePriority={onChangePriority}
+                  onChangePriority={async (id, value) => {
+                    const prev = items.find((t) => t.id === id);
+                    if (!prev || prev.created_by !== userId) {
+                      toast.error("Only the creator can change priority.");
+                      return;
+                    }
+                    // optimistic priority
+                    setItems((cur) => cur.map((t) => (t.id === id ? { ...t, priority: value } : t)));
+                    try {
+                      await updateTask(id, { priority: value });
+                    } catch {
+                      setItems((cur) =>
+                        cur.map((t) => (t.id === id ? { ...t, priority: prev?.priority ?? null } : t))
+                      );
+                    }
+                  }}
                   members={members}
                   currentUserId={userId}
-                  canAssign={canAssign}
+                  todayStr={todayStr}
                 />
               ))}
             </div>
@@ -761,7 +929,7 @@ export default function ProjectTasksBoardPage() {
               onClick={() => pendingDeleteId && deleteTask(pendingDeleteId)}
               disabled={deleting}
             >
-              {deleting ? "Deleting…" : "Delete"}
+              {deleting ? "Deleting..." : "Delete"}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -784,11 +952,13 @@ interface ColumnProps {
   setEditTitle: (v: string) => void;
   editDescription: string;
   setEditDescription: (v: string) => void;
+  editDue: string;
+  setEditDue: (v: string) => void;
   onSaveEdit: (id: string) => void;
   savingEdit: boolean;
   members: Array<{ id: string; email: string }>;
   currentUserId: string | null;
-  canAssign?: boolean;
+  todayStr: string;
 }
 
 function Column(props: ColumnProps) {
@@ -835,11 +1005,13 @@ function Column(props: ColumnProps) {
                 setEditTitle={props.setEditTitle}
                 editDescription={props.editDescription}
                 setEditDescription={props.setEditDescription}
+                editDue={props.editDue}
+                setEditDue={props.setEditDue}
                 onSave={() => props.onSaveEdit(t.id)}
                 saving={props.savingEdit}
                 members={props.members}
                 currentUserId={props.currentUserId}
-                canAssign={props.canAssign}
+                todayStr={props.todayStr}
               />
             ))
           )}
@@ -861,11 +1033,13 @@ interface TaskCardProps {
   setEditTitle: (v: string) => void;
   editDescription: string;
   setEditDescription: (v: string) => void;
+  editDue: string;
+  setEditDue: (v: string) => void;
   onSave: () => void;
   saving: boolean;
   members: Array<{ id: string; email: string }>;
   currentUserId: string | null;
-  canAssign?: boolean;
+  todayStr: string;
 }
 
 function TaskCard(props: TaskCardProps) {
@@ -878,16 +1052,28 @@ function TaskCard(props: TaskCardProps) {
     : undefined;
 
   const priorityValue = props.task.priority ? String(props.task.priority) : "none";
-  const canEdit = !!props.currentUserId && props.currentUserId === props.task.created_by;
+  const canEditPriority = !!props.currentUserId && props.currentUserId === props.task.created_by;
+  const canEditDelete = !!props.currentUserId && props.currentUserId === props.task.created_by;
 
   const assigneeLabel = props.task.assignee_id
     ? props.members.find((m) => m.id === props.task.assignee_id)?.email ?? "User"
-    : null;
+    : "Unassigned";
+
+  const cat = dueCategory(props.task.due_at);
+  const dueClass = dueBadgeClass(cat);
+  const dueText =
+    cat === "overdue"
+      ? "Overdue"
+      : cat === "today"
+      ? "Due today"
+      : cat === "nextweek"
+      ? "Next week"
+      : "No due date";
 
   return (
     <div
       ref={setNodeRef}
-      style={style}
+      style={style as CSSProperties}
       {...listeners}
       {...attributes}
       className={`rounded-xl border border-neutral-200 bg-white hover:bg-neutral-50 transition-colors p-3 shadow-sm hover:shadow-md focus-visible:ring-2 focus-visible:ring-neutral-300 outline-none ${
@@ -911,20 +1097,19 @@ function TaskCard(props: TaskCardProps) {
                   </div>
                 ) : null}
 
-                {assigneeLabel ? (
-                  <div className="mt-2 inline-flex items-center gap-2 rounded-full border border-neutral-200 bg-neutral-50 px-2 py-0.5 text-xs text-neutral-700">
-                    <Avatar className="h-5 w-5">
-                      <AvatarFallback>
-                        {assigneeLabel[0]?.toUpperCase() ?? "?"}
-                      </AvatarFallback>
-                    </Avatar>
-                    <span className="max-w-[160px] truncate">{assigneeLabel}</span>
-                  </div>
-                ) : null}
+                {/* Assignee text only */}
+                <div className="mt-2 inline-flex items-center gap-2 rounded-full border border-neutral-200 bg-neutral-50 px-2 py-0.5 text-xs text-neutral-700">
+                  <Avatar className="h-5 w-5">
+                    <AvatarFallback>
+                      {assigneeLabel[0]?.toUpperCase() ?? "?"}
+                    </AvatarFallback>
+                  </Avatar>
+                  <span className="max-w-[180px] truncate">{assigneeLabel}</span>
+                </div>
               </div>
             </div>
 
-            {canEdit ? (
+            {canEditDelete ? (
               <div className="flex items-center gap-2">
                 <button
                   aria-label="Edit task"
@@ -951,22 +1136,34 @@ function TaskCard(props: TaskCardProps) {
               )}`}
             >
               <span className="font-medium">Priority</span>
-              <select
-                value={priorityValue}
-                onChange={(e) =>
-                  props.onChangePriority(
-                    e.target.value === "none" ? null : Number(e.target.value)
-                  )
-                }
-                className="h-6 w-[110px] border-0 bg-transparent text-current px-1 focus:outline-none"
-              >
-                <option value="none">None</option>
-                <option value="1">P1</option>
-                <option value="2">P2</option>
-                <option value="3">P3</option>
-                <option value="4">P4</option>
-                <option value="5">P5</option>
-              </select>
+              {canEditPriority ? (
+                <select
+                  value={priorityValue}
+                  onChange={(e) =>
+                    props.onChangePriority(
+                      e.target.value === "none" ? null : Number(e.target.value)
+                    )
+                  }
+                  className="h-6 w-[110px] border-0 bg-transparent text-current px-1 focus:outline-none"
+                >
+                  <option value="none">None</option>
+                  <option value="1">P1</option>
+                  <option value="2">P2</option>
+                  <option value="3">P3</option>
+                  <option value="4">P4</option>
+                  <option value="5">P5</option>
+                </select>
+              ) : (
+                <span className="px-1">{priorityValue === "none" ? "None" : `P${priorityValue}`}</span>
+              )}
+            </span>
+
+            {/* Due badge */}
+            <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 ${dueClass}`}>
+              <span className="font-medium">{dueText}</span>
+              {props.task.due_at ? (
+                <span className="opacity-80">({formatDateShort(props.task.due_at)})</span>
+              ) : null}
             </span>
 
             <span className="text-neutral-500">
@@ -987,18 +1184,45 @@ function TaskCard(props: TaskCardProps) {
             rows={3}
             className="bg-white text-neutral-900 border-neutral-300 focus-visible:ring-2 focus-visible:ring-neutral-300 focus-visible:border-neutral-300 rounded-lg"
           />
+          <div className="flex items-center gap-2">
+            <Calendar className="h-4 w-4 text-neutral-500" />
+            <select
+              className="h-9 rounded-xl border border-neutral-300 bg-white text-neutral-900 px-2"
+              onChange={(e) => {
+                const val = e.target.value;
+                  if (val === "today") {
+                    const t = new Date().toISOString().slice(0,10);
+                    props.setEditDue(t);
+                  } else if (val === "nextweek") {
+                    const d = new Date();
+                    d.setDate(d.getDate() + 7);
+                    props.setEditDue(d.toISOString().slice(0,10));
+                  } else if (val === "none") {
+                    props.setEditDue("");
+                  }
+              }}
+              defaultValue=""
+            >
+              <option value="" disabled>Quick due...</option>
+              <option value="today">Today</option>
+              <option value="nextweek">Next week</option>
+              <option value="none">No due date</option>
+            </select>
+              <Input
+                type="date"
+              min={props.todayStr}
+              value={props.editDue}
+              onChange={(e) => props.setEditDue(e.target.value)}
+              className="h-9 w-44 rounded-lg bg-white text-neutral-900 border-neutral-300"
+            />
+          </div>
           <div className="flex items-center justify-end gap-2">
             <Button variant="outline" onClick={props.onSave} disabled={props.saving} className="rounded-lg">
-              {props.saving ? "Saving…" : "Save"}
+              {props.saving ? "Saving..." : "Save"}
             </Button>
           </div>
         </div>
       )}
     </div>
   );
-}
-
-async function assignTask(taskId: string, assigneeId: string, supabase = createClient()) {
-  const { error } = await supabase.from("tasks").update({ assignee_id: assigneeId }).eq("id", taskId);
-  if (error) throw new Error(error.message);
 }

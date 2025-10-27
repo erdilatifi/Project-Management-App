@@ -79,6 +79,41 @@ export async function acceptInvitation(token: string): Promise<{ workspace: { id
   if (error) throw new Error(error.message)
   const row = (Array.isArray(data) ? data[0] : data) as { workspace_id: string; name: string; owner_id: string }
   if (!row) throw new Error('Invitation not found or expired')
+
+  // Best-effort: persist member's email and name to workspace_members for this workspace
+  try {
+    const workspaceId = row.workspace_id
+    const uid = user.id
+    const email = user.email ?? null
+    // Try app user profile for display name; fallback to profiles.full_name
+    let display: string | null = null
+    try {
+      const { data: up } = await supabase.from('users').select('display_name').eq('id', uid).maybeSingle<any>()
+      display = (up?.display_name as string | null) ?? null
+    } catch {}
+    if (!display) {
+      try {
+        const { data: prof } = await supabase.from('profiles').select('full_name').eq('id', uid).maybeSingle<any>()
+        display = (prof?.full_name as string | null) ?? null
+      } catch {}
+    }
+
+    // Try to update using likely column names; ignore if columns not present
+    try {
+      await supabase
+        .from('workspace_members')
+        .update({ member_email: email, member_name: display } as any)
+        .eq('workspace_id', workspaceId)
+        .eq('user_id', uid)
+    } catch {}
+    try {
+      await supabase
+        .from('workspace_members')
+        .update({ email: email, name: display } as any)
+        .eq('workspace_id', workspaceId)
+        .eq('user_id', uid)
+    } catch {}
+  } catch {}
   return { workspace: { id: row.workspace_id, name: row.name, owner_id: row.owner_id } }
 }
 

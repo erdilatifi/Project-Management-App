@@ -64,13 +64,61 @@ export function InviteUser({ workspaceId }: Props) {
   // invite mutation
   const inviteMutation = useMutation({
     mutationFn: async (user: UserLite) => {
-      const { error } = await supabase
-        .from("workspace_members")
-        .upsert(
-          { workspace_id: workspaceId, user_id: user.id, role: "member" } as MemberRow,
-          { onConflict: "workspace_id,user_id" }
-        );
-      if (error) throw new Error(error.message);
+      // Attempt to gather a display name from app profile
+      let displayName: string | null = null;
+      try {
+        const { data: up } = await supabase
+          .from("users")
+          .select("display_name")
+          .eq("id", user.id)
+          .maybeSingle<any>();
+        displayName = (up?.display_name as string | null) ?? null;
+      } catch {}
+      if (!displayName) {
+        try {
+          const { data: prof } = await supabase
+            .from("profiles")
+            .select("full_name")
+            .eq("id", user.id)
+            .maybeSingle<any>();
+          displayName = (prof?.full_name as string | null) ?? null;
+        } catch {}
+      }
+
+      // Try to include email/name columns if present; fallback to minimal upsert
+      let upserted = false;
+      try {
+        const { error } = await supabase
+          .from("workspace_members")
+          .upsert(
+            { workspace_id: workspaceId, user_id: user.id, role: "member", member_email: user.email, member_name: displayName } as any,
+            { onConflict: "workspace_id,user_id" }
+          );
+        if (error) throw error;
+        upserted = true;
+      } catch {}
+      if (!upserted) {
+        try {
+          const { error } = await supabase
+            .from("workspace_members")
+            .upsert(
+              { workspace_id: workspaceId, user_id: user.id, role: "member", email: user.email, name: displayName } as any,
+              { onConflict: "workspace_id,user_id" }
+            );
+          if (error) throw error;
+          upserted = true;
+        } catch {}
+      }
+      if (!upserted) {
+        const { error } = await supabase
+          .from("workspace_members")
+          .upsert(
+            { workspace_id: workspaceId, user_id: user.id, role: "member" } as MemberRow,
+            { onConflict: "workspace_id,user_id" }
+          );
+        if (error) throw new Error(error.message);
+      }
+
       await supabase.from("notifications").insert({
         user_id: user.id,
         type: "invite",
