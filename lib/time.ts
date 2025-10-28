@@ -5,7 +5,20 @@
 export function formatTimeAgo(iso: string | Date): string {
   const now = new Date()
   const then = typeof iso === 'string' ? new Date(iso) : iso
-  const seconds = Math.floor((now.getTime() - then.getTime()) / 1000)
+  
+  // Handle invalid dates
+  if (isNaN(then.getTime())) {
+    return 'just now'
+  }
+  
+  const diffMs = now.getTime() - then.getTime()
+  const seconds = Math.floor(diffMs / 1000)
+  
+  // If less than 5 seconds or future date (clock skew), show "just now"
+  if (seconds < 5 || seconds < 0) {
+    return 'just now'
+  }
+  
   const rtf = new Intl.RelativeTimeFormat(undefined, { numeric: 'auto' })
 
   // Time intervals in descending order for accurate formatting
@@ -21,8 +34,12 @@ export function formatTimeAgo(iso: string | Date): string {
 
   for (const [unit, secs] of intervals) {
     const delta = Math.floor(seconds / secs)
-    if (Math.abs(delta) >= 1) return rtf.format(-delta, unit)
+    if (Math.abs(delta) >= 1) {
+      // For past dates, negate the delta for "ago" format
+      return rtf.format(-Math.abs(delta), unit)
+    }
   }
-  return rtf.format(0, 'second')
+  
+  return 'just now'
 }
 

@@ -198,25 +198,25 @@ export default function MyTasksPage() {
   const groups = groupTasks(filtered);
 
   return (
-    <div className="min-h-screen pt-12 w-full bg-[radial-gradient(80rem_40rem_at_50%_-10%,rgba(0,0,0,0.06),transparent)]">
-      <div className="mx-auto max-w-[1200px] px-6 lg:px-10 py-10">
-        <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+    <div className="min-h-screen w-full">
+      <div className="mx-auto max-w-[1200px] px-6 lg:px-10 py-12">
+        <div className="mb-6 pt-15 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h1 className="text-3xl font-semibold text-neutral-900 tracking-tight">My Tasks</h1>
-            <p className="text-sm text-neutral-600 mt-1">All tasks assigned to you across projects.</p>
+            <h1 className="text-3xl font-semibold text-foreground tracking-tight">My Tasks</h1>
+            <p className="text-sm text-muted-foreground mt-0.5">All tasks assigned to you across projects.</p>
           </div>
           <div className="flex items-center gap-3">
             <Input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search tasks"
-              className="w-64 bg-white text-neutral-900 border-neutral-300 focus-visible:ring-2 focus-visible:ring-neutral-400 focus-visible:border-neutral-400 rounded-xl"
+              className="w-64 bg-background border-border focus-visible:ring-2 focus-visible:ring-ring rounded-xl"
             />
             <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as any)}>
-              <SelectTrigger className="h-9 w-[180px] bg-white text-neutral-900 border-neutral-300 rounded-xl">
+              <SelectTrigger className="h-10 w-[180px] bg-background border-border rounded-xl">
                 <SelectValue placeholder="All statuses" />
               </SelectTrigger>
-              <SelectContent className="bg-white text-neutral-900 border-neutral-200">
+              <SelectContent className="rounded-xl">
                 <SelectItem value="all">All statuses</SelectItem>
                 <SelectItem value="todo">To do</SelectItem>
                 <SelectItem value="in_progress">In progress</SelectItem>
@@ -224,10 +224,10 @@ export default function MyTasksPage() {
               </SelectContent>
             </Select>
             <Select value={dueFilter} onValueChange={(v) => setDueFilter(v as DueFilter)}>
-              <SelectTrigger className="h-9 w-[180px] bg-white text-neutral-900 border-neutral-300 rounded-xl">
+              <SelectTrigger className="h-10 w-[180px] bg-background border-border rounded-xl">
                 <SelectValue placeholder="All due dates" />
               </SelectTrigger>
-              <SelectContent className="bg-white text-neutral-900 border-neutral-200">
+              <SelectContent className="rounded-xl">
                 <SelectItem value="all">All due dates</SelectItem>
                 <SelectItem value="today">Due today</SelectItem>
                 <SelectItem value="nextweek">Next week</SelectItem>
@@ -235,10 +235,10 @@ export default function MyTasksPage() {
               </SelectContent>
             </Select>
             <Select value={groupBy} onValueChange={(v) => setGroupBy(v as any)}>
-              <SelectTrigger className="h-9 w-[180px] bg-white text-neutral-900 border-neutral-300 rounded-xl">
+              <SelectTrigger className="h-10 w-[180px] bg-background border-border rounded-xl">
                 <SelectValue placeholder="Group by" />
               </SelectTrigger>
-              <SelectContent className="bg-white text-neutral-900 border-neutral-200">
+              <SelectContent className="rounded-xl">
                 <SelectItem value="none">No grouping</SelectItem>
                 <SelectItem value="project">Project</SelectItem>
                 <SelectItem value="due">Due date</SelectItem>
@@ -250,11 +250,11 @@ export default function MyTasksPage() {
         {loading ? (
           <div className="space-y-3">
             {Array.from({ length: 6 }).map((_, i) => (
-              <Skeleton key={i} className="h-20 w-full bg-neutral-100 rounded-2xl" />
+              <Skeleton key={i} className="h-20 w-full rounded-2xl" />
             ))}
           </div>
         ) : filtered.length === 0 ? (
-          <Card className="rounded-2xl border border-neutral-200 bg-white p-6 text-neutral-700">
+          <Card className="rounded-2xl border-border bg-card p-6 text-muted-foreground text-center">
             {userId ? "No tasks assigned to you." : "Sign in to view your tasks."}
           </Card>
         ) : (
@@ -262,29 +262,29 @@ export default function MyTasksPage() {
             {groups.map((g) => (
               <div key={g.key} className="space-y-3">
                 {groupBy !== "none" && (
-                  <div className="text-sm font-medium text-neutral-700">{g.label}</div>
+                  <div className="text-sm font-semibold text-foreground">{g.label}</div>
                 )}
                 {g.tasks.length === 0 ? (
-                  <Card className="rounded-xl border border-neutral-200 bg-white p-4 text-neutral-600">No tasks</Card>
+                  <Card className="rounded-xl border-border bg-card p-4 text-muted-foreground">No tasks</Card>
                 ) : (
                   <div className="space-y-4">
                     {g.tasks.map((t) => {
                       return (
-                        <Card key={t.id} className="rounded-2xl border border-neutral-200 bg-white p-5 shadow-sm">
+                        <Card key={t.id} className="rounded-2xl border-border bg-card p-5 shadow-sm hover:shadow-md transition-shadow">
                           <div className="flex items-start justify-between gap-4">
                             <div>
-                              <div className="text-neutral-900 font-medium leading-6">{t.title}</div>
+                              <div className="text-foreground font-semibold leading-6">{t.title}</div>
                               {t.description ? (
-                                <div className="mt-1 text-sm text-neutral-700 line-clamp-2">{t.description}</div>
+                                <div className="mt-1 text-sm text-muted-foreground line-clamp-2">{t.description}</div>
                               ) : null}
-                              <div className="mt-2 flex items-center gap-2 text-xs text-neutral-600">
-                                <Badge variant="outline" className="border-neutral-200 text-neutral-700">
+                              <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
+                                <Badge variant="outline" className="rounded-lg">
                                   {priorityLabel(t.priority)}
                                 </Badge>
-                                <Badge variant="outline" className="border-neutral-200 text-neutral-700">
+                                <Badge variant="outline" className="rounded-lg">
                                   {t.status === "in_progress" ? "In progress" : t.status === "done" ? "Done" : "To do"}
                                 </Badge>
-                                <Badge variant="outline" className={`${dueBadgeClass(dueCategory(t.due_at))}`}>
+                                <Badge variant="outline" className={`${dueBadgeClass(dueCategory(t.due_at))} rounded-lg`}>
                                   {(() => {
                                     const cat = dueCategory(t.due_at);
                                     if (cat === "overdue") return `Overdue${t.due_at ? ` (${new Date(t.due_at).toLocaleDateString()})` : ""}`;
@@ -296,17 +296,15 @@ export default function MyTasksPage() {
                                 {projects[t.project_id] ? (
                                   <Link
                                     href={`/projects/${t.project_id}/tasks`}
-                                    className="underline underline-offset-2 text-neutral-700 hover:text-neutral-900"
+                                    className="underline underline-offset-2 text-muted-foreground hover:text-foreground transition-colors"
                                   >
                                     {projects[t.project_id]?.name ?? "Project"}
                                   </Link>
                                 ) : null}
-                                <span className="text-neutral-500">Created {new Date(t.created_at).toLocaleString()}</span>
+                                <span className="text-muted-foreground">Created {new Date(t.created_at).toLocaleString()}</span>
                               </div>
                             </div>
-                            {/* assignment control handled elsewhere */}
                           </div>
-                          
                         </Card>
                       );
                     })}

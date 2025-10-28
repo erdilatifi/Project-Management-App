@@ -3,7 +3,7 @@ import Link from 'next/link';
 import React, { useEffect, useMemo, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { IoIosMenu, IoIosClose } from 'react-icons/io';
-import { LogIn, LogOut, Loader2, User, Home, PanelsTopLeft, FolderKanban } from 'lucide-react';
+import { LogIn, LogOut, Loader2, User, Home, PanelsTopLeft, FolderKanban, CheckSquare, UserCircle, Workflow } from 'lucide-react';
 import NotificationBell from '@/components/notifications/NotificationBell';
 import { SignOut } from '@/app/actions/AuthActions';
 import { Button } from '@/components/ui/button';
@@ -31,6 +31,7 @@ const Navbar = () => {
   const [isMobile, setIsMobile] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
   const [isSigningOut, setIsSigningOut] = useState(false);
+  const [scrolled, setScrolled] = useState(false);
 
   // User profile data from database
   const [profile, setProfile] = useState<ProfileRow | null>(null);
@@ -44,6 +45,15 @@ const Navbar = () => {
     onResize();
     window.addEventListener('resize', onResize);
     return () => window.removeEventListener('resize', onResize);
+  }, []);
+
+  // Handle scroll behavior
+  useEffect(() => {
+    const handleScroll = () => {
+      setScrolled(window.scrollY > 10);
+    };
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
   // Fetch user profile data from Supabase
@@ -199,18 +209,20 @@ const Navbar = () => {
         <Link
           href={path}
           className={`font-medium transition-colors ${
-            isActive ? 'text-white' : 'text-neutral-200 hover:text-white'
+            isActive ? 'text-foreground' : 'text-muted-foreground hover:text-foreground'
           }`}
         >
-          <span className="inline-flex items-center gap-1">
+          <span className="inline-flex items-center gap-1.5">
             {name === 'Home' && <Home className="w-4 h-4" />}
             {name === 'Workspaces' && <PanelsTopLeft className="w-4 h-4" />}
             {name === 'Projects' && <FolderKanban className="w-4 h-4" />}
+            {name === 'Tasks' && <CheckSquare className="w-4 h-4" />}
+            {name === 'Profile' && <UserCircle className="w-4 h-4" />}
             <span>{name}</span>
           </span>
         </Link>
         <span
-          className={`pointer-events-none absolute -bottom-1 left-0  bg-white transition-all duration-200 ease-out ${
+          className={`pointer-events-none absolute -bottom-1 left-0 h-0.5 bg-primary transition-all duration-200 ease-out ${
             isActive ? 'w-full' : 'w-0 group-hover:w-full'
           }`}
         />
@@ -219,17 +231,17 @@ const Navbar = () => {
   };
 
   const AvatarChip = () => (
-    <div className="flex items-center gap-3 text-white">
+    <div className="flex items-center gap-3 text-foreground">
       {profile?.avatar_url ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img
           src={`${profile.avatar_url}${profile.avatar_url.includes('?') ? '&' : '?'}t=${avatarSalt}`}
           alt="Avatar"
-          className="w-9 h-9 rounded-full object-cover ring-1 ring-neutral-700"
+          className="w-9 h-9 rounded-full object-cover ring-1 ring-border"
         />
       ) : (
-        <div className="w-9 h-9 rounded-full bg-neutral-800 ring-1 ring-neutral-700 flex items-center justify-center">
-          <User className="w-4 h-4 text-white" />
+        <div className="w-9 h-9 rounded-full bg-muted ring-1 ring-border flex items-center justify-center">
+          <User className="w-4 h-4 text-foreground" />
         </div>
       )}
       <span className="text-sm font-medium hidden lg:block">
@@ -239,12 +251,17 @@ const Navbar = () => {
   );
 
   return (
-    <nav className="fixed top-0 left-0 w-full z-50">
-      <div className="bg-black/90 backdrop-blur-md border-b border-neutral-700">
+    <nav className={`fixed left-1/2 -translate-x-1/2 z-50 transition-all duration-300 ${
+      scrolled ? 'top-0 w-full' : 'top-4 w-[90%]'
+    }`}>
+      <div className={`bg-background/95 backdrop-blur-md border border-border shadow-lg transition-all duration-300 ${
+        scrolled ? 'rounded-none border-t-0 border-x-0' : 'rounded-2xl'
+      }`}>
         <div className="mx-auto max-w-[1200px] px-6 lg:px-10">
           <div className="flex justify-between items-center py-3">
             {/* Logo */}
-            <Link href="/" className="text-xl font-semibold tracking-wide text-white">
+            <Link href="/" className="flex items-center gap-2 text-xl font-semibold tracking-wide text-foreground">
+              <Workflow className="h-6 w-6 text-primary" />
               Flow<span className="font-bold">foundry</span>
             </Link>
 
@@ -258,9 +275,9 @@ const Navbar = () => {
                 </div>
 
                 {/* Right cluster */}
-                <div className="flex items-center gap-4 pl-6 border-l border-neutral-700">
+                <div className="flex items-center gap-4 pl-6 border-l border-border">
                   {isLoading ? (
-                    <div className="flex items-center gap-2 text-neutral-300">
+                    <div className="flex items-center gap-2 text-muted-foreground">
                       <Loader2 className="w-4 h-4 animate-spin" />
                       <span className="text-sm">Loadingâ€¦</span>
                     </div>
@@ -273,7 +290,7 @@ const Navbar = () => {
                         disabled={isSigningOut}
                         variant="outline"
                         size="sm"
-                        className="bg-black text-white border border-neutral-700 hover:bg-neutral-900 hover:border-neutral-600"
+                        className="border-border hover:bg-accent"
                       >
                         {isSigningOut ? (
                           <>
@@ -293,7 +310,7 @@ const Navbar = () => {
                       <Button
                         variant="outline"
                         size="sm"
-                        className="bg-black text-white border border-neutral-700 hover:bg-neutral-900 hover:border-neutral-600"
+                        className="border-border hover:bg-accent"
                       >
                         <LogIn className="w-4 h-4 mr-2" />
                         Sign In
@@ -306,13 +323,16 @@ const Navbar = () => {
 
             {/* Mobile toggle */}
             {isMobile && (
-              <button
-                onClick={() => setShowMenu(!showMenu)}
-                className="text-3xl text-white"
-                aria-label="Toggle menu"
-              >
-                {showMenu ? <IoIosClose /> : <IoIosMenu />}
-              </button>
+              <div className="flex items-center gap-3">
+                {user && <NotificationBell />}
+                <button
+                  onClick={() => setShowMenu(!showMenu)}
+                  className="text-3xl text-foreground"
+                  aria-label="Toggle menu"
+                >
+                  {showMenu ? <IoIosClose /> : <IoIosMenu />}
+                </button>
+              </div>
             )}
           </div>
         </div>
@@ -320,7 +340,7 @@ const Navbar = () => {
 
       {/* Mobile menu */}
       {isMobile && showMenu && (
-        <div className="bg-black/95 backdrop-blur-md border-t border-neutral-700">
+        <div className="bg-background/95 backdrop-blur-md border-t border-border">
           <div className="mx-auto max-w-[1200px] px-6 lg:px-10">
             <div className="flex flex-col items-center gap-4 py-4">
               {navLinks.map((l) => (
@@ -329,12 +349,12 @@ const Navbar = () => {
                     href={l.path}
                     onClick={() => setShowMenu(false)}
                     className={`relative inline-block text-lg font-medium ${
-                      pathname === l.path ? 'text-white' : 'text-neutral-200 hover:text-white'
+                      pathname === l.path ? 'text-foreground' : 'text-muted-foreground hover:text-foreground'
                     }`}
                   >
                     {l.name}
                     <span
-                      className={`block  bg-white transition-all duration-200 ease-out ${
+                      className={`block h-0.5 bg-primary transition-all duration-200 ease-out ${
                         pathname === l.path ? 'w-full' : 'w-0 group-hover:w-full'
                       }`}
                     />
@@ -342,25 +362,25 @@ const Navbar = () => {
                 </div>
               ))}
 
-              <div className="w-full pt-4 border-t border-neutral-700">
+              <div className="w-full pt-4 border-t border-border">
                 {isLoading ? (
-                  <div className="flex items-center justify-center gap-2 text-neutral-300 py-2">
+                  <div className="flex items-center justify-center gap-2 text-muted-foreground py-2">
                     <Loader2 className="w-4 h-4 animate-spin" />
                     <span className="text-sm">Loadingâ€¦</span>
                   </div>
                 ) : user ? (
                   <div className="flex flex-col gap-3">
-                    <div className="flex items-center justify-center gap-3 text-white">
+                    <div className="flex items-center justify-center gap-3 text-foreground">
                       {profile?.avatar_url ? (
                         // eslint-disable-next-line @next/next/no-img-element
                         <img
                           src={`${profile.avatar_url}${profile.avatar_url.includes('?') ? '&' : '?'}t=${avatarSalt}`}
                           alt="Avatar"
-                          className="w-9 h-9 rounded-full object-cover ring-1 ring-neutral-700"
+                          className="w-9 h-9 rounded-full object-cover ring-1 ring-border"
                         />
                       ) : (
-                        <div className="w-9 h-9 rounded-full bg-neutral-800 ring-1 ring-neutral-700 flex items-center justify-center">
-                          <User className="w-4 h-4 text-white" />
+                        <div className="w-9 h-9 rounded-full bg-muted ring-1 ring-border flex items-center justify-center">
+                          <User className="w-4 h-4 text-foreground" />
                         </div>
                       )}
                       <span className="text-sm font-medium">
@@ -374,7 +394,7 @@ const Navbar = () => {
                       }}
                       disabled={isSigningOut}
                       variant="outline"
-                      className="w-full bg-black text-white border border-neutral-700 hover:bg-neutral-900 hover:border-neutral-600 " 
+                      className="w-full border-border hover:bg-accent" 
                     >
                       {isSigningOut ? (
                         <>
@@ -391,7 +411,7 @@ const Navbar = () => {
                   </div>
                 ) : (
                   <Link href="/login" onClick={() => setShowMenu(false)} className="w-full">
-                    <Button className="w-full bg-black text-white border border-neutral-700 hover:bg-neutral-900 hover:border-neutral-600" variant="outline">
+                    <Button className="w-full border-border hover:bg-accent" variant="outline">
                       <LogIn className="w-4 h-4 mr-2" />
                       Sign In
                     </Button>

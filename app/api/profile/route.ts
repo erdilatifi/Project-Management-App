@@ -46,7 +46,6 @@ export async function GET() {
       oauthConnections: oauthConnections || []
     })
   } catch (error) {
-    console.error('Profile fetch error:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
@@ -141,7 +140,6 @@ export async function PATCH(request: NextRequest) {
 
     return NextResponse.json({ error: 'Invalid type' }, { status: 400 })
   } catch (error) {
-    console.error('Profile update error:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }

@@ -35,14 +35,14 @@ export default function WorkspacePeoplePage() {
       const ids = (members ?? []).map((m: any) => m.user_id)
       let emailMap: Record<string, string> = {}
       let avatarMap: Record<string, string | null> = {}
-      let profileMap: Record<string, { username: string | null; full_name: string | null }> = {}
+      let profileMap: Record<string, { username: string | null; full_name: string | null; job_title: string | null }> = {}
       let appMap: Record<string, { username: string | null; display: string | null }> = {}
       if (ids.length) {
         const { data: users } = await (supabase as any).rpc('get_auth_users_by_ids', { ids })
         const [profsRes, appUsersRes] = await Promise.all([
           supabase
             .from('profiles')
-            .select('id, avatar_url, username, full_name')
+            .select('id, avatar_url, username, full_name, job_title')
             .in('id', ids),
           supabase
             .from('users')
@@ -53,7 +53,7 @@ export default function WorkspacePeoplePage() {
         const appUsers = appUsersRes?.data as any[] | null
         emailMap = Object.fromEntries((users ?? []).map((u: any) => [u.id, u.email]))
         avatarMap = Object.fromEntries((profs ?? []).map((p: any) => [p.id, p.avatar_url ?? null]))
-        profileMap = Object.fromEntries((profs ?? []).map((p: any) => [p.id, { username: (p.username as string | null) ?? null, full_name: (p.full_name as string | null) ?? null }]))
+        profileMap = Object.fromEntries((profs ?? []).map((p: any) => [p.id, { username: (p.username as string | null) ?? null, full_name: (p.full_name as string | null) ?? null, job_title: (p.job_title as string | null) ?? null }]))
         appMap = Object.fromEntries((appUsers ?? []).map((u: any) => [u.id, { username: (u.username as string | null) ?? null, display: (u.display_name as string | null) ?? null }]))
 
         // Fallback: for any IDs still missing emails, try public view
@@ -88,6 +88,7 @@ export default function WorkspacePeoplePage() {
             role: m.role,
             email: label,
             avatar_url: avatarMap[id] ?? null,
+            job_title: profileMap[id]?.job_title ?? null,
           }
         })
       )
@@ -151,63 +152,71 @@ export default function WorkspacePeoplePage() {
   }, [workspaceId, router])
 
   return (
-    <div className="p-6 space-y-6 w-full">
-      <div className="flex items-start justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold">People</h1>
-          <p className="text-sm text-neutral-500">Invite teammates and manage access.</p>
-        </div>
-        {myRole && myRole !== 'owner' ? (
-          <button
-            className="text-xs px-3 py-2 rounded border border-neutral-300 bg-white hover:bg-neutral-50"
-            onClick={onLeave}
-          >
-            Leave workspace
-          </button>
-        ) : null}
-      </div>
-
-      <InviteUser workspaceId={workspaceId} />
-
-      <div className="space-y-2">
-        <h2 className="text-lg font-medium">Members</h2>
-        <div className="rounded-md border border-neutral-200 overflow-hidden">
-          <div className="grid grid-cols-3 gap-2 p-2 text-xs font-medium text-neutral-600 border-b border-neutral-200">
-            <div>Member</div>
-            <div>Role</div>
-            <div>Actions</div>
+    <div className="min-h-screen w-full">
+      <div className="mx-auto max-w-[1200px] px-6 lg:px-10 py-12 space-y-6">
+        <div className="pt-15 flex items-start justify-between">
+          <div>
+            <h1 className="text-3xl font-semibold tracking-tight text-foreground">People</h1>
+            <p className="text-sm text-muted-foreground mt-0.5">Invite teammates and manage access.</p>
           </div>
-          {loading ? (
-            <div className="p-3 text-sm text-neutral-500">Loading…</div>
-          ) : rows.length === 0 ? (
-            <div className="p-3 text-sm text-neutral-500">No members yet.</div>
-          ) : (
-            <ul>
-              {rows.map((m) => (
-                <li key={m.user_id} className="grid grid-cols-3 gap-2 p-2 text-sm border-t border-neutral-100">
-                  <div className="flex items-center gap-2 min-w-0">
-                    <Avatar className="h-7 w-7">
-                      {m.avatar_url ? (
-                        <AvatarImage src={m.avatar_url} alt={m.email ?? 'Avatar'} />
-                      ) : null}
-                      <AvatarFallback>{m.email?.[0]?.toUpperCase() ?? 'U'}</AvatarFallback>
-                    </Avatar>
-                    <span className="truncate">{m.email}</span>
-                  </div>
-                  <div className="uppercase text-[11px] tracking-wide text-neutral-600">{m.role}</div>
-                  <div className="text-neutral-400 text-xs">
-                    {canManage && m.role !== 'owner' ? (
-                      <button className="text-xs px-2 h-7 rounded border border-neutral-300 bg-white hover:bg-neutral-50" onClick={() => removeMember(m.user_id)}>
-                        Remove
-                      </button>
-                    ) : (
-                      'Owner-managed'
-                    )}
-                  </div>
-                </li>
-              ))}
-            </ul>
-          )}
+          {myRole && myRole !== 'owner' ? (
+            <button
+              className="text-sm px-4 py-2 rounded-xl border border-border bg-card hover:bg-accent transition-colors font-medium"
+              onClick={onLeave}
+            >
+              Leave workspace
+            </button>
+          ) : null}
+        </div>
+
+        <InviteUser workspaceId={workspaceId} />
+
+        <div className="space-y-4">
+          <h2 className="text-xl font-semibold text-foreground">Members</h2>
+          <div className="rounded-xl border border-border overflow-hidden bg-card shadow-sm">
+            <div className="grid grid-cols-4 gap-4 px-4 py-3 text-xs font-semibold text-muted-foreground bg-muted/50 border-b border-border">
+              <div>Member</div>
+              <div>Position</div>
+              <div>Role</div>
+              <div>Actions</div>
+            </div>
+            {loading ? (
+              <div className="px-4 py-8 text-sm text-muted-foreground text-center">Loading…</div>
+            ) : rows.length === 0 ? (
+              <div className="px-4 py-8 text-sm text-muted-foreground text-center">No members yet.</div>
+            ) : (
+              <ul className="divide-y divide-border">
+                {rows.map((m) => (
+                  <li key={m.user_id} className="grid grid-cols-4 gap-4 px-4 py-3 text-sm hover:bg-accent transition-colors">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <Avatar className="h-8 w-8">
+                        {m.avatar_url ? (
+                          <AvatarImage src={m.avatar_url} alt={m.email ?? 'Avatar'} />
+                        ) : null}
+                        <AvatarFallback className="text-xs font-medium">{m.email?.[0]?.toUpperCase() ?? 'U'}</AvatarFallback>
+                      </Avatar>
+                      <span className="truncate font-medium text-foreground">{m.email}</span>
+                    </div>
+                    <div className="flex items-center">
+                      <span className="text-sm text-muted-foreground">{(m as any).job_title || 'No Position'}</span>
+                    </div>
+                    <div className="flex items-center">
+                      <span className="uppercase text-[11px] tracking-wide font-semibold text-muted-foreground px-2 py-1 rounded-md bg-muted">{m.role}</span>
+                    </div>
+                    <div className="flex items-center text-xs">
+                      {canManage && m.role !== 'owner' ? (
+                        <button className="text-xs px-3 py-1.5 rounded-lg border border-border bg-card hover:bg-accent transition-colors font-medium" onClick={() => removeMember(m.user_id)}>
+                          Remove
+                        </button>
+                      ) : (
+                        <span className="text-muted-foreground">Owner-managed</span>
+                      )}
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
         </div>
       </div>
     </div>

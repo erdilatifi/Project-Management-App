@@ -92,7 +92,7 @@ const RegisterPage = () => {
   }
 
   return (
-    <div className="flex justify-center items-center min-h-screen bg-gradient-to-br from-background via-background to-muted/20 p-4">
+    <div className="flex justify-center items-center min-h-screen bg-gradient-to-br from-background via-background to-muted/20 p-4 pt-24">
       <Card className="w-full min-w-[350px] shadow-lg">
         <CardHeader className="space-y-1">
           <div className="flex items-center justify-center mb-2">

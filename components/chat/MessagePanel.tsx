@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
@@ -564,28 +564,28 @@ export default function MessagePanel({ threadId, workspaceId }: Props) {
   };
 
   return (
-    <div className="h-full flex flex-col">
-      <div className="p-2 border-b border-neutral-200 flex items-center justify-between">
+    <div className="h-full flex flex-col bg-muted/30">
+      <div className="px-4 py-3 border-b border-border bg-card flex items-center justify-between shadow-sm">
         <div className="flex items-center gap-2 overflow-x-auto">
           {participants.length === 0 ? (
-            <div className="text-xs text-neutral-500">Public to workspace</div>
+            <div className="text-xs text-muted-foreground font-medium">Public to workspace</div>
           ) : (
             participants.map((p) => (
               <div
                 key={p.id}
-                className="flex items-center gap-2 px-2 py-1 rounded-full border border-neutral-200 bg-neutral-50"
+                className="flex items-center gap-2 px-3 py-1.5 rounded-full border border-border bg-card shadow-sm"
               >
                 <Avatar className="h-6 w-6">
                   {p.avatar_url ? <AvatarImage src={p.avatar_url} alt={p.email ?? "Avatar"} /> : null}
-                  <AvatarFallback>{p.email?.[0]?.toUpperCase() ?? "?"}</AvatarFallback>
+                  <AvatarFallback className="text-xs">{p.email?.[0]?.toUpperCase() ?? "?"}</AvatarFallback>
                 </Avatar>
-                <span className="text-xs max-w-40 truncate">{p.email ?? "User"}</span>
+                <span className="text-xs font-medium text-foreground max-w-40 truncate">{p.email ?? "User"}</span>
                 {creatorId === p.id && (
-                  <span className="ml-1 text-[10px] px-1.5 py-0.5 rounded bg-amber-200 text-amber-900">Owner</span>
+                  <span className="ml-1 text-[10px] px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-400 font-medium">Owner</span>
                 )}
                 {canManage && creatorId !== p.id ? (
                   <button
-                    className="ml-1 text-neutral-500 hover:text-neutral-800"
+                    className="ml-1 text-muted-foreground hover:text-foreground"
                     title="Remove"
                     onClick={() => removeParticipant(p.id)}
                   >
@@ -595,7 +595,7 @@ export default function MessagePanel({ threadId, workspaceId }: Props) {
                 {canManage && creatorId !== p.id ? (
                   <button
                     className={`ml-1 text-[10px] px-1.5 py-0.5 rounded ${
-                      p.is_admin ? "bg-blue-600 text-white" : "bg-neutral-200 text-neutral-800"
+                      p.is_admin ? "bg-blue-600 text-white" : "bg-muted text-muted-foreground"
                     }`}
                     onClick={() => toggleAdmin(p.id, !p.is_admin)}
                     title={p.is_admin ? "Remove admin" : "Make admin"}
@@ -611,7 +611,7 @@ export default function MessagePanel({ threadId, workspaceId }: Props) {
         {/* Removed "Add participant" UI as requested */}
         {participants.some((p) => p.id === userId) && (
           <button
-            className="text-xs px-2 h-7 rounded border border-neutral-300 bg-white hover:bg-neutral-50"
+            className="text-xs px-3 h-8 rounded-lg border border-border bg-card hover:bg-accent font-medium transition-colors"
             onClick={() => removeParticipant(userId!)}
           >
             Leave thread
@@ -620,19 +620,19 @@ export default function MessagePanel({ threadId, workspaceId }: Props) {
       </div>
 
       {typingIds.size > 0 && (
-        <div className="px-3 py-1 text-xs text-neutral-500">
-          Typing: {Array.from(typingIds).map((id) => typingEmails[id] ?? "User").join(", ")}
+        <div className="px-4 py-2 text-xs text-muted-foreground bg-card border-b border-border">
+          <span className="font-medium">Typing:</span> {Array.from(typingIds).map((id) => typingEmails[id] ?? "User").join(", ")}
         </div>
       )}
 
-      <div className="px-2 py-2 border-b border-neutral-200 flex items-center justify-between bg-white">
+      <div className="px-4 py-3 border-b border-border flex items-center justify-between bg-card shadow-sm">
         <div className="flex items-center gap-2">
           {!titleEditing ? (
             <>
-              <h2 className="text-sm font-medium text-neutral-900">{threadTitle ?? "Untitled thread"}</h2>
+              <h2 className="text-base font-semibold text-foreground">{threadTitle ?? "Untitled thread"}</h2>
               {canManage && (
                 <button
-                  className="text-[11px] px-1.5 py-0.5 rounded border border-neutral-300 bg-white text-neutral-800"
+                  className="text-xs px-2 py-1 rounded-md border border-border bg-card hover:bg-accent font-medium transition-colors"
                   onClick={() => {
                     setTitleEditing(true);
                     setTitleInput(threadTitle ?? "");
@@ -644,9 +644,9 @@ export default function MessagePanel({ threadId, workspaceId }: Props) {
             </>
           ) : (
             <div className="flex items-center gap-2">
-              <Input className="h-8 w-72" value={titleInput} onChange={(e) => setTitleInput(e.target.value)} />
+              <Input className="h-9 w-72 rounded-lg border-border bg-background" value={titleInput} onChange={(e) => setTitleInput(e.target.value)} />
               <button
-                className="text-xs px-2 h-7 rounded border border-neutral-300 bg-white text-neutral-900"
+                className="text-xs px-3 h-9 rounded-lg border border-border bg-card hover:bg-accent font-medium transition-colors"
                 disabled={savingTitle}
                 onClick={async () => {
                   try {
@@ -668,7 +668,7 @@ export default function MessagePanel({ threadId, workspaceId }: Props) {
                 Save
               </button>
               <button
-                className="text-xs px-2 h-7 rounded border border-neutral-300 bg-white text-neutral-900"
+                className="text-xs px-3 h-9 rounded-lg border border-border bg-card hover:bg-accent font-medium transition-colors"
                 onClick={() => setTitleEditing(false)}
               >
                 Cancel
@@ -678,9 +678,9 @@ export default function MessagePanel({ threadId, workspaceId }: Props) {
         </div>
       </div>
 
-      <div ref={listRef} className="flex-1 overflow-auto p-3 space-y-3">
+      <div ref={listRef} className="flex-1 overflow-auto p-4 space-y-4">
         {items.length === 0 ? (
-          <div className="h-full w-full flex items-center justify-center text-sm text-neutral-500">
+          <div className="h-full w-full flex items-center justify-center text-sm text-muted-foreground">
             No messages yet — start the conversation.
           </div>
         ) : (
@@ -691,16 +691,16 @@ export default function MessagePanel({ threadId, workspaceId }: Props) {
             return (
               <div key={m.id} className={`group flex items-start gap-3 ${me ? "justify-end" : ""}`}>
                 {!me && (
-                  <Avatar className="h-8 w-8">
-                    <AvatarFallback>{initials}</AvatarFallback>
+                  <Avatar className="h-8 w-8 flex-shrink-0">
+                    <AvatarFallback className="text-xs font-medium">{initials}</AvatarFallback>
                   </Avatar>
                 )}
                 <div
-                  className={`relative max-w-[70%] rounded-md px-3 py-2 text-sm ${
-                    me ? "bg-blue-600 text-white" : "bg-neutral-100 text-neutral-900"
+                  className={`relative max-w-[65%] rounded-2xl px-4 py-2.5 text-sm shadow-sm ${
+                    me ? "bg-blue-600 text-white" : "bg-card border border-border text-foreground"
                   }`}
                 >
-                  {!me && <div className="text-[11px] text-neutral-500 mb-1">{email}</div>}
+                  {!me && <div className="text-[11px] font-medium text-muted-foreground mb-1">{email}</div>}
                   {editingId === m.id ? (
                     <div className="flex items-center gap-2">
                       <input
@@ -732,15 +732,17 @@ export default function MessagePanel({ threadId, workspaceId }: Props) {
                     </div>
                   ) : (
                     <>
-                      <div className="whitespace-pre-wrap wrap-break-words">{m.body}</div>
-                      <div className="mt-1 text-[10px] opacity-70 flex items-center gap-2">
+                      <div className="whitespace-pre-wrap break-words leading-relaxed">{m.body}</div>
+                      <div className={`mt-1.5 text-[10px] flex items-center gap-1.5 ${
+                        me ? "text-blue-100" : "text-muted-foreground"
+                      }`}>
                         <span>{formatTimeAgo(m.created_at)}</span>
-                        {editedIds.has(m.id) && <span className="opacity-70">(edited)</span>}
+                        {editedIds.has(m.id) && <span>(edited)</span>}
                       </div>
                       {me && (
-                        <div className="absolute -top-2 right-1 hidden group-hover:flex items-center gap-1">
+                        <div className="absolute -top-2 right-1 hidden group-hover:flex items-center gap-1 shadow-md rounded-lg overflow-hidden">
                           <button
-                            className="text-[11px] px-1.5 py-0.5 rounded border border-neutral-300 bg-white text-neutral-800"
+                            className="px-2 py-1.5 bg-card hover:bg-accent text-foreground border-r border-border transition-colors"
                             onClick={() => {
                               setEditingId(m.id);
                               setEditingText(m.body);
@@ -750,7 +752,7 @@ export default function MessagePanel({ threadId, workspaceId }: Props) {
                             <Pencil className="w-3.5 h-3.5" />
                           </button>
                           <button
-                            className="text-[11px] px-1.5 py-0.5 rounded border border-red-300 bg-white text-red-700"
+                            className="px-2 py-1.5 bg-card hover:bg-red-50 dark:hover:bg-red-950 text-red-600 transition-colors"
                             onClick={() => deleteMessage(m.id)}
                             title="Delete"
                           >
@@ -762,8 +764,8 @@ export default function MessagePanel({ threadId, workspaceId }: Props) {
                   )}
                 </div>
                 {me && (
-                  <Avatar className="h-8 w-8">
-                    <AvatarFallback>{initials}</AvatarFallback>
+                  <Avatar className="h-8 w-8 flex-shrink-0">
+                    <AvatarFallback className="text-xs font-medium">{initials}</AvatarFallback>
                   </Avatar>
                 )}
               </div>
@@ -772,7 +774,7 @@ export default function MessagePanel({ threadId, workspaceId }: Props) {
         )}
       </div>
 
-      <div className="p-2 border-t border-neutral-200">
+      <div className="p-4 border-t border-border bg-card shadow-sm">
         <Input
           placeholder="Type a message and press Enter"
           value={text}
@@ -783,6 +785,7 @@ export default function MessagePanel({ threadId, workspaceId }: Props) {
               onSend();
             }
           }}
+          className="h-11 rounded-xl border-border bg-background focus-visible:ring-2 focus-visible:ring-ring"
         />
       </div>
     </div>

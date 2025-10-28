@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useEffect, useMemo, useState } from "react";
 import { createClient } from "@/utils/supabase/client";
@@ -111,28 +111,28 @@ export default function CreateProjectDialog({ workspaceId, onCreated }: Props) {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button variant="outline" className="border-neutral-700 text-black">New Project</Button>
+        <Button variant="outline" className="rounded-xl">New Project</Button>
       </DialogTrigger>
-      <DialogContent>
+      <DialogContent className="rounded-2xl">
         <DialogHeader>
-          <DialogTitle>Create Project</DialogTitle>
-          <DialogDescription>
+          <DialogTitle className="text-xl font-semibold">Create Project</DialogTitle>
+          <DialogDescription className="text-sm text-muted-foreground">
             Add a new project to your current workspace.
           </DialogDescription>
         </DialogHeader>
-        <div className="space-y-4 py-2">
+        <div className="space-y-4 py-4">
           {!workspaceId && (
             <div className="space-y-2">
-              <label className="text-sm">Workspace</label>
+              <label className="text-sm font-medium text-foreground">Workspace</label>
               <Select
                 value={wsId ?? undefined}
                 onValueChange={(v) => setWsId(v)}
                 disabled={loadingWs || workspaces.length === 0}
               >
-                <SelectTrigger>
-                  <SelectValue placeholder={loadingWs ? "Loadingâ€¦" : workspaces.length ? "Select a workspace" : "No workspaces available"} />
+                <SelectTrigger className="h-10 rounded-xl border-border bg-background">
+                  <SelectValue placeholder={loadingWs ? "Loading…" : workspaces.length ? "Select a workspace" : "No workspaces available"} />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="rounded-xl">
                   {workspaces.map((w) => (
                     <SelectItem key={w.id} value={w.id}>
                       {w.name}
@@ -141,40 +141,43 @@ export default function CreateProjectDialog({ workspaceId, onCreated }: Props) {
                 </SelectContent>
               </Select>
               {workspaces.length === 0 && !loadingWs && (
-                <div className="mt-3 grid grid-cols-1 gap-2">
+                <div className="mt-3 space-y-2">
                   <Input
                     value={wsName}
                     onChange={(e) => setWsName(e.target.value)}
                     placeholder="Workspace name"
+                    className="h-10 rounded-xl border-border bg-background"
                   />
-                  <Button onClick={onCreateWorkspace} disabled={creatingWs} variant="outline" className="justify-center">
-                    {creatingWs ? "Creatingâ€¦" : "Create Workspace"}
+                  <Button onClick={onCreateWorkspace} disabled={creatingWs} variant="outline" className="w-full rounded-xl">
+                    {creatingWs ? "Creating…" : "Create Workspace"}
                   </Button>
                 </div>
               )}
             </div>
           )}
           <div className="space-y-2">
-            <label className="text-sm">Name</label>
+            <label className="text-sm font-medium text-foreground">Name</label>
             <Input
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="Project name"
+              className="h-10 rounded-xl border-border bg-background"
             />
           </div>
           <div className="space-y-2">
-            <label className="text-sm">Description</label>
+            <label className="text-sm font-medium text-foreground">Description</label>
             <Textarea
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               placeholder="Optional description"
               rows={4}
+              className="rounded-xl border-border bg-background resize-none"
             />
           </div>
         </div>
         <DialogFooter>
-          <Button onClick={onSubmit} disabled={submitting} variant="outline">
-            {submitting ? "Creatingâ€¦" : "Create"}
+          <Button onClick={onSubmit} disabled={submitting} className="rounded-xl px-6">
+            {submitting ? "Creating…" : "Create"}
           </Button>
         </DialogFooter>
       </DialogContent>

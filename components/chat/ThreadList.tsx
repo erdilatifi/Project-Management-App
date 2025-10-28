@@ -1,4 +1,4 @@
-﻿"use client"
+"use client"
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
@@ -93,8 +93,8 @@ const threadsQ = useQuery({
 
   return (
     <div className="h-full flex flex-col">
-      <div className="p-2 border-b border-neutral-200 flex items-center gap-2">
-        <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search threads" />
+      <div className="p-2 border-b border-border flex items-center gap-2">
+        <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search threads" className="bg-background border-border" />
         <Button size="sm" onClick={onNew}><Plus className="w-4 h-4 mr-1" /> New</Button>
       </div>
       <div className="flex-1 overflow-auto">
@@ -105,12 +105,12 @@ const threadsQ = useQuery({
             <Skeleton className="h-8" />
           </div>
         ) : shown.length === 0 ? (
-          <div className="p-3 text-sm text-neutral-500">No threads</div>
+          <div className="p-3 text-sm text-muted-foreground">No threads</div>
         ) : (
           shown.length === 0 ? (
             <div className="p-4 h-full flex items-center justify-center">
               <div className="text-center space-y-3">
-                <div className="text-sm text-neutral-500">No threads yet</div>
+                <div className="text-sm text-muted-foreground">No threads yet</div>
                 <Button size="sm" onClick={onNew}><Plus className="w-4 h-4 mr-1" /> Create first thread</Button>
               </div>
             </div>
@@ -118,14 +118,20 @@ const threadsQ = useQuery({
             <ul>
               {shown.map((t) => (
                 <li key={t.id}>
-                  <div className={`w-full px-3 py-2 flex items-center gap-2 hover:bg-neutral-50 ${activeThreadId === t.id ? 'bg-neutral-100' : ''}`}>
+                  <div className={`w-full px-3 py-2 flex items-center gap-2 transition-colors ${
+                    activeThreadId === t.id 
+                      ? 'bg-accent border-l-2 border-l-primary' 
+                      : 'hover:bg-accent/50'
+                  }`}>
                     <button onClick={() => onSelect(t.id)} className="flex-1 text-left flex items-center gap-2">
-                      <MessageSquare className="w-4 h-4 text-neutral-500" />
-                      <span className="truncate">{t.title ?? 'Untitled thread'}</span>
+                      <MessageSquare className="w-4 h-4 text-muted-foreground" />
+                      <span className={`truncate ${
+                        activeThreadId === t.id ? 'font-semibold text-foreground' : 'text-foreground'
+                      }`}>{t.title ?? 'Untitled thread'}</span>
                     </button>
                     {userId && (t as any).created_by === userId && (
                       <button
-                        className="text-[11px] px-1.5 py-0.5 rounded border border-red-300 bg-white text-red-700"
+                        className="text-[11px] px-1.5 py-0.5 rounded border border-border bg-card hover:bg-red-50 dark:hover:bg-red-950 text-red-600 transition-colors"
                         title="Delete thread"
                         onClick={() => { setPendingDeleteId(t.id); setDeleteOpen(true) }}
                       >

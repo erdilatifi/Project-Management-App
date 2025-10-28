@@ -114,28 +114,26 @@ export default function ProjectsPage() {
   };
 
   return (
-    <div className="min-h-screen w-full  bg-[radial-gradient(90rem_50rem_at_50%_-10%,rgba(0,0,0,0.05),transparent)]">
+    <div className="min-h-screen w-full">
       <div className="mx-auto max-w-[1200px] px-6 lg:px-10 py-12 space-y-6">
-        {/* Sticky header (matches Tasks/Workspaces styling) */}
-        <div className="sticky top-0 z-10 -mx-6 lg:-mx-10 px-6 lg:px-10 py-4 ">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <h1 className="text-3xl font-semibold tracking-tight text-neutral-900">Projects</h1>
-              <p className="text-sm text-neutral-600 mt-0.5">Manage projects in your current workspace.</p>
-            </div>
-            <div className="flex items-center gap-2">
-              <CreateWorkspaceDialog onCreated={(ws) => setWorkspaceId(ws.id)} />
-              <CreateProjectDialog workspaceId={workspaceId} onCreated={onCreated} />
-            </div>
+        {/* Header */}
+        <div className="pt-15 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h1 className="text-3xl font-semibold tracking-tight text-foreground">Projects</h1>
+            <p className="text-sm text-muted-foreground mt-0.5">Manage projects in your current workspace.</p>
+          </div>
+          <div className="flex items-center gap-2">
+            <CreateWorkspaceDialog onCreated={(ws) => setWorkspaceId(ws.id)} />
+            <CreateProjectDialog workspaceId={workspaceId} onCreated={onCreated} />
           </div>
         </div>
 
         {/* Controls */}
-        <Card className="border-neutral-200 shadow-sm rounded-2xl">
+        <Card className="border-border shadow-sm rounded-2xl">
           <CardContent className="px-4 sm:px-6 py-4">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
               <div className="relative flex-1">
-                <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-neutral-500" />
+                <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
                   ref={searchRef}
                   value={search}
@@ -147,7 +145,7 @@ export default function ProjectsPage() {
                     if (e.key === "Enter") reload();
                   }}
                   placeholder="Search projects (Cmd/Ctrl+K)"
-                  className="pl-9 pr-8 bg-white border-neutral-300 focus-visible:ring-2 focus-visible:ring-neutral-300 rounded-xl"
+                  className="pl-9 pr-8 bg-background border-border focus-visible:ring-2 focus-visible:ring-ring rounded-xl"
                 />
                 {search ? (
                   <button
@@ -158,7 +156,7 @@ export default function ProjectsPage() {
                       searchRef.current?.focus();
                       reload();
                     }}
-                    className="absolute right-2 top-1/2 -translate-y-1/2 rounded-md p-1 text-neutral-500 hover:text-neutral-800 hover:bg-neutral-100"
+                    className="absolute right-2 top-1/2 -translate-y-1/2 rounded-md p-1 text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
                   >
                     <X className="h-4 w-4" />
                   </button>
@@ -167,7 +165,7 @@ export default function ProjectsPage() {
               <Button
                 variant="outline"
                 onClick={() => reload()}
-                className="rounded-xl border-neutral-300 text-neutral-900 hover:bg-neutral-50"
+                className="rounded-xl"
               >
                 <RefreshCcw className="mr-2 h-4 w-4" /> Refresh
               </Button>
@@ -179,7 +177,7 @@ export default function ProjectsPage() {
         {booting || loading ? (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
             {Array.from({ length: 4 }).map((_, i) => (
-              <Card key={i} className="p-5 rounded-2xl border-neutral-200 shadow-sm">
+              <Card key={i} className="p-5 rounded-2xl border-border shadow-sm">
                 <div className="flex items-center gap-3">
                   <Skeleton className="h-8 w-8 rounded-lg" />
                   <Skeleton className="h-5 w-1/2 rounded-md" />
@@ -203,7 +201,7 @@ export default function ProjectsPage() {
                 {items.map((p) => (
                   <Card
                     key={p.id}
-                    className="group overflow-hidden rounded-2xl border-neutral-200 shadow-sm hover:shadow-md hover:border-neutral-300 transition-all"
+                    className="group overflow-hidden rounded-2xl border-border shadow-sm hover:shadow-md transition-all"
                   >
                     <div className="p-5 flex flex-col gap-3">
                       <div className="flex items-start justify-between gap-4">
@@ -212,17 +210,17 @@ export default function ProjectsPage() {
                           <div className="min-w-0">
                             <Link
                               href={`/projects/${p.id}`}
-                              className="font-medium text-neutral-900 hover:underline leading-6 line-clamp-2"
+                              className="font-semibold text-foreground hover:underline leading-6 line-clamp-2"
                             >
                               {p.name}
                             </Link>
                             <div className="mt-1 flex items-center gap-2">
                               {p.is_archived ? (
-                                <Badge variant="outline" className="border-amber-300 text-amber-700 bg-amber-50">
+                                <Badge variant="outline" className="border-amber-300 text-amber-700 bg-amber-50 dark:bg-amber-950 dark:text-amber-400 rounded-lg">
                                   Archived
                                 </Badge>
                               ) : null}
-                              <span className="text-xs text-neutral-500">
+                              <span className="text-xs text-muted-foreground">
                                 Created {new Date(p.created_at).toLocaleString()}
                               </span>
                             </div>
@@ -239,24 +237,24 @@ export default function ProjectsPage() {
                       </div>
 
                       {p.description ? (
-                        <p className="text-sm text-neutral-700 leading-6 line-clamp-3">{p.description}</p>
+                        <p className="text-sm text-muted-foreground leading-6 line-clamp-3">{p.description}</p>
                       ) : (
-                        <p className="text-sm text-neutral-500">No description</p>
+                        <p className="text-sm text-muted-foreground italic">No description</p>
                       )}
                     </div>
 
-                    <Separator className="bg-neutral-200" />
+                    <Separator />
 
                     <div className="p-3 flex items-center justify-end gap-2">
                       <Link
                         href={`/projects/${p.id}/tasks`}
-                        className="inline-flex items-center text-xs font-medium text-neutral-700 hover:text-neutral-900 px-2 py-1.5 rounded-lg hover:bg-neutral-100 transition-colors"
+                        className="inline-flex items-center text-xs font-medium text-muted-foreground hover:text-foreground px-2 py-1.5 rounded-lg hover:bg-accent transition-colors"
                       >
                         View tasks
                       </Link>
                       <Link
                         href={`/projects/${p.id}`}
-                        className="inline-flex items-center text-xs font-medium text-neutral-700 hover:text-neutral-900 px-2 py-1.5 rounded-lg hover:bg-neutral-100 transition-colors"
+                        className="inline-flex items-center text-xs font-medium text-muted-foreground hover:text-foreground px-2 py-1.5 rounded-lg hover:bg-accent transition-colors"
                       >
                         Open
                       </Link>
@@ -268,7 +266,7 @@ export default function ProjectsPage() {
 
             {/* Pagination */}
             <div className="flex items-center justify-between mt-6">
-              <div className="text-sm text-neutral-600">
+              <div className="text-sm text-muted-foreground">
                 Page {page} • {total} total
               </div>
               <div className="flex items-center gap-2">
@@ -276,7 +274,7 @@ export default function ProjectsPage() {
                   variant="outline"
                   disabled={!canPrev}
                   onClick={() => setPage((p) => Math.max(1, p - 1))}
-                  className="rounded-xl border-neutral-300 hover:bg-neutral-50"
+                  className="rounded-xl"
                 >
                   <ChevronLeft className="mr-2 h-4 w-4" /> Previous
                 </Button>
@@ -284,7 +282,7 @@ export default function ProjectsPage() {
                   variant="outline"
                   disabled={!canNext}
                   onClick={() => setPage((p) => p + 1)}
-                  className="rounded-xl border-neutral-300 hover:bg-neutral-50"
+                  className="rounded-xl"
                 >
                   Next <ChevronRight className="ml-2 h-4 w-4" />
                 </Button>
@@ -299,13 +297,13 @@ export default function ProjectsPage() {
 
 function EmptyState({ onReset }: { onReset: () => void }) {
   return (
-    <Card className="overflow-hidden rounded-2xl border-neutral-200">
+    <Card className="overflow-hidden rounded-2xl border-border">
       <div className="px-6 py-12 text-center">
-        <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-neutral-100">
-          <FolderPlus className="h-6 w-6 text-neutral-600" />
+        <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-muted">
+          <FolderPlus className="h-6 w-6 text-muted-foreground" />
         </div>
-        <h3 className="text-lg font-medium text-neutral-900">No projects found</h3>
-        <p className="mt-1 text-sm text-neutral-600">
+        <h3 className="text-lg font-semibold text-foreground">No projects found</h3>
+        <p className="mt-1 text-sm text-muted-foreground">
           Try adjusting your search or create a new project to get started.
         </p>
         <div className="mt-4 flex items-center justify-center gap-2">

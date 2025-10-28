@@ -28,6 +28,7 @@ export default function NotificationBell() {
   const [open, setOpen] = useState(false)
   const [items, setItems] = useState<Item[]>([])
   const subscribed = useRef(false)
+  const containerRef = useRef<HTMLDivElement>(null)
 
   const load = useCallback(async () => {
     if (!user?.id) return
@@ -45,6 +46,23 @@ export default function NotificationBell() {
     setItems([])
     if (user?.id) load()
   }, [user?.id, load])
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+        setOpen(false)
+      }
+    }
+
+    if (open) {
+      document.addEventListener('mousedown', handleClickOutside)
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside)
+    }
+  }, [open])
 
   useEffect(() => {
     if (!user?.id || subscribed.current) return
@@ -146,34 +164,34 @@ export default function NotificationBell() {
   }
 
   return (
-    <div className="relative">
-      <button aria-label="Notifications" className="relative p-2 rounded-md hover:bg-neutral-900 text-white" onClick={() => setOpen((v) => !v)}>
+    <div className="relative" ref={containerRef}>
+      <button aria-label="Notifications" className="relative p-2 rounded-md hover:bg-accent text-foreground transition-colors" onClick={() => setOpen((v) => !v)}>
         <Bell className="w-5 h-5" />
         {unread > 0 && (
-          <span className="absolute -top-1 -right-1 min-w-4 h-4 px-1 rounded-full bg-red-600 text-[10px] leading-4 text-white text-center">
+          <span className="absolute -top-1 -right-1 min-w-4 h-4 px-1 rounded-full bg-red-600 text-[10px] leading-4 text-white text-center font-medium">
             {unread > 99 ? '99+' : unread}
           </span>
         )}
       </button>
 
       {open && (
-        <div className="absolute right-0 mt-2 w-[360px] max-h-[480px] overflow-auto rounded-md border border-neutral-700 bg-black shadow-lg z-50">
-          <div className="flex items-center justify-between p-2 border-b border-neutral-800">
-            <div className="text-sm text-neutral-300">Notifications</div>
+        <div className="absolute right-0 mt-2 w-[360px] max-h-[480px] overflow-auto rounded-xl border border-border bg-card shadow-lg z-50">
+          <div className="flex items-center justify-between px-4 py-3 border-b border-border">
+            <div className="text-sm font-semibold text-foreground">Notifications</div>
             <div className="flex items-center gap-2">
               <Button
-                variant="outline"
+                variant="ghost"
                 size="sm"
-                className="h-7 text-xs border-neutral-700"
+                className="h-8 text-xs rounded-lg"
                 onClick={markAll}
                 disabled={unread === 0}
               >
                 Mark all read
               </Button>
               <Button
-                variant="outline"
+                variant="ghost"
                 size="sm"
-                className="h-7 text-xs border-neutral-700"
+                className="h-8 text-xs rounded-lg"
                 onClick={clearAll}
                 disabled={items.length === 0}
               >
@@ -182,26 +200,26 @@ export default function NotificationBell() {
             </div>
           </div>
           {items.length === 0 ? (
-            <div className="p-3 text-sm text-neutral-400">No notifications</div>
+            <div className="p-4 text-sm text-muted-foreground text-center">No notifications</div>
           ) : (
-            <ul className="divide-y divide-neutral-800">
+            <ul className="divide-y divide-border">
               {items.map((n) => (
-                <li key={n.id} className={`p-3 hover:bg-neutral-900 cursor-pointer ${n.is_read ? 'opacity-70' : ''}`} onClick={() => onClickItem(n)}>
+                <li key={n.id} className={`px-4 py-3 hover:bg-accent cursor-pointer transition-colors ${n.is_read ? 'opacity-60' : ''}`} onClick={() => onClickItem(n)}>
                   <div className="flex items-start gap-3">
-                    <div className={`mt-1 w-2 h-2 rounded-full ${n.is_read ? 'bg-neutral-700' : 'bg-blue-500'}`} />
+                    <div className={`mt-1.5 w-2 h-2 rounded-full flex-shrink-0 ${n.is_read ? 'bg-muted-foreground' : 'bg-blue-500'}`} />
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
-                        <span className="text-neutral-300">{iconFor(n.type)}</span>
-                        <div className="text-sm font-medium text-white truncate">{n.title ?? n.type}</div>
-                        <div className="ml-auto text-[11px] text-neutral-400 shrink-0">{formatTimeAgo(n.created_at)}</div>
+                        <span className="text-muted-foreground">{iconFor(n.type)}</span>
+                        <div className="text-sm font-medium text-foreground truncate">{n.title ?? n.type}</div>
+                        <div className="ml-auto text-[11px] text-muted-foreground shrink-0">{formatTimeAgo(n.created_at)}</div>
                       </div>
-                      {n.body ? <div className="text-xs text-neutral-300 mt-1 whitespace-pre-wrap">{n.body}</div> : null}
+                      {n.body ? <div className="text-xs text-muted-foreground mt-1.5 leading-relaxed">{n.body}</div> : null}
                       {n.type === 'workspace_invite' && (
                         <div className="mt-2 flex items-center gap-2">
                           <Button
                             size="sm"
                             variant="outline"
-                            className="h-7 text-xs border-neutral-700"
+                            className="h-7 text-xs rounded-lg"
                             onClick={async (e) => {
                               e.stopPropagation()
                               try {
@@ -224,7 +242,7 @@ export default function NotificationBell() {
                           <Button
                             size="sm"
                             variant="outline"
-                            className="h-7 text-xs border-neutral-700"
+                            className="h-7 text-xs rounded-lg"
                             onClick={async (e) => {
                               e.stopPropagation()
                               try {

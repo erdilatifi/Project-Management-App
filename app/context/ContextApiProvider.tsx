@@ -26,7 +26,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       setSession(session);
       setUser(session?.user ?? null);
     } catch (error) {
-      console.error('Error refreshing auth', error);
+      // Silently handle auth refresh errors
     }
   };
 
@@ -38,7 +38,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         setSession(session);
         setUser(session?.user ?? null);
       } catch (error) {
-        console.error('Error getting session', error);
+        // Silently handle session fetch errors
       } finally {
         setLoading(false);
       }

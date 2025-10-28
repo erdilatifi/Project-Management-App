@@ -2,6 +2,9 @@
   "name": "project-management-app",
   "version": "0.1.0",
   "private": true,
+  "license": "UNLICENSED",
+  "author": "Flowfoundry",
+  "description": "Proprietary project management application - All rights reserved",
   "scripts": {
     "dev": "next dev",
     "build": "next build",

@@ -403,7 +403,7 @@ export default function ProfilePage() {
 
         <TabsContent value="preferences">
           <Card className="p-6 lg:min-w-[700px] space-y-6">
-            <CardTitle className="text-xl font-semibold">Notifications & Preferences</CardTitle>
+            <CardTitle className="text-xl font-semibold">Preferences</CardTitle>
             <CardContent>
               <NotificationPreferences />
             </CardContent>

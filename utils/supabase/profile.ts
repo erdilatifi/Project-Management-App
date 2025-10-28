@@ -249,6 +249,4 @@ export async function logAuditEvent(
       old_values: oldValues,
       new_values: newValues
     })
-  
-  if (error) console.error('Audit log error:', error)
 }

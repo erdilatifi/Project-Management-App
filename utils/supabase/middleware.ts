@@ -48,9 +48,10 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.redirect(url)
   }
 
-  // Redirect unauthenticated users to login
+  // Redirect unauthenticated users to login (except for public pages)
   if (
     !user &&
+    request.nextUrl.pathname !== '/' && 
     !request.nextUrl.pathname.startsWith('/login') &&
     !request.nextUrl.pathname.startsWith('/register') &&
     !request.nextUrl.pathname.startsWith('/forgot-password') &&

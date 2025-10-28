@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import {
   useEffect,
@@ -43,16 +43,12 @@ import {
   useSensors,
 } from "@dnd-kit/core";
 
-/* ==========================================================================
-   Inline AssigneeSearchBar for create-only (no per-card dropdown)
-   ========================================================================== */
 
 type Candidate = { id: string; label: string };
 
 type SearchBarProps = {
   candidates: Candidate[];
   placeholder?: string;
-  /** null = Unassigned, "<id>" = user id */
   value: string | null;
   onChange: (val: string | null) => void;
   allowUnassigned?: boolean;
@@ -133,7 +129,7 @@ function AssigneeSearchBar({
             setOpen(true);
           }}
           placeholder={placeholder}
-          className="h-9 rounded-xl bg-white text-neutral-900 border-neutral-300 pr-8"
+          className="h-9 rounded-xl bg-background border-border pr-8"
           aria-autocomplete="list"
           aria-expanded={open}
           onKeyDown={(e) => {
@@ -161,20 +157,20 @@ function AssigneeSearchBar({
       {open && (
         <div
           role="listbox"
-          className="absolute z-20 mt-1 w-full rounded-xl border border-neutral-200 bg-white shadow-lg overflow-hidden"
+          className="absolute z-20 mt-1 w-full rounded-xl border border-border bg-card shadow-lg overflow-hidden"
           onMouseDown={(e) => e.preventDefault()}
         >
           {allowUnassigned && (
             <button
               type="button"
-              className="w-full text-left px-3 py-2 text-sm hover:bg-neutral-50"
+              className="w-full text-left px-3 py-2 text-sm hover:bg-accent"
               onClick={() => select(null)}
             >
               Unassigned
             </button>
           )}
           {options.length === 0 ? (
-            <div className="px-3 py-2 text-sm text-neutral-500">No results</div>
+            <div className="px-3 py-2 text-sm text-muted-foreground">No results</div>
           ) : (
             <ul>
               {options.map((opt, i) => (
@@ -182,8 +178,8 @@ function AssigneeSearchBar({
                   <button
                     type="button"
                     role="option"
-                    className={`w-full text-left px-3 py-2 text-sm hover:bg-neutral-50 ${
-                      i === activeIndex ? "bg-neutral-50" : ""
+                    className={`w-full text-left px-3 py-2 text-sm hover:bg-accent ${
+                      i === activeIndex ? "bg-accent" : ""
                     }`}
                     onMouseEnter={() => setActiveIndex(i)}
                     onClick={() => select(opt.id)}
@@ -241,14 +237,14 @@ function dueCategory(due_at?: string | null): DueCategory {
 function dueBadgeClass(cat: DueCategory) {
   switch (cat) {
     case "overdue":
-      return "bg-red-50 text-red-700 border-red-200";
+      return "bg-red-100 dark:bg-red-950 text-red-700 dark:text-red-400 border-red-200 dark:border-red-800";
     case "today":
-      return "bg-amber-50 text-amber-700 border-amber-200";
+      return "bg-amber-100 dark:bg-amber-950 text-amber-700 dark:text-amber-400 border-amber-200 dark:border-amber-800";
     case "nextweek":
-      return "bg-blue-50 text-blue-700 border-blue-200";
+      return "bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-400 border-blue-200 dark:border-blue-800";
     case "none":
     default:
-      return "bg-neutral-50 text-neutral-700 border-neutral-200";
+      return "bg-muted text-muted-foreground border-border";
   }
 }
 
@@ -297,17 +293,17 @@ const statusTint: Record<Status, string> = {
 const priorityClass = (p?: number | null) => {
   switch (p) {
     case 1:
-      return "bg-red-50 text-red-700 border-red-200";
+      return "bg-red-100 dark:bg-red-950 text-red-700 dark:text-red-400 border-red-200 dark:border-red-800";
     case 2:
-      return "bg-orange-50 text-orange-700 border-orange-200";
+      return "bg-orange-100 dark:bg-orange-950 text-orange-700 dark:text-orange-400 border-orange-200 dark:border-orange-800";
     case 3:
-      return "bg-amber-50 text-amber-700 border-amber-200";
+      return "bg-amber-100 dark:bg-amber-950 text-amber-700 dark:text-amber-400 border-amber-200 dark:border-amber-800";
     case 4:
-      return "bg-blue-50 text-blue-700 border-blue-200";
+      return "bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-400 border-blue-200 dark:border-blue-800";
     case 5:
-      return "bg-purple-50 text-purple-700 border-purple-200";
+      return "bg-purple-100 dark:bg-purple-950 text-purple-700 dark:text-purple-400 border-purple-200 dark:border-purple-800";
     default:
-      return "bg-neutral-50 text-neutral-700 border-neutral-200";
+      return "bg-muted text-muted-foreground border-border";
   }
 };
 
@@ -809,10 +805,10 @@ export default function ProjectTasksBoardPage() {
         {/* Header */}
         <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           {canCreate && (
-            <Card className="w-full p-3 rounded-xl border border-neutral-200 shadow-sm">
+            <Card className="w-full p-3 rounded-xl border border-border shadow-sm">
               <div className="flex items-end gap-3 flex-wrap">
                 <div className="flex flex-col">
-                  <label className="text-xs text-neutral-600 mb-1">Task title</label>
+                  <label className="text-xs text-muted-foreground mb-1 font-medium">Task title</label>
                   <Input
                     value={newTitle}
                     onChange={(e) => setNewTitle(e.target.value)}
@@ -821,12 +817,12 @@ export default function ProjectTasksBoardPage() {
                     }}
                     placeholder="Quick add a task..."
                     aria-label="New task title"
-                    className="w-72 bg-white text-neutral-900 border-neutral-300 focus-visible:ring-2 focus-visible:ring-neutral-400 focus-visible:border-neutral-400 rounded-xl"
+                    className="w-72 bg-background border-border focus-visible:ring-2 focus-visible:ring-ring rounded-xl"
                   />
                 </div>
 
                 <div className="flex flex-col">
-                  <label className="text-xs text-neutral-600 mb-1">Assign to</label>
+                  <label className="text-xs text-muted-foreground mb-1 font-medium">Assign to</label>
                   <AssigneeSearchBar
                     candidates={filterCandidates}
                     value={createAssigneeId}
@@ -839,9 +835,9 @@ export default function ProjectTasksBoardPage() {
 
                 <div className="flex items-center gap-3">
                   <div className="flex flex-col">
-                    <label className="text-xs text-neutral-600 mb-1">Quick due</label>
+                    <label className="text-xs text-muted-foreground mb-1 font-medium">Quick due</label>
                     <select
-                      className="h-9 rounded-xl border border-neutral-300 bg-white text-neutral-900 px-2"
+                      className="h-9 rounded-xl border border-border bg-card px-2 text-foreground"
                       onChange={(e) => {
                         const val = e.target.value;
                         if (val === "today") {
@@ -863,13 +859,13 @@ export default function ProjectTasksBoardPage() {
                     </select>
                   </div>
                   <div className="flex flex-col">
-                    <label className="text-xs text-neutral-600 mb-1">Date</label>
+                    <label className="text-xs text-muted-foreground mb-1 font-medium">Date</label>
                     <Input
                       type="date"
                       min={todayStr}
                       value={createDue}
                       onChange={(e) => setCreateDue(e.target.value)}
-                      className="h-9 w-44 rounded-xl bg-white text-neutral-900 border-neutral-300"
+                      className="h-9 w-44 rounded-xl bg-card border-border text-foreground [&::-webkit-calendar-picker-indicator]:dark:invert [&::-webkit-calendar-picker-indicator]:cursor-pointer"
                     />
                   </div>
                 </div>
@@ -877,7 +873,8 @@ export default function ProjectTasksBoardPage() {
                 <Button
                   onClick={submitNew}
                   disabled={creating}
-                  className="rounded-xl border border-neutral-300 bg-white hover:bg-neutral-50 text-neutral-900 shadow-sm"
+                  variant="outline"
+                  className="rounded-xl"
                 >
                   <Plus className="mr-2 h-4 w-4" /> Add
                 </Button>
@@ -887,11 +884,11 @@ export default function ProjectTasksBoardPage() {
 
           {/* Due filter */}
           <div className="flex items-center gap-2">
-            <span className="text-sm text-neutral-600">Filter:</span>
+            <span className="text-sm text-muted-foreground font-medium">Filter:</span>
             <select
               value={dueFilter}
               onChange={(e) => setDueFilter(e.target.value as DueFilter)}
-              className="h-9 rounded-xl border border-neutral-300 bg-white text-neutral-900 px-2"
+              className="h-9 rounded-xl border border-border bg-card text-foreground px-2"
             >
               <option value="all">All</option>
               <option value="today">Due today</option>
@@ -907,15 +904,15 @@ export default function ProjectTasksBoardPage() {
             {COLUMNS.map((c) => (
               <Card
                 key={c.id}
-                className="bg-white border border-neutral-200 rounded-2xl p-4 shadow-sm"
+                className="bg-card border border-border rounded-2xl p-4 shadow-sm"
               >
                 <div className="flex items-center justify-between">
-                  <div className="text-neutral-900 font-medium">{c.label}</div>
-                  <Badge variant="outline" className="border-neutral-200 text-neutral-600">
+                  <div className="text-foreground font-medium">{c.label}</div>
+                  <Badge variant="outline" className="border-border">
                     ...
                   </Badge>
                 </div>
-                <Separator className="my-3 bg-neutral-200" />
+                <Separator className="my-3" />
                 <div className="space-y-3">
                   {Array.from({ length: 3 }).map((_, i) => (
                     <Skeleton key={i} className="h-16 w-full bg-neutral-100 rounded-xl" />
@@ -1026,19 +1023,19 @@ function Column(props: ColumnProps) {
   return (
     <Card
       ref={setNodeRef as unknown as (instance: HTMLDivElement | null) => void}
-      className={`group overflow-hidden rounded-2xl border border-neutral-200 shadow-sm transition-all ${
-        isOver ? "ring-2 ring-neutral-300" : "ring-0"
+      className={`group overflow-hidden rounded-2xl border border-border shadow-sm transition-all ${
+        isOver ? "ring-2 ring-ring" : "ring-0"
       }`}
     >
-      {/* tinted header */}
+      {/* header */}
       <div
-        className={`sticky top-0 z-10 -mb-1 bg-gradient-to-b ${statusTint[props.columnId]} px-4 pt-3 pb-2 border-b border-neutral-200`}
+        className={`sticky top-0 z-10 -mb-1 bg-card px-4 pt-3 pb-2 border-b border-border`}
       >
         <div className="flex items-center justify-between gap-2">
-          <div className="text-neutral-900 font-medium">{props.label}</div>
+          <div className="text-foreground font-medium">{props.label}</div>
           <Badge
             variant="outline"
-            className="border-neutral-200 text-neutral-700 bg-white/70 backdrop-blur"
+            className="border-border bg-background"
           >
             {props.tasks.length}
           </Badge>
@@ -1048,7 +1045,7 @@ function Column(props: ColumnProps) {
       <div className="p-4">
         <div className="space-y-3 max-h-[70vh] overflow-auto pr-1">
           {props.tasks.length === 0 ? (
-            <div className="text-sm text-neutral-500 py-6 text-center border border-dashed border-neutral-200 rounded-xl">
+            <div className="text-sm text-muted-foreground py-6 text-center border border-dashed border-border rounded-xl">
               Drop tasks here
             </div>
           ) : (
@@ -1135,7 +1132,7 @@ function TaskCard(props: TaskCardProps) {
       style={style as CSSProperties}
       {...listeners}
       {...attributes}
-      className={`rounded-xl border border-neutral-200 bg-white hover:bg-neutral-50 transition-colors p-3 shadow-sm hover:shadow-md focus-visible:ring-2 focus-visible:ring-neutral-300 outline-none ${
+      className={`rounded-xl border border-border bg-card hover:bg-accent transition-colors p-3 shadow-sm hover:shadow-md focus-visible:ring-2 focus-visible:ring-ring outline-none ${
         isDragging ? "opacity-70" : ""
       }`}
     >
@@ -1143,21 +1140,21 @@ function TaskCard(props: TaskCardProps) {
         <>
           <div className="flex items-start justify-between gap-3">
             <div className="flex items-start gap-2">
-              <span className="mt-0.5 inline-flex h-5 w-5 items-center justify-center rounded-md border border-neutral-200 bg-white text-neutral-500 cursor-grab active:cursor-grabbing">
+              <span className="mt-0.5 inline-flex h-5 w-5 items-center justify-center rounded-md border border-border bg-card text-muted-foreground cursor-grab active:cursor-grabbing">
                 <GripVertical className="h-3.5 w-3.5" />
               </span>
               <div>
-                <div className="text-neutral-900 font-medium leading-5 line-clamp-2">
+                <div className="text-foreground font-medium leading-5 line-clamp-2">
                   {props.task.title}
                 </div>
                 {props.task.description ? (
-                  <div className="mt-1 text-sm text-neutral-700 line-clamp-3">
+                  <div className="mt-1 text-sm text-muted-foreground line-clamp-3">
                     {props.task.description}
                   </div>
                 ) : null}
 
                 {/* Assignee text only */}
-                <div className="mt-2 inline-flex items-center gap-2 rounded-full border border-neutral-200 bg-neutral-50 px-2 py-0.5 text-xs text-neutral-700">
+                <div className="mt-2 inline-flex items-center gap-2 rounded-full border border-border bg-muted px-2 py-0.5 text-xs text-foreground">
                   <Avatar className="h-5 w-5">
                     <AvatarFallback>
                       {assigneeLabel[0]?.toUpperCase() ?? "?"}
@@ -1172,14 +1169,14 @@ function TaskCard(props: TaskCardProps) {
               <div className="flex items-center gap-2">
                 <button
                   aria-label="Edit task"
-                  className="text-neutral-600 hover:text-neutral-900"
+                  className="text-muted-foreground hover:text-foreground"
                   onClick={props.onEdit}
                 >
                   <Pencil className="h-4 w-4" />
                 </button>
                 <button
                   aria-label="Delete task"
-                  className="text-neutral-600 hover:text-neutral-900"
+                  className="text-muted-foreground hover:text-foreground"
                   onClick={props.onDelete}
                 >
                   <Trash2 className="h-4 w-4" />
@@ -1188,7 +1185,7 @@ function TaskCard(props: TaskCardProps) {
             ) : null}
           </div>
 
-          <div className="mt-3 flex items-center flex-wrap gap-2 text-xs text-neutral-600">
+          <div className="mt-3 flex items-center flex-wrap gap-2 text-xs text-muted-foreground">
             <span
               className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 ${priorityClass(
                 props.task.priority
@@ -1225,7 +1222,7 @@ function TaskCard(props: TaskCardProps) {
               ) : null}
             </span>
 
-            <span className="text-neutral-500">
+            <span className="text-muted-foreground">
               Created {new Date(props.task.created_at).toLocaleString()}
             </span>
           </div>
@@ -1235,18 +1232,18 @@ function TaskCard(props: TaskCardProps) {
           <Input
             value={props.editTitle}
             onChange={(e) => props.setEditTitle(e.target.value)}
-            className="bg-white text-neutral-900 border-neutral-300 focus-visible:ring-2 focus-visible:ring-neutral-300 focus-visible:border-neutral-300 rounded-lg"
+            className="bg-background border-border focus-visible:ring-2 focus-visible:ring-ring rounded-lg"
           />
           <Textarea
             value={props.editDescription}
             onChange={(e) => props.setEditDescription(e.target.value)}
             rows={3}
-            className="bg-white text-neutral-900 border-neutral-300 focus-visible:ring-2 focus-visible:ring-neutral-300 focus-visible:border-neutral-300 rounded-lg"
+            className="bg-background border-border focus-visible:ring-2 focus-visible:ring-ring rounded-lg"
           />
           <div className="flex items-center gap-2">
-            <Calendar className="h-4 w-4 text-neutral-500" />
+            <Calendar className="h-4 w-4 text-muted-foreground" />
             <select
-              className="h-9 rounded-xl border border-neutral-300 bg-white text-neutral-900 px-2"
+              className="h-9 rounded-xl border border-border bg-background px-2"
               onChange={(e) => {
                 const val = e.target.value;
                   if (val === "today") {

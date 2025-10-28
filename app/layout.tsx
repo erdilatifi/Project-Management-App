@@ -1,4 +1,4 @@
-﻿import type { Metadata } from "next";
+import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { AuthProvider } from "./context/ContextApiProvider";
@@ -33,11 +33,9 @@ export default function RootLayout({
         <ThemeProvider>
           <AuthProvider>
             <QueryProvider>
-            <div className="flex items-center justify-center min-h-screen w-full">
               <Navbar />
               {children}
               <Toaster />
-            </div>
             </QueryProvider>
           </AuthProvider>
         </ThemeProvider>

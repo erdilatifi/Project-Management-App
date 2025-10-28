@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
@@ -158,55 +158,53 @@ export default function WorkspacesPage() {
   const Avatar = ({ name }: { name: string }) => {
     const initial = (name?.trim()?.[0] ?? "?").toUpperCase();
     return (
-      <div className="flex h-8 w-8 items-center justify-center rounded-lg border border-neutral-200 bg-neutral-50 text-neutral-700">
+      <div className="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-muted text-foreground">
         {initial}
       </div>
     );
   };
 
   return (
-    <div className="min-h-screen w-full bg-[radial-gradient(90rem_50rem_at_50%_-10%,rgba(0,0,0,0.05),transparent)]">
+    <div className="min-h-screen w-full">
       <div className="mx-auto max-w-[1200px] px-6 lg:px-10 py-12 space-y-6">
-        {/* Sticky header (matches tasks page vibe) */}
-        <div className="sticky top-0 z-10 -mx-6 lg:-mx-10 px-6 lg:px-10 py-4 ">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <h1 className="text-3xl font-semibold tracking-tight text-neutral-900">Workspaces</h1>
-              <p className="text-sm text-neutral-600 mt-0.5">All workspaces you can access.</p>
-            </div>
-            <div className="flex items-center gap-2">
-              <CreateWorkspaceDialog
-                onCreated={(ws) =>
-                  setItems((cur) => [
-                    {
-                      id: ws.id,
-                      name: ws.name,
-                      slug: null,
-                      description: null,
-                      owner_id: "",
-                      created_at: new Date().toISOString()
-                    },
-                    ...cur
-                  ])
-                }
-              />
-            </div>
+        {/* Header */}
+        <div className="pt-15 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h1 className="text-3xl font-semibold tracking-tight text-foreground">Workspaces</h1>
+            <p className="text-sm text-muted-foreground mt-0.5">All workspaces you can access.</p>
+          </div>
+          <div className="flex items-center gap-2">
+            <CreateWorkspaceDialog
+              onCreated={(ws) =>
+                setItems((cur) => [
+                  {
+                    id: ws.id,
+                    name: ws.name,
+                    slug: null,
+                    description: null,
+                    owner_id: "",
+                    created_at: new Date().toISOString()
+                  },
+                  ...cur
+                ])
+              }
+            />
           </div>
         </div>
 
         {/* Search / toolbar card */}
-        <Card className="border-neutral-200 shadow-sm rounded-2xl">
+        <Card className="border-border shadow-sm rounded-2xl">
           <CardContent className="px-4 sm:px-6 py-4">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
               <div className="relative flex-1">
-                <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-neutral-500" />
+                <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
                   ref={searchRef}
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                   onKeyDown={(e) => { if (e.key === "Enter") load(); }}
                   placeholder="Search workspaces (Ctrl/Cmd+K)"
-                  className="pl-9 pr-8 bg-white border-neutral-300 focus-visible:ring-2 focus-visible:ring-neutral-300 rounded-xl"
+                  className="pl-9 pr-8 bg-background border-border focus-visible:ring-2 focus-visible:ring-ring rounded-xl"
                 />
                 {search ? (
                   <button
@@ -216,7 +214,7 @@ export default function WorkspacesPage() {
                       searchRef.current?.focus();
                       load();
                     }}
-                    className="absolute right-2 top-1/2 -translate-y-1/2 rounded-md p-1 text-neutral-500 hover:text-neutral-800 hover:bg-neutral-100"
+                    className="absolute right-2 top-1/2 -translate-y-1/2 rounded-md p-1 text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
                   >
                     <X className="h-4 w-4" />
                   </button>
@@ -226,7 +224,7 @@ export default function WorkspacesPage() {
               <Button
                 variant="outline"
                 onClick={() => load()}
-                className="rounded-xl border-neutral-300 text-neutral-900 hover:bg-neutral-50"
+                className="rounded-xl"
               >
                 <RefreshCcw className="mr-2 h-4 w-4" /> Refresh
               </Button>
@@ -238,7 +236,7 @@ export default function WorkspacesPage() {
         {loading ? (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
             {Array.from({ length: 4 }).map((_, i) => (
-              <Card key={i} className="p-5 rounded-2xl border-neutral-200 shadow-sm">
+              <Card key={i} className="p-5 rounded-2xl border-border shadow-sm">
                 <div className="flex items-center gap-3">
                   <Skeleton className="h-8 w-8 rounded-lg" />
                   <Skeleton className="h-5 w-1/2 rounded-md" />
@@ -254,11 +252,11 @@ export default function WorkspacesPage() {
             ))}
           </div>
         ) : items.length === 0 ? (
-          <Card className="overflow-hidden rounded-2xl border-neutral-200">
+          <Card className="overflow-hidden rounded-2xl border-border">
             <div className="px-6 py-12 text-center">
               <div className="mx-auto max-w-md">
-                <h3 className="text-lg font-medium text-neutral-900">No workspaces found</h3>
-                <p className="mt-1 text-sm text-neutral-600">
+                <h3 className="text-lg font-semibold text-foreground">No workspaces found</h3>
+                <p className="mt-1 text-sm text-muted-foreground">
                   Try adjusting your search, or create a new workspace to get started.
                 </p>
                 <div className="mt-4">
@@ -286,7 +284,7 @@ export default function WorkspacesPage() {
             {items.map((w) => (
               <Card
                 key={w.id}
-                className="group overflow-hidden rounded-2xl border-neutral-200 shadow-sm hover:shadow-md hover:border-neutral-300 transition-all"
+                className="group overflow-hidden rounded-2xl border-border shadow-sm hover:shadow-md transition-all"
               >
                 <div className="p-5 flex flex-col gap-3">
                   <div className="flex items-start justify-between gap-4">
@@ -294,14 +292,14 @@ export default function WorkspacesPage() {
                       <Avatar name={w.name} />
                       <div className="min-w-0">
                         <div className="flex items-center gap-2 flex-wrap">
-                          <h2 className="font-medium text-neutral-900 leading-6 line-clamp-2">{w.name}</h2>
+                          <h2 className="font-semibold text-foreground leading-6 line-clamp-2">{w.name}</h2>
                           {w.slug ? (
-                            <Badge variant="outline" className="border-neutral-300 text-neutral-700 bg-neutral-50">
+                            <Badge variant="outline" className="rounded-lg">
                               {w.slug}
                             </Badge>
                           ) : null}
                         </div>
-                        <div className="text-xs text-neutral-500 mt-1">
+                        <div className="text-xs text-muted-foreground mt-1">
                           Created {new Date(w.created_at).toLocaleString()}
                         </div>
                       </div>
@@ -323,22 +321,22 @@ export default function WorkspacesPage() {
                   </div>
 
                   {w.description ? (
-                    <p className="text-sm text-neutral-700 leading-6 line-clamp-3">{w.description}</p>
+                    <p className="text-sm text-muted-foreground leading-6 line-clamp-3">{w.description}</p>
                   ) : (
-                    <p className="text-sm text-neutral-500">No description</p>
+                    <p className="text-sm text-muted-foreground italic">No description</p>
                   )}
                 </div>
 
-                <Separator className="bg-neutral-200" />
+                <Separator />
 
                 <div className="p-3 flex items-center justify-end gap-2">
                   <Link href={`/workspaces/${w.id}/people`}>
-                    <Button variant="outline" size="sm" className="h-7 rounded-lg border-neutral-300">
+                    <Button variant="outline" size="sm" className="h-7 rounded-lg">
                       <Users className="w-4 h-4 mr-1.5" /> People
                     </Button>
                   </Link>
                   <Link href={`/workspaces/${w.id}/messages`}>
-                    <Button variant="outline" size="sm" className="h-7 rounded-lg border-neutral-300">
+                    <Button variant="outline" size="sm" className="h-7 rounded-lg">
                       <MessageSquare className="w-4 h-4 mr-1.5" /> Messages
                     </Button>
                   </Link>
