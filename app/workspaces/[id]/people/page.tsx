@@ -35,16 +35,26 @@ export default function WorkspacePeoplePage() {
       const ids = (members ?? []).map((m: any) => m.user_id)
       let emailMap: Record<string, string> = {}
       let avatarMap: Record<string, string | null> = {}
-      let nameMap: Record<string, string | null> = {}
+      let profileMap: Record<string, { username: string | null; full_name: string | null }> = {}
+      let appMap: Record<string, { username: string | null; display: string | null }> = {}
       if (ids.length) {
         const { data: users } = await (supabase as any).rpc('get_auth_users_by_ids', { ids })
-        const { data: profs } = await supabase
-          .from('profiles')
-          .select('id, avatar_url, full_name')
-          .in('id', ids)
+        const [profsRes, appUsersRes] = await Promise.all([
+          supabase
+            .from('profiles')
+            .select('id, avatar_url, username, full_name')
+            .in('id', ids),
+          supabase
+            .from('users')
+            .select('id, username, display_name')
+            .in('id', ids),
+        ])
+        const profs = profsRes?.data as any[] | null
+        const appUsers = appUsersRes?.data as any[] | null
         emailMap = Object.fromEntries((users ?? []).map((u: any) => [u.id, u.email]))
         avatarMap = Object.fromEntries((profs ?? []).map((p: any) => [p.id, p.avatar_url ?? null]))
-        nameMap = Object.fromEntries((profs ?? []).map((p: any) => [p.id, (p.full_name as string | null) ?? null]))
+        profileMap = Object.fromEntries((profs ?? []).map((p: any) => [p.id, { username: (p.username as string | null) ?? null, full_name: (p.full_name as string | null) ?? null }]))
+        appMap = Object.fromEntries((appUsers ?? []).map((u: any) => [u.id, { username: (u.username as string | null) ?? null, display: (u.display_name as string | null) ?? null }]))
 
         // Fallback: for any IDs still missing emails, try public view
         const missingEmailIds = ids.filter((x) => !emailMap[x])
@@ -63,13 +73,23 @@ export default function WorkspacePeoplePage() {
         }
       }
       setRows(
-        (members ?? []).map((m: any) => ({
-          workspace_id: m.workspace_id,
-          user_id: m.user_id,
-          role: m.role,
-          email: (nameMap[m.user_id]?.trim() || emailMap[m.user_id] || 'Unknown'),
-          avatar_url: avatarMap[m.user_id] ?? null,
-        }))
+        (members ?? []).map((m: any) => {
+          const id = m.user_id
+          const label =
+            profileMap[id]?.username?.trim() ||
+            appMap[id]?.username?.trim() ||
+            appMap[id]?.display?.trim() ||
+            profileMap[id]?.full_name?.trim() ||
+            emailMap[id] ||
+            'Unknown'
+          return {
+            workspace_id: m.workspace_id,
+            user_id: id,
+            role: m.role,
+            email: label,
+            avatar_url: avatarMap[id] ?? null,
+          }
+        })
       )
       setLoading(false)
     }

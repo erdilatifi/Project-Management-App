@@ -428,39 +428,43 @@ export default function ProjectTasksBoardPage() {
                 })
               );
 
-              // Try app users.display_name
-              let displayMap: Record<string, string | null> = {};
+              // Try app users.username and display_name
+              let userMap: Record<string, { username: string | null; display: string | null }> = {};
               try {
-                const missingForDisplay = ids.filter((id) => !wmLabelMap[id]);
-                if (missingForDisplay.length) {
+                if (ids.length) {
                   const { data: userProfiles } = await supabase
                     .from("users")
-                    .select("id, display_name")
-                    .in("id", missingForDisplay);
-                  displayMap = Object.fromEntries(
+                    .select("id, username, display_name")
+                    .in("id", ids);
+                  userMap = Object.fromEntries(
                     (userProfiles ?? []).map((u: any) => [
                       String(u.id),
-                      (u.display_name as string | null) ?? null,
+                      {
+                        username: (u.username as string | null) ?? null,
+                        display: (u.display_name as string | null) ?? null,
+                      },
                     ])
                   );
                 }
               } catch {
-                displayMap = {};
+                userMap = {};
               }
 
-              // Fallback to profiles.full_name
-              let nameMap: Record<string, string | null> = {};
+              // Prefer profiles.username if available; fallback to profiles.full_name
+              let profilesMap: Record<string, { username: string | null; full_name: string | null }> = {};
               try {
-                const missingForName = ids.filter((id) => !wmLabelMap[id] && !displayMap[id]);
-                if (missingForName.length) {
+                if (ids.length) {
                   const { data: profs } = await supabase
                     .from("profiles")
-                    .select("id, full_name")
-                    .in("id", missingForName);
-                  nameMap = Object.fromEntries(
+                    .select("id, username, full_name")
+                    .in("id", ids);
+                  profilesMap = Object.fromEntries(
                     (profs ?? []).map((p: any) => [
                       String(p.id),
-                      (p.full_name as string | null) ?? null,
+                      {
+                        username: (p.username as string | null) ?? null,
+                        full_name: (p.full_name as string | null) ?? null,
+                      },
                     ])
                   );
                 }
@@ -468,8 +472,17 @@ export default function ProjectTasksBoardPage() {
 
               setMembers(
                 ids.map((id) => {
-                  const username = (wmLabelMap[id]?.trim() || displayMap[id]?.trim() || nameMap[id]?.trim()) ?? null;
-                  return { id, email: username || "User" };
+                  const label =
+                    // Prefer explicit usernames first
+                    (profilesMap[id]?.username?.trim()) ||
+                    (userMap[id]?.username?.trim()) ||
+                    // Then any workspace-provided label
+                    (wmLabelMap[id]?.trim()) ||
+                    // Then other names
+                    (userMap[id]?.display?.trim()) ||
+                    (profilesMap[id]?.full_name?.trim()) ||
+                    null;
+                  return { id, email: label || "User" };
                 })
               );
             } catch {
@@ -718,10 +731,11 @@ export default function ProjectTasksBoardPage() {
 
     try {
       const created = await createTask(title, initialAssigneeId, dueLocal);
-      // swap temp with real
-      setItems((cur) =>
-        sortTasks(cur.map((t) => (t.id === tempId ? created : t)))
-      );
+      // swap temp with real; also dedupe in case realtime already added the real row
+      setItems((cur) => {
+        const without = cur.filter((t) => t.id !== tempId && t.id !== created.id);
+        return sortTasks([...without, created]);
+      });
       toast.success("Task created");
     } catch (e) {
       // remove temp row
@@ -880,7 +894,6 @@ export default function ProjectTasksBoardPage() {
               className="h-9 rounded-xl border border-neutral-300 bg-white text-neutral-900 px-2"
             >
               <option value="all">All</option>
-              <option value="overdue">Overdue</option>
               <option value="today">Due today</option>
               <option value="nextweek">Next week</option>
               <option value="none">No due date</option>

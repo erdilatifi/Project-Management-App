@@ -12,8 +12,13 @@ import { useAuth } from '@/app/context/ContextApiProvider';
 import { createClient } from '@/utils/supabase/client';
 
 type ProfileRow = {
+  username: string | null;
   full_name: string | null;
   avatar_url: string | null;
+};
+type AppUserRow = {
+  username: string | null;
+  display_name: string | null;
 };
 
 const Navbar = () => {
@@ -27,6 +32,7 @@ const Navbar = () => {
   const [isSigningOut, setIsSigningOut] = useState(false);
 
   const [profile, setProfile] = useState<ProfileRow | null>(null);
+  const [appUser, setAppUser] = useState<AppUserRow | null>(null);
   const [profileLoading, setProfileLoading] = useState(false);
   const [avatarSalt, setAvatarSalt] = useState<number>(Date.now()); // cache buster
 
@@ -42,16 +48,35 @@ const Navbar = () => {
   const fetchProfile = async (uid: string) => {
     setProfileLoading(true);
     try {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('full_name, avatar_url')
-        .eq('id', uid)
-        .maybeSingle<ProfileRow>();
-      if (error) {
-        console.error('Navbar profile load error:', error.message);
-        setProfile(null);
-      } else {
-        setProfile(data ?? null);
+      // Try to fetch profiles including username; if that column doesn't exist yet, fallback gracefully
+      let prof: ProfileRow | null = null;
+      try {
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('username, full_name, avatar_url')
+          .eq('id', uid)
+          .maybeSingle<ProfileRow>();
+        if (!error) prof = data ?? null; else throw error;
+      } catch {
+        const { data } = await supabase
+          .from('profiles')
+          .select('full_name, avatar_url')
+          .eq('id', uid)
+          .maybeSingle<any>();
+        prof = data ? { username: null, full_name: data.full_name ?? null, avatar_url: data.avatar_url ?? null } : null;
+      }
+      setProfile(prof);
+
+      // Also fetch app users table for username/display_name fallback
+      try {
+        const { data: app } = await supabase
+          .from('users')
+          .select('username, display_name')
+          .eq('id', uid)
+          .maybeSingle<AppUserRow>();
+        setAppUser(app ?? null);
+      } catch {
+        setAppUser(null);
       }
     } finally {
       setProfileLoading(false);
@@ -60,7 +85,7 @@ const Navbar = () => {
 
   useEffect(() => {
     if (user?.id) fetchProfile(user.id);
-    else setProfile(null);
+    else { setProfile(null); setAppUser(null); }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id]);
 
@@ -68,7 +93,7 @@ const Navbar = () => {
 useEffect(() => {
   if (!user?.id) return;
 
-  const channel = supabase
+  const profChannel = supabase
     .channel('navbar-profiles')
     .on(
       'postgres_changes',
@@ -79,16 +104,14 @@ useEffect(() => {
         filter: `id=eq.${user.id}`,
       },
       (payload) => {
-        // DELETE event safety check
         const deleted = payload.eventType === 'DELETE' || !payload.new;
-
         if (deleted) {
           setProfile(null);
           return;
         }
-
         const next = payload.new as ProfileRow & { id: string };
         setProfile({
+          username: (next as any).username ?? null,
           full_name: next.full_name ?? null,
           avatar_url: next.avatar_url ?? null,
         });
@@ -97,8 +120,31 @@ useEffect(() => {
     )
     .subscribe();
 
+  const userChannel = supabase
+    .channel('navbar-users')
+    .on(
+      'postgres_changes',
+      {
+        event: '*',
+        schema: 'public',
+        table: 'users',
+        filter: `id=eq.${user.id}`,
+      },
+      (payload) => {
+        const deleted = payload.eventType === 'DELETE' || !payload.new;
+        if (deleted) {
+          setAppUser(null);
+          return;
+        }
+        const next = payload.new as AppUserRow & { id: string };
+        setAppUser({ username: (next as any).username ?? null, display_name: (next as any).display_name ?? null });
+      }
+    )
+    .subscribe();
+
   return () => {
-    supabase.removeChannel(channel);
+    supabase.removeChannel(profChannel);
+    supabase.removeChannel(userChannel);
   };
 }, [user?.id, supabase]);
 
@@ -131,8 +177,14 @@ useEffect(() => {
   ];
 
   const displayName = useMemo(
-    () => profile?.full_name?.trim() || user?.email?.split('@')[0] || '',
-    [profile?.full_name, user?.email]
+    () =>
+      profile?.username?.trim() ||
+      appUser?.username?.trim() ||
+      appUser?.display_name?.trim() ||
+      profile?.full_name?.trim() ||
+      user?.email?.split('@')[0] ||
+      '',
+    [profile?.username, profile?.full_name, appUser?.username, appUser?.display_name, user?.email]
   );
 
   // underline animation: hover from 0 -> 100%, active stays 100%

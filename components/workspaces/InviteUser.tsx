@@ -67,23 +67,32 @@ export function InviteUser({ workspaceId }: Props) {
         );
 
         const ids = base.map((u) => u.id);
-        let nameMap: Record<string, string | null> = {};
+        let profMap: Record<string, { username: string | null; full_name: string | null }> = {};
         if (ids.length) {
           try {
             const { data: profs } = await supabase
               .from("profiles")
-              .select("id, full_name")
+              .select("id, username, full_name")
               .in("id", ids);
-            nameMap = Object.fromEntries((profs ?? []).map((p: any) => [String(p.id), (p.full_name as string | null) ?? null]));
+            profMap = Object.fromEntries((profs ?? []).map((p: any) => [
+              String(p.id),
+              { username: (p.username as string | null) ?? null, full_name: (p.full_name as string | null) ?? null },
+            ]));
           } catch {}
         }
-        return base.map((u) => ({ id: u.id, email: String(u.email), name: nameMap[u.id] ?? null }));
+        return base.map((u) => ({
+          id: u.id,
+          email: String(u.email),
+          name: profMap[u.id]?.username?.trim() || profMap[u.id]?.full_name?.trim() || null,
+        }));
       }
 
-      // Case 2: term -> search email + name, then merge
-      const [byEmail, byNameIds] = await Promise.all([
+      // Case 2: term -> search email + name + username, then merge
+      const [byEmail, byNameIds, byProfUsernameIds, byAppUsernameIds] = await Promise.all([
         supabase.from("auth_users_public").select("id, email").ilike("email", `%${term}%`).limit(20),
         supabase.from("profiles").select("id").ilike("full_name", `%${term}%`).limit(30),
+        supabase.from("profiles").select("id").ilike("username", `%${term}%`).limit(30),
+        supabase.from("users").select("id").ilike("username", `%${term}%`).limit(30),
       ]);
       if (byEmail.error) throw new Error(byEmail.error.message);
 
@@ -91,14 +100,17 @@ export function InviteUser({ workspaceId }: Props) {
         (u) => typeof u.id === "string" && typeof u.email === "string"
       );
       const nameIds = ((byNameIds.data ?? []) as Array<{ id: string }>).map((r) => r.id);
+      const profUserIds = ((byProfUsernameIds.data ?? []) as Array<{ id: string }>).map((r) => r.id);
+      const appUserIds = ((byAppUsernameIds.data ?? []) as Array<{ id: string }>).map((r) => r.id);
 
       let nameRows: Array<{ id: string; email: string | null }> = [];
-      if (nameIds.length) {
+      const idsToFetchEmails = Array.from(new Set([ ...nameIds, ...profUserIds, ...appUserIds ]));
+      if (idsToFetchEmails.length) {
         try {
           const { data } = await supabase
             .from("auth_users_public")
             .select("id, email")
-            .in("id", nameIds)
+            .in("id", idsToFetchEmails)
             .limit(50);
           nameRows = (data ?? []) as Array<{ id: string; email: string | null }>;
         } catch {}
@@ -111,17 +123,40 @@ export function InviteUser({ workspaceId }: Props) {
 
       const merged = Array.from(map.values()).filter((u) => typeof u.email === "string");
       const ids = merged.map((u) => u.id);
-      let nameMap: Record<string, string | null> = {};
+      let profMap: Record<string, { username: string | null; full_name: string | null }> = {};
+      let appMap: Record<string, { username: string | null; display: string | null }> = {};
       if (ids.length) {
         try {
-          const { data: profs } = await supabase
-            .from("profiles")
-            .select("id, full_name")
-            .in("id", ids);
-          nameMap = Object.fromEntries((profs ?? []).map((p: any) => [String(p.id), (p.full_name as string | null) ?? null]));
+          const [profsRes, appUsersRes] = await Promise.all([
+            supabase.from("profiles").select("id, username, full_name").in("id", ids),
+            supabase.from("users").select("id, username, display_name").in("id", ids),
+          ])
+          const profs = (profsRes?.data ?? []) as any[]
+          const appUsers = (appUsersRes?.data ?? []) as any[]
+          profMap = Object.fromEntries(
+            profs.map((p: any) => [
+              String(p.id),
+              { username: (p.username as string | null) ?? null, full_name: (p.full_name as string | null) ?? null },
+            ])
+          );
+          appMap = Object.fromEntries(
+            appUsers.map((u: any) => [
+              String(u.id),
+              { username: (u.username as string | null) ?? null, display: (u.display_name as string | null) ?? null },
+            ])
+          );
         } catch {}
       }
-      return merged.map((u) => ({ id: u.id, email: String(u.email), name: nameMap[u.id] ?? null }));
+      return merged.map((u) => ({
+        id: u.id,
+        email: String(u.email),
+        name:
+          profMap[u.id]?.username?.trim() ||
+          appMap[u.id]?.username?.trim() ||
+          appMap[u.id]?.display?.trim() ||
+          profMap[u.id]?.full_name?.trim() ||
+          null,
+      }));
     },
     select: (rows) => rows.filter((u) => !memberIds.has(u.id)),
   });

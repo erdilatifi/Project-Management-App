@@ -2,6 +2,7 @@ import { createClient } from '@/utils/supabase/client'
 
 export interface UserProfile {
   id: string
+  username?: string | null
   full_name: string
   display_name: string
   email: string

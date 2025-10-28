@@ -17,13 +17,15 @@ export const SignIn = async (email: string, password: string) => {
   return { success: true, data };
 };
 
-export const SignUp = async (email: string, password: string) => {
+export const SignUp = async (email: string, password: string, username?: string) => {
   const supabase = await createClient();
   const { data, error } = await supabase.auth.signUp({ 
     email, 
     password,
     options: {
       emailRedirectTo: `${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/auth/callback`,
+      // Stash desired username in auth metadata; we'll persist to public.users on callback
+      data: username ? { username } : undefined,
     }
   });
 

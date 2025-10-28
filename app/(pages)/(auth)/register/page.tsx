@@ -15,6 +15,12 @@ import { UserPlus, Mail, Lock, CheckCircle2, Loader2 } from 'lucide-react'
 import { useAuth } from '@/app/context/ContextApiProvider'
 
 const registerSchema = z.object({
+  username: z
+    .string()
+    .min(3, 'Username must be at least 3 characters')
+    .max(32, 'Username must be at most 32 characters')
+    .regex(/^[a-zA-Z0-9_.-]+$/, 'Only letters, numbers, _, ., - allowed')
+    .transform((s) => s.trim()),
   email: z.string().email('Please enter a valid email'),
   password: z.string().min(6, 'Password must be at least 6 characters long'),
   confirmPassword: z.string().min(6, 'Password must be at least 6 characters long'),
@@ -45,7 +51,7 @@ const RegisterPage = () => {
 
   const onSubmit = async (data: RegisterFormData) => {
     try {
-      const result = await SignUp(data.email, data.password)
+      const result = await SignUp(data.email, data.password, data.username)
 
       if (result?.error) {
         setError('root', { message: result.error })
@@ -103,6 +109,22 @@ const RegisterPage = () => {
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="username">Username</Label>
+              <div className="relative">
+                <Input
+                  id="username"
+                  {...register('username')}
+                  placeholder="yourname"
+                  type="text"
+                  className="pl-3"
+                  aria-invalid={!!errors.username}
+                />
+              </div>
+              {errors.username && (
+                <p className="text-destructive text-sm mt-1">{errors.username.message}</p>
+              )}
+            </div>
             <div className="space-y-2">
               <Label htmlFor="email">Email</Label>
               <div className="relative">

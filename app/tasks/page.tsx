@@ -32,7 +32,7 @@ const priorityLabel = (p?: number | null) => (p ? `P${p}` : "None");
 
 // Due-date helpers to match the project tasks page
 type DueCategory = "overdue" | "today" | "nextweek" | "none";
-type DueFilter = "all" | "today" | "nextweek" | "none";
+type DueFilter = "all" | DueCategory;
 
 function startOfDay(d: Date) {
   const dt = new Date(d);
@@ -182,7 +182,7 @@ export default function MyTasksPage() {
       });
       return Object.keys(by).map((k) => ({ key: k, label: projects[k]?.name ?? "Project", tasks: by[k] }));
     }
-    // Due date buckets (overdue folded into Today)
+    // Due date buckets (fold overdue into Today to match create controls)
     const buckets: Record<Exclude<DueCategory, "overdue">, { label: string; tasks: TaskRow[] }> = {
       today: { label: "Due today", tasks: [] },
       nextweek: { label: "Next week", tasks: [] },
@@ -287,7 +287,7 @@ export default function MyTasksPage() {
                                 <Badge variant="outline" className={`${dueBadgeClass(dueCategory(t.due_at))}`}>
                                   {(() => {
                                     const cat = dueCategory(t.due_at);
-                                    if (cat === "overdue") return t.due_at ? `Due ${new Date(t.due_at).toLocaleDateString()}` : "Due";
+                                    if (cat === "overdue") return `Overdue${t.due_at ? ` (${new Date(t.due_at).toLocaleDateString()})` : ""}`;
                                     if (cat === "today") return `Due today${t.due_at ? ` (${new Date(t.due_at).toLocaleDateString()})` : ""}`;
                                     if (cat === "nextweek") return `Next week${t.due_at ? ` (${new Date(t.due_at).toLocaleDateString()})` : ""}`;
                                     return t.due_at ? `Due ${new Date(t.due_at).toLocaleDateString()}` : "No due date";
