@@ -1,9 +1,14 @@
+/**
+ * Format a date/time as a relative time string (e.g., "2 hours ago", "in 3 days")
+ * Uses Intl.RelativeTimeFormat for localized output
+ */
 export function formatTimeAgo(iso: string | Date): string {
   const now = new Date()
   const then = typeof iso === 'string' ? new Date(iso) : iso
   const seconds = Math.floor((now.getTime() - then.getTime()) / 1000)
   const rtf = new Intl.RelativeTimeFormat(undefined, { numeric: 'auto' })
 
+  // Time intervals in descending order for accurate formatting
   const intervals: Array<[Intl.RelativeTimeFormatUnit, number]> = [
     ['year', 60 * 60 * 24 * 365],
     ['month', 60 * 60 * 24 * 30],

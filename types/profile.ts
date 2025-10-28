@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-// Schema and Types
+// Available timezone options for user profiles
 export const timezones = ['utc-5', 'utc', 'utc+1', 'utc+2', 'utc+3', 'utc+5.5', 'utc+8', 'utc+9'] as const;
 export const themes = ['light', 'dark', 'system'] as const;
 export const emailFrequencies = ['instant', 'hourly', 'daily', 'weekly'] as const;
@@ -13,7 +13,7 @@ export type EmailFrequency = typeof emailFrequencies[number];
 export type TaskView = typeof taskViews[number];
 export type AvailabilityStatus = typeof availabilityStatuses[number];
 
-// Form Schemas
+// Zod validation schema for user profile form
 export const profileSchema = z.object({
   fullName: z.string().min(2, 'Full name must be at least 2 characters'),
   displayName: z.string()
@@ -25,6 +25,7 @@ export const profileSchema = z.object({
   avatarUrl: z.string().nullable().optional()
 });
 
+// Zod validation schema for user preferences form
 export const preferencesSchema = z.object({
   emailNotifications: z.boolean(),
   emailFrequency: z.enum(emailFrequencies),
@@ -37,6 +38,7 @@ export const preferencesSchema = z.object({
   availability: z.enum(availabilityStatuses)
 });
 
+// Zod validation schema for privacy settings form
 export const privacySchema = z.object({
   showProfile: z.boolean(),
   allowMentions: z.boolean(),
@@ -44,14 +46,14 @@ export const privacySchema = z.object({
   maskEmail: z.boolean()
 });
 
-// Local storage keys
+// Keys for storing user data in browser local storage
 export const STORAGE_KEYS = {
   PROFILE: 'userProfile',
   PREFERENCES: 'userPreferences',
   PRIVACY: 'privacySettings'
 } as const;
 
-// Default values
+// Default profile values for initialization
 export const DEFAULT_PROFILE: z.infer<typeof profileSchema> = {
   fullName: 'Jordan Davis',
   displayName: '@jordandavis',
@@ -61,6 +63,7 @@ export const DEFAULT_PROFILE: z.infer<typeof profileSchema> = {
   avatarUrl: null
 };
 
+// Default user preferences
 export const DEFAULT_PREFERENCES: z.infer<typeof preferencesSchema> = {
   emailNotifications: true,
   emailFrequency: 'instant',
@@ -73,6 +76,7 @@ export const DEFAULT_PREFERENCES: z.infer<typeof preferencesSchema> = {
   availability: 'available'
 };
 
+// Default privacy settings
 export const DEFAULT_PRIVACY: z.infer<typeof privacySchema> = {
   showProfile: true,
   allowMentions: true,
@@ -80,7 +84,7 @@ export const DEFAULT_PRIVACY: z.infer<typeof privacySchema> = {
   maskEmail: true
 };
 
-// Types for form data
+// TypeScript types inferred from Zod schemas
 export type ProfileFormData = z.infer<typeof profileSchema>;
 export type PreferencesFormData = z.infer<typeof preferencesSchema>;
 export type PrivacyFormData = z.infer<typeof privacySchema>;

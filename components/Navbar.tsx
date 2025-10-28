@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 import Link from 'next/link';
 import React, { useEffect, useMemo, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
@@ -27,16 +27,18 @@ const Navbar = () => {
   const supabase = useMemo(() => createClient(), []);
   const { user, loading: isLoading, refreshAuth } = useAuth();
 
+  // UI state management
   const [isMobile, setIsMobile] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
   const [isSigningOut, setIsSigningOut] = useState(false);
 
+  // User profile data from database
   const [profile, setProfile] = useState<ProfileRow | null>(null);
   const [appUser, setAppUser] = useState<AppUserRow | null>(null);
   const [profileLoading, setProfileLoading] = useState(false);
-  const [avatarSalt, setAvatarSalt] = useState<number>(Date.now()); // cache buster
+  const [avatarSalt, setAvatarSalt] = useState<number>(Date.now()); // Cache buster for avatar updates
 
-  // responsive
+  // Handle responsive layout based on window width
   useEffect(() => {
     const onResize = () => setIsMobile(window.innerWidth < 1024);
     onResize();
@@ -44,11 +46,11 @@ const Navbar = () => {
     return () => window.removeEventListener('resize', onResize);
   }, []);
 
-  // fetch profile
+  // Fetch user profile data from Supabase
   const fetchProfile = async (uid: string) => {
     setProfileLoading(true);
     try {
-      // Try to fetch profiles including username; if that column doesn't exist yet, fallback gracefully
+      // Attempt to fetch profile with username field, fallback if column doesn't exist
       let prof: ProfileRow | null = null;
       try {
         const { data, error } = await supabase
@@ -67,7 +69,7 @@ const Navbar = () => {
       }
       setProfile(prof);
 
-      // Also fetch app users table for username/display_name fallback
+      // Fetch from users table as fallback for display name
       try {
         const { data: app } = await supabase
           .from('users')
@@ -89,8 +91,8 @@ const Navbar = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id]);
 
-  // realtime updates
-useEffect(() => {
+  // Subscribe to real-time profile and user updates
+  useEffect(() => {
   if (!user?.id) return;
 
   const profChannel = supabase
@@ -149,6 +151,7 @@ useEffect(() => {
 }, [user?.id, supabase]);
 
 
+  // Handle user sign out and redirect to login
   const handleSignOut = async () => {
     setIsSigningOut(true);
     try {
@@ -176,6 +179,7 @@ useEffect(() => {
     { name: 'Profile', path: '/profile' },
   ];
 
+  // Determine display name with fallback priority: username > display_name > full_name > email
   const displayName = useMemo(
     () =>
       profile?.username?.trim() ||
@@ -187,7 +191,7 @@ useEffect(() => {
     [profile?.username, profile?.full_name, appUser?.username, appUser?.display_name, user?.email]
   );
 
-  // underline animation: hover from 0 -> 100%, active stays 100%
+  // Navigation item with animated underline on hover and active state
   const NavItem = ({ name, path }: { name: string; path: string }) => {
     const isActive = pathname === path;
     return (

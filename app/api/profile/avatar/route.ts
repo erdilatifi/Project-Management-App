@@ -1,14 +1,15 @@
 import { createClient } from '@/utils/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
 
+/**
+ * API endpoint for uploading user avatar images
+ * Handles file validation, storage upload, and profile update
+ */
 export async function POST(request: NextRequest) {
-  console.log('Avatar upload request received')
-  
   try {
     const supabase = await createClient()
     
-    // Get current user
-    console.log('Getting current user...')
+    // Authenticate user
     const { data: { user }, error: userError } = await supabase.auth.getUser()
     
     if (userError || !user) {
@@ -16,51 +17,39 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    console.log('Processing file upload for user:', user.id)
-    
-    // Get file from form data
+    // Extract file from form data
     const formData = await request.formData()
     const file = formData.get('file') as File | null
     
     if (!file) {
-      console.error('No file found in form data')
       return NextResponse.json({ error: 'No file provided' }, { status: 400 })
     }
 
-    console.log('File received:', {
-      name: file.name,
-      type: file.type,
-      size: file.size,
-    })
-
-    // Validate file type
+    // Validate file type (images only)
     if (!file.type.startsWith('image/')) {
-      const error = `Invalid file type: ${file.type}. Only images are allowed.`
-      console.error(error)
-      return NextResponse.json({ error }, { status: 400 })
+      return NextResponse.json({ 
+        error: `Invalid file type: ${file.type}. Only images are allowed.` 
+      }, { status: 400 })
     }
 
-    // Validate file size (2MB)
+    // Validate file size (2MB max)
     if (file.size > 2 * 1024 * 1024) {
-      const error = `File too large: ${(file.size / 1024 / 1024).toFixed(2)}MB. Max size is 2MB.`
-      console.error(error)
-      return NextResponse.json({ error }, { status: 400 })
+      return NextResponse.json({ 
+        error: `File too large: ${(file.size / 1024 / 1024).toFixed(2)}MB. Max size is 2MB.` 
+      }, { status: 400 })
     }
 
     // Create unique file name
     const fileExt = file.name.split('.').pop()
     const fileName = `${user.id}-${Date.now()}.${fileExt}`
     const filePath = `avatars/${fileName}`
-    
-    console.log('Uploading file to storage:', filePath)
 
     try {
-      // Convert File to ArrayBuffer then to Buffer
+      // Convert File to Buffer for upload
       const arrayBuffer = await file.arrayBuffer()
       const buffer = Buffer.from(arrayBuffer)
 
-      // Upload to Supabase Storage
-      console.log('Uploading to Supabase Storage...')
+      // Upload to Supabase Storage bucket
       const { data: uploadData, error: uploadError } = await supabase.storage
         .from('profile-images')
         .upload(filePath, buffer, {
@@ -77,17 +66,12 @@ export async function POST(request: NextRequest) {
         }, { status: 500 })
       }
 
-      console.log('File uploaded successfully:', uploadData)
-
-      // Get public URL
+      // Generate public URL for the uploaded image
       const { data: { publicUrl } } = supabase.storage
         .from('profile-images')
         .getPublicUrl(filePath)
 
-      console.log('Generated public URL:', publicUrl)
-
-      // Update user profile
-      console.log('Updating user profile with new avatar URL...')
+      // Update user profile with new avatar URL
       const { data: updateData, error: updateError } = await supabase
         .from('users')
         .update({ 
@@ -106,9 +90,7 @@ export async function POST(request: NextRequest) {
         }, { status: 500 })
       }
 
-      console.log('Profile updated successfully:', updateData)
-
-      // Log audit event
+      // Create audit log (non-blocking)
       try {
         await supabase.from('audit_logs').insert({
           user_id: user.id,
@@ -118,10 +100,9 @@ export async function POST(request: NextRequest) {
           new_values: { avatar_url: publicUrl },
           created_at: new Date().toISOString()
         })
-        console.log('Audit log created')
       } catch (auditError) {
+        // Audit logging failure should not block the response
         console.error('Failed to create audit log:', auditError)
-        // Don't fail the request if audit logging fails
       }
 
       return NextResponse.json({ 

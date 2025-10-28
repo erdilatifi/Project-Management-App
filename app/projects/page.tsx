@@ -39,7 +39,7 @@ export default function ProjectsPage() {
 
   const searchRef = useRef<HTMLInputElement>(null);
 
-  // Derive a current workspace id by selecting the first membership for the user.
+  // Initialize user and workspace context on component mount
   useEffect(() => {
     const init = async () => {
       try {
@@ -70,7 +70,7 @@ export default function ProjectsPage() {
     if (error) toast.error(error);
   }, [error]);
 
-  // Cmd/Ctrl+K → focus search
+  // Keyboard shortcut: Cmd/Ctrl+K to focus search input
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") {
@@ -82,6 +82,7 @@ export default function ProjectsPage() {
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
+  // Add newly created project to the list
   const onCreated = (p: { id: string; name: string; description: string | null; workspace_id?: string }) => {
     setItems((cur) => [
       {
@@ -97,11 +98,12 @@ export default function ProjectsPage() {
     ]);
   };
 
+  // Update project in the list after edit
   const onUpdated = (p: { id: string; name: string; description: string | null; is_archived?: boolean | null }) => {
     setItems((cur) => cur.map((it) => (it.id === p.id ? ({ ...it, ...p } as any) : it)));
   };
 
-  // tiny avatar from initial
+  // Display project avatar with first letter of name
   const Avatar = ({ name }: { name: string }) => {
     const initial = (name?.trim()?.[0] ?? "?").toUpperCase();
     return (

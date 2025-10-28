@@ -17,17 +17,15 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import WorkSettings from "@/components/profile/WorkSettings";
 import NotificationPreferences from "@/components/profile/NotificationPreferences";
-import StatsSummary from "@/components/profile/StatsSummary";
 import NotificationsList from "@/components/notifications/NotificationsList";
-import TasksPanel from "@/components/profile/TasksPanel";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
+// Validation schema for profile form fields
 const schema = z.object({
   full_name: z.string().min(1, "Full name is required").max(120),
   job_title: z.string().max(120).optional().or(z.literal("")),
-  avatar_file: z.any().optional(), 
+  avatar_file: z.any().optional(),
 });
 
 type FormValues = z.infer<typeof schema>;
@@ -35,6 +33,7 @@ type FormValues = z.infer<typeof schema>;
 export default function ProfilePage() {
   const supabase = createClient();
 
+  // User authentication and profile state
   const [userId, setUserId] = useState<string | null>(null);
   const [existingAvatarUrl, setExistingAvatarUrl] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
@@ -42,7 +41,7 @@ export default function ProfilePage() {
   const [authChecked, setAuthChecked] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-  // remove dialog state
+  // Avatar removal dialog state
   const [removeOpen, setRemoveOpen] = useState(false);
   const [removing, setRemoving] = useState(false);
 
@@ -63,19 +62,20 @@ export default function ProfilePage() {
 
   const avatarFile = watch("avatar_file") as FileList | undefined;
 
-  // Show a preview if a new file is selected; else show existing avatar
+  // Generate preview URL for selected avatar or show existing avatar
   const previewUrl = useMemo(() => {
     if (avatarFile?.length) return URL.createObjectURL(avatarFile[0]);
     return existingAvatarUrl ?? undefined;
   }, [avatarFile, existingAvatarUrl]);
 
-  // Revoke preview URL when file changes / component unmounts
+  // Clean up object URLs to prevent memory leaks
   useEffect(() => {
     if (!avatarFile?.length) return;
     const url = URL.createObjectURL(avatarFile[0]);
     return () => URL.revokeObjectURL(url);
   }, [avatarFile]);
 
+  // Load user authentication and profile data on component mount
   useEffect(() => {
     const load = async () => {
       const { data, error } = await supabase.auth.getUser();
@@ -91,6 +91,7 @@ export default function ProfilePage() {
       setUserId(uid);
       if (!uid) return;
 
+      // Fetch user profile from database
       const { data: profile, error: profErr, status } = await supabase
         .from("profiles")
         .select("full_name, job_title, avatar_url")
@@ -105,6 +106,7 @@ export default function ProfilePage() {
         return;
       }
 
+      // Populate form with existing profile data
       if (profile) {
         reset({
           full_name: profile.full_name ?? "",
@@ -119,6 +121,7 @@ export default function ProfilePage() {
     load();
   }, []);
 
+  // Validate avatar file size and type before upload
   const validateAvatarLocal = () => {
     const f = avatarFile?.[0];
     if (!f) {
@@ -126,7 +129,7 @@ export default function ProfilePage() {
       return true;
     }
 
-    const maxBytes = 2 * 1024 * 1024; // 2MB
+    const maxBytes = 2 * 1024 * 1024; // 2MB limit
     const isImage = f.type.startsWith("image/");
     if (!isImage) {
       setError("avatar_file", { type: "manual", message: "Please select an image file." });
@@ -141,6 +144,7 @@ export default function ProfilePage() {
     return true;
   };
 
+  // Upload avatar image to Supabase storage and return public URL
   async function uploadAvatarIfAny(uid: string): Promise<string | null> {
     if (!avatarFile?.length) return null;
     if (!validateAvatarLocal()) return null;
@@ -151,6 +155,7 @@ export default function ProfilePage() {
       const ext = (file.name.split(".").pop() || "png").toLowerCase();
       const path = `${uid}/${Date.now()}.${ext}`;
 
+      // Upload to Supabase storage bucket
       const { error: uploadErr } = await supabase.storage
         .from("profile-images")
         .upload(path, file, {
@@ -160,7 +165,7 @@ export default function ProfilePage() {
 
       if (uploadErr) throw uploadErr;
 
-      // Public URL (bucket must be public; for private, use signed URLs)
+      // Get public URL for the uploaded image
       const { data: publicData } = supabase.storage
         .from("profile-images")
         .getPublicUrl(path);
@@ -171,9 +176,8 @@ export default function ProfilePage() {
     }
   }
 
-  // Robust path extraction: returns the storage path WITHOUT the bucket name
-  // Works for URLs like:
-  // https://<ref>.supabase.co/storage/v1/object/public/profile-images/<path>
+  // Extract storage path from Supabase public URL for file deletion
+  // Parses URLs like: https://<ref>.supabase.co/storage/v1/object/public/profile-images/<path>
   function getStoragePathFromPublicUrl(urlStr: string): string | null {
     try {
       const u = new URL(urlStr);
@@ -194,6 +198,7 @@ export default function ProfilePage() {
     }
   }
 
+  // Handle avatar removal: delete from storage and update database
   const handleRemoveConfirmed = async () => {
     if (!userId) return;
     if (!existingAvatarUrl) {
@@ -202,7 +207,7 @@ export default function ProfilePage() {
     }
     setRemoving(true);
     try {
-      // 1) delete file if we can compute its path
+      // Delete file from storage if path can be extracted
       const storagePath = getStoragePathFromPublicUrl(existingAvatarUrl);
       if (storagePath) {
         const { error: delErr } = await supabase
@@ -210,12 +215,11 @@ export default function ProfilePage() {
           .from("profile-images")
           .remove([storagePath]);
         if (delErr) {
-          // Not fatal; continue to null the DB value
           console.warn("Storage remove warning:", delErr.message);
         }
       }
 
-      // 2) null avatar in DB
+      // Update database to remove avatar URL
       const { error: upErr } = await supabase
         .from("profiles")
         .update({ avatar_url: null })
@@ -236,6 +240,7 @@ export default function ProfilePage() {
     }
   };
 
+  // Handle form submission: upload avatar and save profile data
   const onSubmit = async (values: FormValues) => {
     setErrorMsg(null);
     if (!userId) {
@@ -246,6 +251,7 @@ export default function ProfilePage() {
     }
     setSaving(true);
     try {
+      // Upload new avatar if selected
       const newAvatarUrl = await uploadAvatarIfAny(userId);
       const payload = {
         id: userId,
@@ -254,6 +260,7 @@ export default function ProfilePage() {
         ...(newAvatarUrl ? { avatar_url: newAvatarUrl } : {}),
       };
 
+      // Upsert profile data to database
       const { error } = await supabase.from("profiles").upsert(payload, {
         onConflict: "id",
       });
@@ -261,7 +268,7 @@ export default function ProfilePage() {
 
       if (newAvatarUrl) setExistingAvatarUrl(newAvatarUrl);
 
-      // Clear file input after successful save (so same filename can be reselected)
+      // Clear file input to allow reselecting the same file
       if (fileInputRef.current) fileInputRef.current.value = "";
       reset({ full_name: values.full_name, job_title: values.job_title || "" });
 
@@ -296,11 +303,8 @@ export default function ProfilePage() {
       <Tabs defaultValue="personal" className="space-y-6">
         <TabsList>
           <TabsTrigger value="personal">Personal</TabsTrigger>
-          <TabsTrigger value="work">Work</TabsTrigger>
           <TabsTrigger value="preferences">Preferences</TabsTrigger>
           <TabsTrigger value="notifications">Notifications</TabsTrigger>
-          <TabsTrigger value="tasks">Tasks</TabsTrigger>
-          <TabsTrigger value="overview">Overview</TabsTrigger>
         </TabsList>
 
         <TabsContent value="personal">
@@ -336,10 +340,10 @@ export default function ProfilePage() {
                   }}
                   onChange={(e) => {
                     register("avatar_file").onChange(e);
-                    // validate on select
+                    // Validate immediately on file selection
                     const ok = validateAvatarLocal();
                     if (!ok) {
-                      // if invalid, clear the input so the preview doesn't show
+                      // Clear input if validation fails
                       if (fileInputRef.current) fileInputRef.current.value = "";
                     }
                   }}
@@ -368,7 +372,6 @@ export default function ProfilePage() {
               </div>
             </div>
 
-            {/* Full Name */}
             <div className="space-y-2">
               <label className="text-sm font-medium">Full name</label>
               <Input placeholder="John Doe" {...register("full_name")} />
@@ -377,7 +380,6 @@ export default function ProfilePage() {
               )}
             </div>
 
-            {/* Job Title */}
             <div className="space-y-2">
               <label className="text-sm font-medium">Job title</label>
               <Input placeholder="Project Manager" {...register("job_title")} />
@@ -395,15 +397,6 @@ export default function ProfilePage() {
               {uploading && <span className="text-sm">Uploading image…</span>}
             </div>
           </form>
-        </CardContent>
-      </Card>
-        </TabsContent>
-
-        <TabsContent value="work">
-      <Card className="p-6 lg:min-w-[700px] space-y-6">
-        <CardTitle className="text-xl font-semibold">Work Settings</CardTitle>
-        <CardContent>
-          <WorkSettings />
         </CardContent>
       </Card>
         </TabsContent>
@@ -426,27 +419,8 @@ export default function ProfilePage() {
           </Card>
         </TabsContent>
 
-        <TabsContent value="tasks">
-          <Card className="p-6 lg:min-w-[700px] space-y-6">
-            <CardTitle className="text-xl font-semibold">Tasks</CardTitle>
-            <CardContent>
-              <TasksPanel />
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="overview">
-          <Card className="p-6 lg:min-w-[700px] space-y-6">
-            <CardTitle className="text-xl font-semibold">Overview</CardTitle>
-            <CardContent>
-              <StatsSummary />
-            </CardContent>
-          </Card>
-        </TabsContent>
-
       </Tabs>
 
-      {/* Confirm Remove Avatar Dialog */}
       <Dialog open={removeOpen} onOpenChange={setRemoveOpen}>
         <DialogContent>
           <DialogHeader>

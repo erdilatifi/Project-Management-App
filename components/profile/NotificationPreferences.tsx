@@ -19,6 +19,7 @@ import { useAuth } from "@/app/context/ContextApiProvider";
 import { createNotification } from "@/utils/supabase/notifications";
 
 export default function NotificationPreferences() {
+  // Manage preferences in local storage with Zod validation
   const [prefs, setPrefs] = useLocalStorageState(
     STORAGE_KEYS.PREFERENCES,
     preferencesSchema,
@@ -28,7 +29,7 @@ export default function NotificationPreferences() {
   const { setTheme } = useTheme();
   const { user } = useAuth();
 
-  // Hydrate from server if available
+  // Load preferences from server on component mount
   useEffect(() => {
     const load = async () => {
       try {
@@ -64,6 +65,7 @@ export default function NotificationPreferences() {
     setTheme(prefs.theme);
   }, [prefs.theme, setTheme]);
 
+  // Save preferences to server and sync timezone if present
   const onSave = useCallback(async () => {
     setSaving(true);
     try {
@@ -102,6 +104,7 @@ export default function NotificationPreferences() {
     }
   }, [prefs]);
 
+  // Send a test notification to verify notification settings
   const sendTest = useCallback(async () => {
     if (!user?.id) return;
     try {
