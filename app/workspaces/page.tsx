@@ -11,7 +11,7 @@ import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import CreateWorkspaceDialog from "@/components/workspaces/CreateWorkspaceDialog";
-import { Search, RefreshCcw, Trash2, X, Users, MessageSquare } from "lucide-react";
+import { Search, RefreshCcw, Trash2, X, Users, MessageSquare, ChevronLeft, ChevronRight, FolderPlus } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -20,87 +20,31 @@ import {
   DialogHeader,
   DialogTitle
 } from "@/components/ui/dialog";
-
-type WorkspaceRow = {
-  id: string;
-  name: string;
-  slug: string | null;
-  description: string | null;
-  owner_id: string;
-  created_at: string;
-};
+import { useWorkspaces, WorkspaceRow } from "@/hooks/useWorkspaces";
 
 export default function WorkspacesPage() {
   const supabase = useMemo(() => createClient(), []);
-  const [items, setItems] = useState<WorkspaceRow[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [search, setSearch] = useState("");
+  const {
+    items,
+    loading,
+    error,
+    search,
+    setSearch,
+    page,
+    setPage,
+    canPrev,
+    canNext,
+    total,
+    setItems,
+    reload,
+  } = useWorkspaces({ pageSize: 10 });
+
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [wsToDelete, setWsToDelete] = useState<WorkspaceRow | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
 
   const searchRef = useRef<HTMLInputElement>(null);
-
-  const load = async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const { data: userRes } = await supabase.auth.getUser();
-      const uid = userRes.user?.id ?? null;
-
-      // Fetch memberships first and then filter workspaces by IDs
-      let ids: string[] | null = null;
-      if (uid) {
-        const { data: memberships, error: memErr } = await supabase
-          .from("workspace_members")
-          .select("workspace_id")
-          .eq("user_id", uid);
-        if (memErr) throw memErr;
-        ids = (memberships ?? []).map((r: any) => r.workspace_id as string);
-        if ((ids?.length ?? 0) === 0) {
-          setItems([]);
-          setLoading(false);
-          return;
-        }
-      }
-
-      let query = supabase
-        .from("workspaces")
-        .select("id, name, slug, description, owner_id, created_at")
-        .order("created_at", { ascending: false });
-
-      if (ids && ids.length) query = query.in("id", ids);
-
-      if (search.trim()) {
-        const like = `%${search.trim()}%`;
-        query = query.or(`name.ilike.${like},description.ilike.${like},slug.ilike.${like}`);
-      }
-
-      const { data, error } = await query;
-      if (error) throw error;
-      // strip relation field when setting items
-      const out = (data ?? []).map((w: any) => ({
-        id: w.id,
-        name: w.name,
-        slug: w.slug,
-        description: w.description,
-        owner_id: w.owner_id,
-        created_at: w.created_at,
-      })) as WorkspaceRow[];
-      setItems(out);
-    } catch (e: any) {
-      setError(e?.message ?? "Failed to load workspaces");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
   useEffect(() => {
     const initUser = async () => {
@@ -201,8 +145,11 @@ export default function WorkspacesPage() {
                 <Input
                   ref={searchRef}
                   value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  onKeyDown={(e) => { if (e.key === "Enter") load(); }}
+                  onChange={(e) => {
+                    setSearch(e.target.value);
+                    setPage(1);
+                  }}
+                  onKeyDown={(e) => { if (e.key === "Enter") reload(); }}
                   placeholder="Search workspaces (Ctrl/Cmd+K)"
                   className="pl-9 pr-8 bg-background border-border focus-visible:ring-2 focus-visible:ring-ring rounded-xl"
                 />
@@ -211,8 +158,9 @@ export default function WorkspacesPage() {
                     aria-label="Clear search"
                     onClick={() => {
                       setSearch("");
+                      setPage(1);
                       searchRef.current?.focus();
-                      load();
+                      reload();
                     }}
                     className="absolute right-2 top-1/2 -translate-y-1/2 rounded-md p-1 text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
                   >
@@ -223,7 +171,7 @@ export default function WorkspacesPage() {
 
               <Button
                 variant="outline"
-                onClick={() => load()}
+                onClick={() => reload()}
                 className="rounded-xl"
               >
                 <RefreshCcw className="mr-2 h-4 w-4" /> Refresh
@@ -251,104 +199,107 @@ export default function WorkspacesPage() {
               </Card>
             ))}
           </div>
-        ) : items.length === 0 ? (
-          <Card className="overflow-hidden rounded-2xl border-border">
-            <div className="px-6 py-12 text-center">
-              <div className="mx-auto max-w-md">
-                <h3 className="text-lg font-semibold text-foreground">No workspaces found</h3>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  Try adjusting your search, or create a new workspace to get started.
-                </p>
-                <div className="mt-4">
-                  <CreateWorkspaceDialog
-                    onCreated={(ws) =>
-                      setItems((cur) => [
-                        {
-                          id: ws.id,
-                          name: ws.name,
-                          slug: null,
-                          description: null,
-                          owner_id: userId ?? "",
-                          created_at: new Date().toISOString()
-                        },
-                        ...cur
-                      ])
-                    }
-                  />
-                </div>
-              </div>
-            </div>
-          </Card>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-            {items.map((w) => (
-              <Card
-                key={w.id}
-                className="group overflow-hidden rounded-2xl border-border shadow-sm hover:shadow-md transition-all"
-              >
-                <div className="p-5 flex flex-col gap-3">
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="flex items-start gap-3 min-w-0">
-                      <Avatar name={w.name} />
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <h2 className="font-semibold text-foreground leading-6 line-clamp-2">{w.name}</h2>
-                          {w.slug ? (
-                            <Badge variant="outline" className="rounded-lg">
-                              {w.slug}
-                            </Badge>
+          <>
+            {items.length === 0 ? (
+              <EmptyState onReset={() => { setSearch(""); setPage(1); reload(); }} />
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                {items.map((w) => (
+                  <Card
+                    key={w.id}
+                    className="group overflow-hidden rounded-2xl border-border shadow-sm hover:shadow-md transition-all"
+                  >
+                    <div className="p-5 flex flex-col gap-3">
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="flex items-start gap-3 min-w-0">
+                          <Avatar name={w.name} />
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <h2 className="font-semibold text-foreground leading-6 line-clamp-2">{w.name}</h2>
+                              {w.slug ? (
+                                <Badge variant="outline" className="rounded-lg">
+                                  {w.slug}
+                                </Badge>
+                              ) : null}
+                            </div>
+                            <div className="text-xs text-muted-foreground mt-1">
+                              Created {new Date(w.created_at).toLocaleString()}
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-2 shrink-0">
+                          {userId && userId === w.owner_id ? (
+                            <Button
+                              variant="destructive"
+                              size="sm"
+                              onClick={() => onDelete(w)}
+                              className="rounded-lg"
+                              title={`Delete ${w.name}`}
+                            >
+                              <Trash2 className="mr-1.5 h-4 w-4" /> Delete
+                            </Button>
                           ) : null}
                         </div>
-                        <div className="text-xs text-muted-foreground mt-1">
-                          Created {new Date(w.created_at).toLocaleString()}
-                        </div>
                       </div>
+
+                      {w.description ? (
+                        <p className="text-sm text-muted-foreground leading-6 line-clamp-3">{w.description}</p>
+                      ) : (
+                        <p className="text-sm text-muted-foreground italic">No description</p>
+                      )}
                     </div>
 
-                    <div className="flex items-center gap-2 shrink-0">
-                      {userId && userId === w.owner_id ? (
-                        <Button
-                          variant="destructive"
-                          size="sm"
-                          onClick={() => onDelete(w)}
-                          className="rounded-lg"
-                          title={`Delete ${w.name}`}
-                        >
-                          <Trash2 className="mr-1.5 h-4 w-4" /> Delete
+                    <Separator />
+
+                    <div className="p-3 flex items-center justify-end gap-2">
+                      <Link href={`/workspaces/${w.id}/people`}>
+                        <Button variant="outline" size="sm" className="h-7 rounded-lg">
+                          <Users className="w-4 h-4 mr-1.5" /> People
                         </Button>
-                      ) : null}
+                      </Link>
+                      <Link href={`/workspaces/${w.id}/messages`}>
+                        <Button variant="outline" size="sm" className="h-7 rounded-lg">
+                          <MessageSquare className="w-4 h-4 mr-1.5" /> Messages
+                        </Button>
+                      </Link>
+                      <Link href={`/projects`}>
+                        <Button variant="ghost" size="sm" className="h-7 rounded-lg">
+                          View projects
+                        </Button>
+                      </Link>
                     </div>
-                  </div>
+                  </Card>
+                ))}
+              </div>
+            )}
 
-                  {w.description ? (
-                    <p className="text-sm text-muted-foreground leading-6 line-clamp-3">{w.description}</p>
-                  ) : (
-                    <p className="text-sm text-muted-foreground italic">No description</p>
-                  )}
-                </div>
-
-                <Separator />
-
-                <div className="p-3 flex items-center justify-end gap-2">
-                  <Link href={`/workspaces/${w.id}/people`}>
-                    <Button variant="outline" size="sm" className="h-7 rounded-lg">
-                      <Users className="w-4 h-4 mr-1.5" /> People
-                    </Button>
-                  </Link>
-                  <Link href={`/workspaces/${w.id}/messages`}>
-                    <Button variant="outline" size="sm" className="h-7 rounded-lg">
-                      <MessageSquare className="w-4 h-4 mr-1.5" /> Messages
-                    </Button>
-                  </Link>
-                  <Link href={`/projects`}>
-                    <Button variant="ghost" size="sm" className="h-7 rounded-lg">
-                      View projects
-                    </Button>
-                  </Link>
-                </div>
-              </Card>
-            ))}
-          </div>
+            {/* Pagination */}
+            <div className="flex items-center justify-between mt-6">
+              <div className="text-sm text-muted-foreground">
+                Page {page} • {total} total
+              </div>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  disabled={!canPrev}
+                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+                  className="rounded-xl"
+                >
+                  <ChevronLeft className="mr-2 h-4 w-4" /> Previous
+                </Button>
+                <Button
+                  variant="outline"
+                  disabled={!canNext}
+                  onClick={() => setPage((p) => p + 1)}
+                  className="rounded-xl"
+                >
+                  Next <ChevronRight className="ml-2 h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+          </>
         )}
 
         {/* Confirm delete dialog */}
@@ -365,7 +316,7 @@ export default function WorkspacesPage() {
                 Cancel
               </Button>
               <Button variant="destructive" onClick={onDeleteConfirmed} disabled={deleting}>
-                {deleting ? "Deletingâ€¦" : "Delete"}
+                {deleting ? "Deleting…" : "Delete"}
               </Button>
             </DialogFooter>
           </DialogContent>
@@ -375,4 +326,23 @@ export default function WorkspacesPage() {
   );
 }
 
-
+function EmptyState({ onReset }: { onReset: () => void }) {
+  return (
+    <Card className="overflow-hidden rounded-2xl border-border">
+      <div className="px-6 py-12 text-center">
+        <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-muted">
+          <FolderPlus className="h-6 w-6 text-muted-foreground" />
+        </div>
+        <h3 className="text-lg font-semibold text-foreground">No workspaces found</h3>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Try adjusting your search or create a new workspace to get started.
+        </p>
+        <div className="mt-4 flex items-center justify-center gap-2">
+          <Button onClick={onReset} variant="outline" className="rounded-xl">
+            Clear search
+          </Button>
+        </div>
+      </div>
+    </Card>
+  );
+}

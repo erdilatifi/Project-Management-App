@@ -30,6 +30,8 @@ import {
 import { toast } from "sonner";
 import { Pencil, Trash2, Plus, GripVertical, Calendar } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { TaskAssignees } from "@/components/tasks/TaskAssignees";
+import { CreateTaskDialog } from "@/components/tasks/CreateTaskDialog";
 
 import {
   DndContext,
@@ -273,6 +275,7 @@ export type TaskRow = {
   status: Status;
   priority?: number | null; // 1-5
   assignee_id?: string | null;
+  assignee_ids?: string[] | null;
   due_at?: string | null;
   created_by: string | null;
   created_at: string;
@@ -316,9 +319,6 @@ export default function ProjectTasksBoardPage() {
 
   const [items, setItems] = useState<TaskRow[]>([]);
   const [loading, setLoading] = useState(true);
-  const [creating, setCreating] = useState(false);
-  const [newTitle, setNewTitle] = useState("");
-  const [createDue, setCreateDue] = useState<string>(""); // yyyy-mm-dd
   const todayStr = useMemo(() => new Date().toISOString().slice(0,10), []);
   const [userId, setUserId] = useState<string | null>(null);
   const [activeId, setActiveId] = useState<UniqueIdentifier | null>(null);
@@ -327,22 +327,19 @@ export default function ProjectTasksBoardPage() {
   const [canCreate, setCanCreate] = useState<boolean>(false);
   const [dueFilter, setDueFilter] = useState<DueFilter>("all");
 
-  // Create-time assignee only
-  const [createAssigneeId, setCreateAssigneeId] = useState<string | null>(null);
-
-  // Editing state per task
+  // Task editing state
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editTitle, setEditTitle] = useState<string>("");
   const [editDescription, setEditDescription] = useState<string>("");
   const [editDue, setEditDue] = useState<string>("");
   const [savingEdit, setSavingEdit] = useState(false);
 
-  // Delete confirm
+  // Delete confirmation dialog
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
 
-  // sensors
+  // Drag and drop sensors
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } })
   );
@@ -352,21 +349,30 @@ export default function ProjectTasksBoardPage() {
       .slice()
       .sort(
         (a, b) =>
-          new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+          new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
       );
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
+      console.log('Loading tasks for project:', projectId, 'userId:', userId);
+      
+      // Load ALL tasks in the project (project board shows everything)
       const { data, error } = await supabase
         .from("tasks")
         .select(
-          "id, project_id, workspace_id, title, description, status, priority, assignee_id, due_at, created_by, created_at"
+          "id, project_id, workspace_id, title, description, status, priority, assignee_id, assignee_ids, due_at, created_by, created_at"
         )
         .eq("project_id", projectId)
-        .order("created_at", { ascending: true });
+        .order("created_at", { ascending: false });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error loading tasks:', error);
+        throw error;
+      }
+      console.log('Loaded tasks:', data?.length, data);
+      console.log('Current user ID:', userId);
+      console.log('Sample task:', data?.[0]);
       setItems(sortTasks((data ?? []) as TaskRow[]));
     } catch (e: unknown) {
       toast.error(
@@ -375,9 +381,9 @@ export default function ProjectTasksBoardPage() {
     } finally {
       setLoading(false);
     }
-  }, [projectId, supabase]);
+  }, [projectId, supabase, userId]);
 
-  // bootstrap
+  // Initialize workspace and members
   useEffect(() => {
     const init = async () => {
       let currentUserId: string | null = null;
@@ -424,29 +430,7 @@ export default function ProjectTasksBoardPage() {
                 })
               );
 
-              // Try app users.username and display_name
-              let userMap: Record<string, { username: string | null; display: string | null }> = {};
-              try {
-                if (ids.length) {
-                  const { data: userProfiles } = await supabase
-                    .from("users")
-                    .select("id, username, display_name")
-                    .in("id", ids);
-                  userMap = Object.fromEntries(
-                    (userProfiles ?? []).map((u: any) => [
-                      String(u.id),
-                      {
-                        username: (u.username as string | null) ?? null,
-                        display: (u.display_name as string | null) ?? null,
-                      },
-                    ])
-                  );
-                }
-              } catch {
-                userMap = {};
-              }
-
-              // Prefer profiles.username if available; fallback to profiles.full_name
+              // Fetch profiles for additional user data
               let profilesMap: Record<string, { username: string | null; full_name: string | null }> = {};
               try {
                 if (ids.length) {
@@ -469,16 +453,13 @@ export default function ProjectTasksBoardPage() {
               setMembers(
                 ids.map((id) => {
                   const label =
-                    // Prefer explicit usernames first
-                    (profilesMap[id]?.username?.trim()) ||
-                    (userMap[id]?.username?.trim()) ||
-                    // Then any workspace-provided label
+                    // Prefer workspace member data first
                     (wmLabelMap[id]?.trim()) ||
-                    // Then other names
-                    (userMap[id]?.display?.trim()) ||
+                    // Then profiles data
+                    (profilesMap[id]?.username?.trim()) ||
                     (profilesMap[id]?.full_name?.trim()) ||
-                    null;
-                  return { id, email: label || "User" };
+                    "User";
+                  return { id, email: label };
                 })
               );
             } catch {
@@ -493,7 +474,7 @@ export default function ProjectTasksBoardPage() {
     init();
   }, [supabase, load, projectId]);
 
-  // realtime
+  // Real-time task updates
   useEffect(() => {
     if (!projectId) return;
     const channel = supabase
@@ -527,64 +508,8 @@ export default function ProjectTasksBoardPage() {
     };
   }, [supabase, projectId]);
 
-  // CRUD helpers --------------------------------------------------------------
-  const createTask = async (title: string, initialAssigneeId: string | null, dueLocal: string) => {
-    if (!canCreate) {
-      toast.error("Only owners/admins can add tasks.");
-      throw new Error("not_allowed");
-    }
-    const due_at = dueLocal ? new Date(dueLocal).toISOString() : null;
-    const { data, error } = await supabase
-      .from("tasks")
-      .insert({
-        project_id: projectId,
-        title: title.trim(),
-        status: "todo",
-        created_by: userId,
-        assignee_id: initialAssigneeId,
-        due_at,
-      })
-      .select(
-        "id, project_id, workspace_id, title, description, status, priority, assignee_id, due_at, created_by, created_at"
-      )
-      .single<TaskRow>();
-    if (error) throw error;
-    try {
-      const actor = (await supabase.auth.getUser()).data.user?.id ?? 'system'
-      // Assignee notification (fanout)
-      if (data?.assignee_id && data.assignee_id !== userId) {
-        await fetch('/api/notifications/fanout', {
-          method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            type: 'task_assigned',
-            actorId: actor,
-            recipients: [data.assignee_id],
-            workspaceId: data.workspace_id ?? workspaceId ?? null,
-            projectId: data.project_id,
-            taskId: data.id,
-            meta: { task_title: data.title },
-          }),
-        })
-      }
-      // Unassigned → notify admins/owners
-      const wsId = data?.workspace_id ?? workspaceId ?? null
-      if (wsId && !data?.assignee_id) {
-        const { data: admins } = await supabase
-          .from('workspace_members')
-          .select('user_id, role')
-          .eq('workspace_id', wsId)
-          .in('role', ['owner', 'admin'] as any)
-        const recipients = (admins ?? [])
-          .map((r: any) => String(r.user_id))
-          .filter((uid) => uid && uid !== userId)
-        if (recipients.length) {
-          await fetch('/api/notifications/fanout', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ type: 'task_created', actorId: actor, recipients, workspaceId: wsId, projectId: data.project_id, taskId: data.id, meta: { task_title: data.title } }) })
-        }
-      }
-    } catch {}
-    return data;
-  };
 
+  // Task update helper
   const updateTask = async (id: string, patch: Partial<TaskRow>) => {
     try {
       const prev = items.find((t) => t.id === id) || null;
@@ -660,12 +585,19 @@ export default function ProjectTasksBoardPage() {
     }
   };
 
-  // DnD handlers (assignee-only) ----------------------------------------------
+  // Drag and drop handlers
   const onDragStart = (evt: DragStartEvent) => {
     const draggedId = evt.active.id as string;
     const t = items.find((x) => x.id === draggedId);
-    if (!t || t.assignee_id !== userId) return; // only current assignee can drag
-    setActiveId(evt.active.id);
+    if (!t) return;
+    
+    const assignees = Array.isArray(t.assignee_ids) ? t.assignee_ids : [];
+    console.log('Drag start - task:', t.id, 'assignees:', assignees, 'userId:', userId);
+    
+    // Allow drag if user is one of the assignees, task is unassigned, or user is creator
+    if (assignees.length === 0 || assignees.includes(userId || "") || t.created_by === userId) {
+      setActiveId(evt.active.id);
+    }
   };
 
   const onDragEnd = async (evt: DragEndEvent) => {
@@ -675,70 +607,26 @@ export default function ProjectTasksBoardPage() {
     if (!overId) return;
 
     const prev = items.find((t) => t.id === draggedId);
-    if (!prev || prev.assignee_id !== userId) return; // only assignee can move
+    if (!prev) return;
+    
+    const assignees = Array.isArray(prev.assignee_ids) ? prev.assignee_ids : [];
+    // Allow move if user is one of the assignees, task is unassigned, or user is creator
+    if (!(assignees.length === 0 || assignees.includes(userId || "") || prev.created_by === userId)) return;
 
-    // Droppable ids are "column:<status>"
+    // Parse column ID from droppable
     const [, target] = overId.split(":");
     if (!target || !["todo", "in_progress", "done"].includes(target)) return;
 
     const nextStatus = target as Status;
     if (prev.status === nextStatus) return;
 
-    // optimistic update
+    // Optimistic UI update
     setItems((cur) => cur.map((t) => (t.id === draggedId ? { ...t, status: nextStatus } : t)));
     try {
       await updateTask(draggedId, { status: nextStatus });
     } catch {
       // revert on failure
       setItems((cur) => cur.map((t) => (t.id === draggedId ? { ...t, status: prev.status } : t)));
-    }
-  };
-
-  // UI helpers ----------------------------------------------------------------
-  const submitNew = async () => {
-    if (!canCreate) {
-      toast.error("Only owners/admins can add tasks.");
-      return;
-    }
-    const title = newTitle.trim();
-    if (!title) return;
-    const initialAssigneeId = createAssigneeId ?? null;
-    // Use date input value directly; quick-due select already maps into createDue
-    const dueLocal = createDue; // yyyy-mm-dd or empty
-    setNewTitle("");
-    setCreateAssigneeId(null);
-
-    // optimistic temp row
-    const tempId = `temp-${Date.now()}`;
-    const optimistic: TaskRow = {
-      id: tempId,
-      project_id: projectId,
-      workspace_id: workspaceId,
-      title,
-      description: null,
-      status: "todo",
-      priority: null,
-      assignee_id: initialAssigneeId,
-      due_at: dueLocal ? new Date(dueLocal).toISOString() : null,
-      created_by: userId,
-      created_at: new Date().toISOString(),
-    };
-    setItems((cur) => sortTasks([...cur, optimistic]));
-
-    try {
-      const created = await createTask(title, initialAssigneeId, dueLocal);
-      // swap temp with real; also dedupe in case realtime already added the real row
-      setItems((cur) => {
-        const without = cur.filter((t) => t.id !== tempId && t.id !== created.id);
-        return sortTasks([...without, created]);
-      });
-      toast.success("Task created");
-    } catch (e) {
-      // remove temp row
-      setItems((cur) => cur.filter((t) => t.id !== tempId));
-      if ((e as Error)?.message !== "not_allowed") {
-        toast.error(e instanceof Error ? e.message : "Failed to create task");
-      }
     }
   };
 
@@ -790,10 +678,7 @@ export default function ProjectTasksBoardPage() {
     setDeleteOpen(true);
   };
 
-  // search-bar candidates
-  const filterCandidates = members.map((m) => ({ id: m.id, label: m.email ?? "" }));
-
-  // derive filtered items by due category
+  // Filter tasks by due date category
   const filteredItems = useMemo(() => {
     if (dueFilter === "all") return items;
     return items.filter((t) => dueCategory(t.due_at) === dueFilter);
@@ -802,87 +687,28 @@ export default function ProjectTasksBoardPage() {
   return (
     <div className="min-h-screen pt-12 w-full bg-[radial-gradient(80rem_40rem_at_50%_-10%,rgba(0,0,0,0.06),transparent)]">
       <div className="mx-auto max-w-[1200px] px-6 lg:px-10 py-10">
-        {/* Header */}
-        <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          {canCreate && (
-            <Card className="w-full p-3 rounded-xl border border-border shadow-sm">
-              <div className="flex items-end gap-3 flex-wrap">
-                <div className="flex flex-col">
-                  <label className="text-xs text-muted-foreground mb-1 font-medium">Task title</label>
-                  <Input
-                    value={newTitle}
-                    onChange={(e) => setNewTitle(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") submitNew();
-                    }}
-                    placeholder="Quick add a task..."
-                    aria-label="New task title"
-                    className="w-72 bg-background border-border focus-visible:ring-2 focus-visible:ring-ring rounded-xl"
-                  />
-                </div>
-
-                <div className="flex flex-col">
-                  <label className="text-xs text-muted-foreground mb-1 font-medium">Assign to</label>
-                  <AssigneeSearchBar
-                    candidates={filterCandidates}
-                    value={createAssigneeId}
-                    onChange={(val) => setCreateAssigneeId(val)}
-                    allowUnassigned
-                    placeholder="Assign to..."
-                    className="w-56"
-                  />
-                </div>
-
-                <div className="flex items-center gap-3">
-                  <div className="flex flex-col">
-                    <label className="text-xs text-muted-foreground mb-1 font-medium">Quick due</label>
-                    <select
-                      className="h-9 rounded-xl border border-border bg-card px-2 text-foreground"
-                      onChange={(e) => {
-                        const val = e.target.value;
-                        if (val === "today") {
-                          setCreateDue(todayStr);
-                        } else if (val === "nextweek") {
-                          const d = new Date();
-                          d.setDate(d.getDate() + 7);
-                          setCreateDue(d.toISOString().slice(0,10));
-                        } else if (val === "none") {
-                          setCreateDue("");
-                        }
-                      }}
-                      defaultValue=""
-                    >
-                      <option value="" disabled>Quick due...</option>
-                      <option value="today">Today</option>
-                      <option value="nextweek">Next week</option>
-                      <option value="none">No due date</option>
-                    </select>
-                  </div>
-                  <div className="flex flex-col">
-                    <label className="text-xs text-muted-foreground mb-1 font-medium">Date</label>
-                    <Input
-                      type="date"
-                      min={todayStr}
-                      value={createDue}
-                      onChange={(e) => setCreateDue(e.target.value)}
-                      className="h-9 w-44 rounded-xl bg-card border-border text-foreground [&::-webkit-calendar-picker-indicator]:dark:invert [&::-webkit-calendar-picker-indicator]:cursor-pointer"
-                    />
-                  </div>
-                </div>
-
-                <Button
-                  onClick={submitNew}
-                  disabled={creating}
-                  variant="outline"
-                  className="rounded-xl"
-                >
-                  <Plus className="mr-2 h-4 w-4" /> Add
-                </Button>
-              </div>
-            </Card>
+        {/* Header with Create Task Dialog */}
+        <div className="mb-6 flex items-center justify-between">
+          <h1 className="text-3xl font-bold tracking-tight">Tasks Board</h1>
+          {canCreate && workspaceId && (
+            <CreateTaskDialog
+              projectId={projectId}
+              workspaceId={workspaceId}
+              onTaskCreated={async (task) => {
+                console.log('Task created, received:', task);
+                // Optimistically add the task immediately
+                if (task) {
+                  setItems((cur) => sortTasks([...cur, task as TaskRow]));
+                }
+                // Reload to ensure consistency
+                await load();
+              }}
+            />
           )}
+        </div>
 
-          {/* Due filter */}
+        {/* Due filter */}
+        <div className="mb-6">
           <div className="flex items-center gap-2">
             <span className="text-sm text-muted-foreground font-medium">Filter:</span>
             <select
@@ -1066,6 +892,7 @@ function Column(props: ColumnProps) {
                 onSave={() => props.onSaveEdit(t.id)}
                 saving={props.savingEdit}
                 members={props.members}
+                assignees={Array.isArray(t.assignee_ids) ? t.assignee_ids : []}
                 currentUserId={props.currentUserId}
                 todayStr={props.todayStr}
               />
@@ -1076,8 +903,6 @@ function Column(props: ColumnProps) {
     </Card>
   );
 }
-
-/* ----------------------- Task card (draggable) ----------------------- */
 
 interface TaskCardProps {
   task: TaskRow;
@@ -1094,6 +919,7 @@ interface TaskCardProps {
   onSave: () => void;
   saving: boolean;
   members: Array<{ id: string; email: string }>;
+  assignees: string[];
   currentUserId: string | null;
   todayStr: string;
 }
@@ -1110,10 +936,6 @@ function TaskCard(props: TaskCardProps) {
   const priorityValue = props.task.priority ? String(props.task.priority) : "none";
   const canEditPriority = !!props.currentUserId && props.currentUserId === props.task.created_by;
   const canEditDelete = !!props.currentUserId && props.currentUserId === props.task.created_by;
-
-  const assigneeLabel = props.task.assignee_id
-    ? props.members.find((m) => m.id === props.task.assignee_id)?.email ?? "User"
-    : "Unassigned";
 
   const cat = dueCategory(props.task.due_at);
   const dueClass = dueBadgeClass(cat);
@@ -1153,14 +975,16 @@ function TaskCard(props: TaskCardProps) {
                   </div>
                 ) : null}
 
-                {/* Assignee text only */}
-                <div className="mt-2 inline-flex items-center gap-2 rounded-full border border-border bg-muted px-2 py-0.5 text-xs text-foreground">
-                  <Avatar className="h-5 w-5">
-                    <AvatarFallback>
-                      {assigneeLabel[0]?.toUpperCase() ?? "?"}
-                    </AvatarFallback>
-                  </Avatar>
-                  <span className="max-w-[180px] truncate">{assigneeLabel}</span>
+                {/* Multiple Assignees Display */}
+                <div className="mt-2">
+                  <TaskAssignees
+                    assignees={props.assignees
+                      .map(id => props.members.find(m => m.id === id))
+                      .filter(Boolean)
+                      .map(m => ({ id: m!.id, label: m!.email }))}
+                    maxDisplay={3}
+                    size="sm"
+                  />
                 </div>
               </div>
             </div>
@@ -1200,7 +1024,7 @@ function TaskCard(props: TaskCardProps) {
                       e.target.value === "none" ? null : Number(e.target.value)
                     )
                   }
-                  className="h-6 w-[110px] border-0 bg-transparent text-current px-1 focus:outline-none"
+                  className="h-6 w-[110px] border-0 bg-transparent text-current px-1 focus:outline-none focus:ring-0 cursor-pointer"
                 >
                   <option value="none">None</option>
                   <option value="1">P1</option>
@@ -1228,22 +1052,24 @@ function TaskCard(props: TaskCardProps) {
           </div>
         </>
       ) : (
-        <div className="space-y-2">
+        <div className="space-y-3">
           <Input
             value={props.editTitle}
             onChange={(e) => props.setEditTitle(e.target.value)}
-            className="bg-background border-border focus-visible:ring-2 focus-visible:ring-ring rounded-lg"
+            placeholder="Task title"
+            className="bg-background border-border text-foreground placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring rounded-xl shadow-sm"
           />
           <Textarea
             value={props.editDescription}
             onChange={(e) => props.setEditDescription(e.target.value)}
+            placeholder="Description (optional)"
             rows={3}
-            className="bg-background border-border focus-visible:ring-2 focus-visible:ring-ring rounded-lg"
+            className="bg-background border-border text-foreground placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring rounded-xl shadow-sm resize-none"
           />
           <div className="flex items-center gap-2">
             <Calendar className="h-4 w-4 text-muted-foreground" />
             <select
-              className="h-9 rounded-xl border border-border bg-background px-2"
+              className="h-9 rounded-xl border border-border bg-background text-foreground px-3 focus:outline-none focus:ring-2 focus:ring-ring shadow-sm"
               onChange={(e) => {
                 const val = e.target.value;
                   if (val === "today") {
@@ -1269,12 +1095,18 @@ function TaskCard(props: TaskCardProps) {
               min={props.todayStr}
               value={props.editDue}
               onChange={(e) => props.setEditDue(e.target.value)}
-              className="h-9 w-44 rounded-lg bg-white text-neutral-900 border-neutral-300"
+              className="h-9 w-44 rounded-xl bg-background text-foreground border-border shadow-sm focus-visible:ring-2 focus-visible:ring-ring"
             />
           </div>
-          <div className="flex items-center justify-end gap-2">
-            <Button variant="outline" onClick={props.onSave} disabled={props.saving} className="rounded-lg">
-              {props.saving ? "Saving..." : "Save"}
+          <div className="flex items-center justify-end gap-2 pt-1">
+            <Button 
+              variant="outline" 
+              size="sm"
+              onClick={props.onSave} 
+              disabled={props.saving} 
+              className="rounded-xl shadow-sm hover:shadow-md transition-all"
+            >
+              {props.saving ? "Saving..." : "Save Changes"}
             </Button>
           </div>
         </div>

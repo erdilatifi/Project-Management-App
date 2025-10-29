@@ -286,7 +286,7 @@ export default function ProfilePage() {
   if (authChecked && !userId) {
     return (
       <div className="mx-auto max-w-[1200px] p-6">
-        <Card className="p-6 lg:min-w-[700px] space-y-4">
+        <Card className="p-6 max-w-2xl mx-auto space-y-4">
           <CardTitle className="text-2xl font-semibold">Profile</CardTitle>
           <CardContent>You need to sign in to view your profile.</CardContent>
         </Card>
@@ -296,11 +296,11 @@ export default function ProfilePage() {
 
   return (
     <div className="mx-auto max-w-[1200px] p-6 space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-center pt-15">
         <h1 className="text-2xl font-semibold">Profile</h1>
       </div>
 
-      <Tabs defaultValue="personal" className="space-y-6">
+      <Tabs defaultValue="personal" className="space-y-6 max-w-3xl mx-auto">
         <TabsList>
           <TabsTrigger value="personal">Personal</TabsTrigger>
           <TabsTrigger value="preferences">Preferences</TabsTrigger>
@@ -308,7 +308,7 @@ export default function ProfilePage() {
         </TabsList>
 
         <TabsContent value="personal">
-      <Card className="p-6 lg:min-w-[700px] space-y-6">
+      <Card className="p-6 space-y-6">
         <CardTitle className="text-2xl font-semibold">Profile</CardTitle>
 
         <CardContent className="space-y-6">
@@ -402,7 +402,7 @@ export default function ProfilePage() {
         </TabsContent>
 
         <TabsContent value="preferences">
-          <Card className="p-6 lg:min-w-[700px] space-y-6">
+          <Card className="p-6 space-y-6">
             <CardTitle className="text-xl font-semibold">Preferences</CardTitle>
             <CardContent>
               <NotificationPreferences />
@@ -411,7 +411,7 @@ export default function ProfilePage() {
         </TabsContent>
 
         <TabsContent value="notifications">
-          <Card className="p-6 lg:min-w-[700px] space-y-6">
+          <Card className="p-6 space-y-6">
             <CardTitle className="text-xl font-semibold">Notifications</CardTitle>
             <CardContent>
               <NotificationsList />

@@ -1,14 +1,18 @@
 "use client"
 
-import { useEffect, useMemo, useState, useCallback } from 'react'
+import { useEffect, useMemo, useState, useCallback, useRef } from 'react'
 import { useParams } from 'next/navigation'
 import { InviteUser } from '@/components/workspaces/InviteUser'
 import { createClient } from '@/utils/supabase/client'
 import type { Member } from '@/types/workspaces'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import { Input } from '@/components/ui/input'
+import { Card } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
 import { toast } from 'sonner'
 import { getWorkspaceRole } from '@/utils/permissions'
 import { useRouter } from 'next/navigation'
+import { Search, X, UserMinus } from 'lucide-react'
 
 export default function WorkspacePeoplePage() {
   const { id } = useParams<{ id: string }>()
@@ -19,6 +23,8 @@ export default function WorkspacePeoplePage() {
   const [loading, setLoading] = useState(true)
   const [canManage, setCanManage] = useState(false)
   const [myRole, setMyRole] = useState<string | null>(null)
+  const [searchQuery, setSearchQuery] = useState('')
+  const searchRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     const load = async () => {
@@ -151,6 +157,29 @@ export default function WorkspacePeoplePage() {
     }
   }, [workspaceId, router])
 
+  // Filter members based on search query
+  const filteredRows = useMemo(() => {
+    if (!searchQuery.trim()) return rows
+    const query = searchQuery.toLowerCase()
+    return rows.filter((m) => 
+      m.email?.toLowerCase().includes(query) ||
+      m.job_title?.toLowerCase().includes(query) ||
+      m.role?.toLowerCase().includes(query)
+    )
+  }, [rows, searchQuery])
+
+  // Keyboard shortcut for search
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault()
+        searchRef.current?.focus()
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [])
+
   return (
     <div className="min-h-screen w-full">
       <div className="mx-auto max-w-[1200px] px-6 lg:px-10 py-12 space-y-6">
@@ -172,7 +201,38 @@ export default function WorkspacePeoplePage() {
         <InviteUser workspaceId={workspaceId} />
 
         <div className="space-y-4">
-          <h2 className="text-xl font-semibold text-foreground">Members</h2>
+          <div className="flex items-center justify-between">
+            <h2 className="text-xl font-semibold text-foreground">Members ({rows.length})</h2>
+          </div>
+          
+          {/* Search bar */}
+          <Card className="border-border shadow-sm rounded-2xl">
+            <div className="px-4 sm:px-6 py-4">
+              <div className="relative">
+                <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  ref={searchRef}
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Search members (Ctrl/Cmd+K)"
+                  className="pl-9 pr-8 bg-background border-border focus-visible:ring-2 focus-visible:ring-ring rounded-xl"
+                />
+                {searchQuery ? (
+                  <button
+                    aria-label="Clear search"
+                    onClick={() => {
+                      setSearchQuery('')
+                      searchRef.current?.focus()
+                    }}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 rounded-md p-1 text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                ) : null}
+              </div>
+            </div>
+          </Card>
+
           <div className="rounded-xl border border-border overflow-hidden bg-card shadow-sm">
             <div className="grid grid-cols-4 gap-4 px-4 py-3 text-xs font-semibold text-muted-foreground bg-muted/50 border-b border-border">
               <div>Member</div>
@@ -182,11 +242,13 @@ export default function WorkspacePeoplePage() {
             </div>
             {loading ? (
               <div className="px-4 py-8 text-sm text-muted-foreground text-center">Loading…</div>
-            ) : rows.length === 0 ? (
-              <div className="px-4 py-8 text-sm text-muted-foreground text-center">No members yet.</div>
+            ) : filteredRows.length === 0 ? (
+              <div className="px-4 py-8 text-sm text-muted-foreground text-center">
+                {searchQuery ? 'No members match your search.' : 'No members yet.'}
+              </div>
             ) : (
               <ul className="divide-y divide-border">
-                {rows.map((m) => (
+                {filteredRows.map((m) => (
                   <li key={m.user_id} className="grid grid-cols-4 gap-4 px-4 py-3 text-sm hover:bg-accent transition-colors">
                     <div className="flex items-center gap-3 min-w-0">
                       <Avatar className="h-8 w-8">
@@ -198,18 +260,23 @@ export default function WorkspacePeoplePage() {
                       <span className="truncate font-medium text-foreground">{m.email}</span>
                     </div>
                     <div className="flex items-center">
-                      <span className="text-sm text-muted-foreground">{(m as any).job_title || 'No Position'}</span>
+                      <span className="text-sm text-muted-foreground">{m.job_title || 'No Position'}</span>
                     </div>
                     <div className="flex items-center">
                       <span className="uppercase text-[11px] tracking-wide font-semibold text-muted-foreground px-2 py-1 rounded-md bg-muted">{m.role}</span>
                     </div>
                     <div className="flex items-center text-xs">
                       {canManage && m.role !== 'owner' ? (
-                        <button className="text-xs px-3 py-1.5 rounded-lg border border-border bg-card hover:bg-accent transition-colors font-medium" onClick={() => removeMember(m.user_id)}>
-                          Remove
-                        </button>
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          onClick={() => removeMember(m.user_id)}
+                          className="h-8 rounded-lg"
+                        >
+                          <UserMinus className="mr-1.5 h-3.5 w-3.5" /> Remove
+                        </Button>
                       ) : (
-                        <span className="text-muted-foreground">Owner-managed</span>
+                        <span className="text-muted-foreground text-xs">—</span>
                       )}
                     </div>
                   </li>

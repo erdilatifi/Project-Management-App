@@ -123,29 +123,29 @@ export default function ProjectDetailsPage() {
   };
 
   return (
-    <div className="min-h-[calc(100dvh-64px)] w-full bg-[radial-gradient(90rem_50rem_at_50%_-10%,rgba(0,0,0,0.05),transparent)]">
-      <div className="mx-auto max-w-[1000px] px-6 lg:px-10 py-10">
+    <div className="min-h-[calc(100dvh-64px)] w-full ">
+      <div className="mx-auto max-w-[1000px] px-6 lg:px-10 py-10 pt-15">
         {/* Breadcrumbs / Back */}
-        <div className="mb-4 flex items-center gap-3 text-sm">
+        <div className="mb-4 pt-10 flex items-center gap-3 text-sm">
           <Link
             href="/projects"
-            className="inline-flex items-center gap-2 text-neutral-700 hover:text-neutral-900"
+            className="inline-flex items-center gap-2 text-muted-foreground hover:text-foreground"
           >
             <ArrowLeft className="h-4 w-4" /> Back to projects
           </Link>
-          <span className="select-none text-neutral-400">/</span>
-          <span className="truncate text-neutral-600">{project?.name ?? "Project"}</span>
+          <span className="select-none text-muted-foreground">/</span>
+          <span className="truncate text-muted-foreground">{project?.name ?? "Project"}</span>
         </div>
 
         {/* Loading State */}
         {loading || !project ? (
-          <Card className="rounded-2xl border border-neutral-200 bg-white shadow-sm p-6">
+          <Card className="rounded-2xl border-border shadow-sm p-6">
             <Skeleton className="h-8 w-1/2 rounded" />
             <div className="mt-4 space-y-2">
               <Skeleton className="h-4 w-3/4 rounded" />
               <Skeleton className="h-4 w-2/3 rounded" />
             </div>
-            <Separator className="my-6 bg-neutral-200" />
+            <Separator className="my-6" />
             <div className="grid grid-cols-1 gap-6">
               <Skeleton className="h-10 w-full rounded-lg" />
               <Skeleton className="h-32 w-full rounded-lg" />
@@ -156,15 +156,15 @@ export default function ProjectDetailsPage() {
             </div>
           </Card>
         ) : (
-          <Card className="overflow-hidden rounded-2xl border border-neutral-200 bg-white shadow-sm">
+          <Card className="overflow-hidden rounded-2xl border-border shadow-sm">
             {/* Toolbar */}
-            <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between px-6 py-5 bg-linear-to-b from-white to-neutral-50/60">
+            <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between px-6 py-5">
               <div className="flex items-center gap-3">
-                <h1 className="text-2xl font-semibold text-neutral-900 tracking-tight">{project.name}</h1>
+                <h1 className="text-2xl font-semibold text-foreground tracking-tight">{project.name}</h1>
                 {dirty && (
                   <Badge
                     variant="outline"
-                    className="border-amber-300 text-amber-700 bg-amber-50"
+                    className="border-amber-300 text-amber-700 bg-amber-50 dark:bg-amber-950 dark:text-amber-400 rounded-lg"
                   >
                     Unsaved changes
                   </Badge>
@@ -174,7 +174,7 @@ export default function ProjectDetailsPage() {
                 <Link href={`/projects/${project.id}/tasks`}>
                   <Button
                     variant="outline"
-                    className="rounded-xl border-neutral-300 bg-white hover:bg-neutral-50 text-neutral-900"
+                    className="rounded-xl"
                   >
                     <ListChecks className="mr-2 h-4 w-4" /> Open Tasks Board
                   </Button>
@@ -182,7 +182,7 @@ export default function ProjectDetailsPage() {
                 <Button
                   onClick={onSave}
                   disabled={saving || !dirty}
-                  className="rounded-xl bg-neutral-900 text-white hover:bg-neutral-800 disabled:opacity-60"
+                  className="rounded-xl"
                 >
                   {saving ? (
                     <>
@@ -197,16 +197,16 @@ export default function ProjectDetailsPage() {
               </div>
             </div>
 
-            <Separator className="bg-neutral-200" />
+            <Separator />
 
             <CardContent className="px-6 py-6">
-              <div className="mb-5 text-xs text-neutral-600">
-                Created <span className="text-neutral-800">{createdAtText(project.created_at)}</span>
+              <div className="mb-5 text-xs text-muted-foreground">
+                Created <span className="text-foreground">{createdAtText(project.created_at)}</span>
               </div>
 
               <div className="grid grid-cols-1 gap-6">
                 <div className="space-y-2">
-                  <Label htmlFor="name" className="text-neutral-800">
+                  <Label htmlFor="name">
                     Project name
                   </Label>
                   <Input
@@ -214,12 +214,12 @@ export default function ProjectDetailsPage() {
                     value={name}
                     onChange={(e) => setName(e.target.value)}
                     placeholder="e.g. Marketing Website Refresh"
-                    className="bg-white text-neutral-900 border-neutral-300 focus-visible:ring-2 focus-visible:ring-neutral-300 focus-visible:border-neutral-300 rounded-xl"
+                    className="rounded-xl"
                   />
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="description" className="text-neutral-800">
+                  <Label htmlFor="description">
                     Description
                   </Label>
                   <Textarea
@@ -228,7 +228,7 @@ export default function ProjectDetailsPage() {
                     onChange={(e) => setDescription(e.target.value)}
                     rows={6}
                     placeholder="What is this project about? Goals, scope, stakeholders…"
-                    className="bg-white text-neutral-900 border-neutral-300 focus-visible:ring-2 focus-visible:ring-neutral-300 focus-visible:border-neutral-300 rounded-xl"
+                    className="rounded-xl bg-background"
                   />
                 </div>
               </div>

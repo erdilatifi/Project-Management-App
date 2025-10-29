@@ -50,5 +50,6 @@ export type Member = {
   role: MemberRole
   email?: string
   avatar_url?: string | null
+  job_title?: string | null
   created_at?: string
 }

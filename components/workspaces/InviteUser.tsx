@@ -26,7 +26,7 @@ export function InviteUser({ workspaceId }: Props) {
   // Debounce input
   const [debounced, setDebounced] = useState("");
   useEffect(() => {
-    const id = setTimeout(() => setDebounced(query.trim()), 180);
+    const id = setTimeout(() => setDebounced(query.trim()), 300);
     return () => clearTimeout(id);
   }, [query]);
 
@@ -186,13 +186,18 @@ export function InviteUser({ workspaceId }: Props) {
     },
   });
 
-  // Key handler: first Enter opens results & triggers immediate search. No auto-invite.
+  // Key handler: Enter to select first result, Escape to close
   const onKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter") {
       e.preventDefault();
-      // Force the debounced term immediately so results show right away
-      setDebounced(query.trim());
-      setOpen(true);
+      const first = (searchQ.data ?? [])[0];
+      if (first && !inviteMutation.isPending) {
+        inviteMutation.mutate(first);
+      } else {
+        // Force the debounced term immediately so results show right away
+        setDebounced(query.trim());
+        setOpen(true);
+      }
     }
     if (e.key === "Escape") {
       setOpen(false);
@@ -201,11 +206,14 @@ export function InviteUser({ workspaceId }: Props) {
   };
 
   return (
-    <Card className="w-full max-w-xl p-3 border border-neutral-200 rounded-2xl shadow-sm">
-      <div className="flex flex-col gap-2">
-        <label htmlFor="invite" className="text-xs text-neutral-600 px-1">
-          Invite by email (search existing users)
+    <Card className="w-full max-w-xl p-4 border-border rounded-2xl shadow-sm">
+      <div className="flex flex-col gap-3">
+        <label htmlFor="invite" className="text-sm font-medium text-foreground">
+          Invite Team Members
         </label>
+        <p className="text-xs text-muted-foreground -mt-2">
+          Search for existing users by name or email
+        </p>
         <Popover open={open} onOpenChange={setOpen}>
           <PopoverTrigger asChild>
             <div className="relative">
@@ -215,11 +223,16 @@ export function InviteUser({ workspaceId }: Props) {
                 value={query}
                 onChange={(e) => {
                   setQuery(e.target.value);
+                  if (e.target.value.trim()) {
+                    setOpen(true);
+                  }
                 }}
-                onFocus={() => setOpen(true)}
+                onFocus={() => {
+                  if (query.trim()) setOpen(true);
+                }}
                 onKeyDown={onKeyDown}
                 placeholder="Type a name or email, press Enter to search…"
-                className="h-10 rounded-xl pr-10 bg-white border-neutral-300 focus-visible:ring-2 focus-visible:ring-neutral-400"
+                className="h-10 rounded-xl pr-10 bg-background border-border focus-visible:ring-2 focus-visible:ring-ring"
                 aria-label="Invite user by email"
                 autoComplete="off"
                 spellCheck={false}
@@ -232,25 +245,25 @@ export function InviteUser({ workspaceId }: Props) {
                     setQuery("");
                     inputRef.current?.focus();
                   }}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 text-neutral-500 hover:text-neutral-900"
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
                 >
                   <X className="h-4 w-4" />
                 </button>
               ) : null}
             </div>
           </PopoverTrigger>
-          <PopoverContent align="start" className="p-0 w-[480px] rounded-xl shadow-lg border border-neutral-200">
+          <PopoverContent align="start" className="p-0 w-[480px] rounded-xl shadow-lg border-border">
             <Command shouldFilter={false}>
               <CommandList className="max-h-72 overflow-auto">
                 {searchQ.isFetching ? (
                   <div className="p-3 space-y-2">
                     {Array.from({ length: 4 }).map((_, i) => (
-                      <Skeleton key={i} className="h-8 w-full rounded-md bg-neutral-100" />
+                      <Skeleton key={i} className="h-8 w-full rounded-md" />
                     ))}
                   </div>
                 ) : (searchQ.data?.length ?? 0) === 0 ? (
-                  <CommandEmpty className="py-6 text-neutral-500">
-                    {debounced ? "No users found" : "Press Enter to search"}
+                  <CommandEmpty className="py-6 text-muted-foreground">
+                    {debounced ? "No users found" : query.trim() ? "Searching..." : "Start typing to search"}
                   </CommandEmpty>
                 ) : (
                   <CommandGroup heading="Users">
@@ -269,15 +282,15 @@ export function InviteUser({ workspaceId }: Props) {
                             <div className="truncate max-w-[360px] text-sm">
                               {u.name ? (
                                 <>
-                                  <span className="font-medium">{u.name}</span>
-                                  <span className="text-neutral-500"> — {u.email}</span>
+                                  <span className="font-medium text-foreground">{u.name}</span>
+                                  <span className="text-muted-foreground"> — {u.email}</span>
                                 </>
                               ) : (
-                                <span>{u.email}</span>
+                                <span className="text-foreground">{u.email}</span>
                               )}
                             </div>
                           </div>
-                          <span className="text-xs text-neutral-500 shrink-0">
+                          <span className="text-xs text-muted-foreground shrink-0">
                             {inviteMutation.isPending ? "Inviting…" : "Invite"}
                           </span>
                         </div>
@@ -289,9 +302,15 @@ export function InviteUser({ workspaceId }: Props) {
             </Command>
           </PopoverContent>
         </Popover>
-        <div className="flex items-center justify-between px-1">
-          <span className="text-xs text-neutral-500">
-            Type, press <kbd className="px-1 py-0.5 rounded bg-neutral-100 border">Enter</kbd> to show results.
+        <div className="flex items-center justify-between">
+          <span className="text-xs text-muted-foreground">
+            {(searchQ.data?.length ?? 0) > 0 ? (
+              <>
+                Press <kbd className="px-1.5 py-0.5 rounded bg-muted border border-border text-foreground font-mono text-[10px]">Enter</kbd> to invite first result
+              </>
+            ) : (
+              "Type to search users"
+            )}
           </span>
           <Button
             size="sm"
@@ -305,10 +324,10 @@ export function InviteUser({ workspaceId }: Props) {
                 setDebounced(query.trim());
               }
             }}
-            disabled={inviteMutation.isPending}
-            className="h-8 rounded-lg"
+            disabled={inviteMutation.isPending || !query.trim()}
+            className="h-8 rounded-xl"
           >
-            {inviteMutation.isPending ? "Inviting…" : "Invite"}
+            {inviteMutation.isPending ? "Inviting…" : "Quick Invite"}
           </Button>
         </div>
       </div>
