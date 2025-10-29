@@ -1,6 +1,9 @@
 import { NextResponse } from 'next/server'
 import { createClient as createServerSupabase } from '@/utils/supabase/server'
 import { createAdminClient } from '@/utils/supabase/admin'
+import { validateBody, authenticateRequest, errorResponse } from '@/lib/validation/middleware'
+import { inviteUserSchema } from '@/lib/validation/schemas'
+import { sanitizeEmail } from '@/lib/validation/sanitize'
 
 function randToken(len = 12) {
   const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789abcdefghijkmnopqrstuvwxyz'
@@ -13,20 +16,21 @@ function randToken(len = 12) {
 
 export async function POST(req: Request) {
   try {
-    const { workspaceId, userId, email } = (await req.json()) as {
-      workspaceId: string
-      userId?: string
-      email?: string
-    }
-    if (!workspaceId || (!userId && !email)) {
-      return NextResponse.json({ error: 'workspaceId and userId or email required' }, { status: 400 })
-    }
-
     // Ensure caller is authenticated
     const supabase = await createServerSupabase()
-    const { data: authRes, error: authErr } = await supabase.auth.getUser()
-    if (authErr || !authRes?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    const actorId = authRes.user.id
+    const authResult = await authenticateRequest(supabase)
+    if (!authResult.success) {
+      return authResult.response
+    }
+    const actorId = authResult.userId
+
+    // Validate request body
+    const bodyValidation = await validateBody(req, inviteUserSchema)
+    if (!bodyValidation.success) {
+      return bodyValidation.response
+    }
+    
+    const { workspaceId, userId, email } = bodyValidation.data
 
     const admin = createAdminClient()
 
@@ -42,7 +46,7 @@ export async function POST(req: Request) {
     }
 
     // Resolve invitee email if only userId provided
-    let targetEmail = email ?? null
+    let targetEmail = email ? sanitizeEmail(email) : null
     if (!targetEmail && userId) {
       try {
         const { data: byId } = await (admin as any).auth.admin.getUserById(userId)

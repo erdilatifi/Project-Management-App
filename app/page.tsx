@@ -18,7 +18,7 @@ function cn(...args: Array<string | false | null | undefined>) {
 }
 
 function Container({ children, className }: { children: ReactNode; className?: string }) {
-  return <div className={cn('mx-auto max-w-7xl px-4 sm:px-6 lg:px-8', className)}>{children}</div>;
+  return <div className={cn('mx-auto max-w-7xl px-3 sm:px-6 lg:px-8', className)}>{children}</div>;
 }
 
 function Section({ children, className, id }: { children: ReactNode; className?: string; id?: string }) {
@@ -34,10 +34,10 @@ function SectionTitle({ eyebrow, title, subtitle, center = true }: { eyebrow?: s
           <span>{eyebrow}</span>
         </div>
       )}
-      <h2 className="text-4xl font-bold tracking-tight sm:text-5xl bg-linear-to-br from-foreground to-foreground/70 bg-clip-text text-transparent">
+      <h2 className="text-3xl font-bold tracking-tight sm:text-4xl lg:text-5xl bg-linear-to-br from-foreground to-foreground/70 bg-clip-text text-transparent">
         {title}
       </h2>
-      {subtitle && <p className="mx-auto mt-4 max-w-2xl text-lg text-muted-foreground">{subtitle}</p>}
+      {subtitle && <p className="mx-auto mt-3 sm:mt-4 max-w-2xl text-base sm:text-lg text-muted-foreground px-2">{subtitle}</p>}
     </div>
   );
 }
@@ -55,13 +55,13 @@ function EmailCapture() {
   };
 
   return (
-    <form onSubmit={handleSubmit} className="mx-auto flex max-w-md gap-2">
+    <form onSubmit={handleSubmit} className="mx-auto flex flex-col sm:flex-row max-w-md gap-2 px-3 sm:px-0">
       <div className="relative flex-1">
         <Mail className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
         <Input type="email" placeholder="Enter your email" value={email} onChange={(e) => setEmail(e.target.value)}
           required className="pl-10 h-11 bg-background/50 backdrop-blur-sm" disabled={submitted} aria-label="Email address" />
       </div>
-      <Button type="submit" className="h-11 px-6 shadow-lg shadow-primary/25 hover:shadow-xl hover:shadow-primary/30 transition-all" disabled={submitted}>
+      <Button type="submit" className="h-11 px-6 shadow-lg shadow-primary/25 hover:shadow-xl hover:shadow-primary/30 transition-all sm:w-auto w-full" disabled={submitted}>
         {submitted ? 'Thanks!' : 'Get Started'}
       </Button>
     </form>
@@ -75,11 +75,11 @@ function FeatureCard({ icon: Icon, title, description, popular }: { icon: any; t
         <Badge className="absolute -top-3 left-4 z-10 shadow-lg">Most Popular</Badge>
       )}
       <Card className="h-full border-2 transition-all duration-300 hover:border-primary/50 hover:shadow-xl hover:shadow-primary/5 bg-card/50 backdrop-blur-sm">
-        <CardContent className="p-6">
+        <CardContent className="p-4 sm:p-6">
           <div className="mb-4 inline-flex rounded-2xl bg-primary/10 p-3 ring-1 ring-primary/20 group-hover:ring-primary/40 transition-all group-hover:scale-110 duration-300">
             <Icon className="h-6 w-6 text-primary" />
           </div>
-          <h3 className="mb-2 text-xl font-semibold">{title}</h3>
+          <h3 className="mb-2 text-lg sm:text-xl font-semibold">{title}</h3>
           <p className="text-sm leading-relaxed text-muted-foreground">{description}</p>
         </CardContent>
       </Card>
@@ -89,9 +89,9 @@ function FeatureCard({ icon: Icon, title, description, popular }: { icon: any; t
 
 function Stat({ value, label, icon: Icon }: { value: string; label: string; icon?: any }) {
   return (
-    <div className="group rounded-2xl border-2 bg-linear-to-br from-card/50 to-card/30 backdrop-blur-sm p-8 text-center transition-all hover:border-primary/50 hover:shadow-lg hover:shadow-primary/5">
+    <div className="group rounded-2xl border-2 bg-linear-to-br from-card/50 to-card/30 backdrop-blur-sm p-4 sm:p-6 lg:p-8 text-center transition-all hover:border-primary/50 hover:shadow-lg hover:shadow-primary/5">
       {Icon && <Icon className="mx-auto mb-3 h-8 w-8 text-primary" />}
-      <p className="text-4xl font-bold tracking-tight bg-linear-to-br from-foreground to-foreground/70 bg-clip-text text-transparent">{value}</p>
+      <p className="text-3xl sm:text-4xl font-bold tracking-tight bg-linear-to-br from-foreground to-foreground/70 bg-clip-text text-transparent">{value}</p>
       <p className="mt-2 text-sm font-medium text-muted-foreground">{label}</p>
     </div>
   );

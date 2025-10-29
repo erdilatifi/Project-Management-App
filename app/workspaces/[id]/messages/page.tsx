@@ -2,12 +2,13 @@
 
 import ThreadList from "@/components/chat/ThreadList";
 import MessagePanel from "@/components/chat/MessagePanel";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useState, useEffect } from "react";
 import { usePathname, useRouter, useSearchParams, useParams } from "next/navigation";
+import { MessageSquare, ArrowLeft, Edit2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { Plus, MessageSquare, Loader2 } from "lucide-react";
+import { createClient } from "@/utils/supabase/client";
+import { toast } from "sonner";
 
 /**
  * WorkspaceMessagesPage
@@ -23,12 +24,15 @@ export default function WorkspaceMessagesPage() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const pathname = usePathname();
+  const supabase = useMemo(() => createClient(), []);
 
   const activeThreadId = searchParams.get("thread") ?? undefined;
+  const [threadTitle, setThreadTitle] = useState<string | null>(null);
+  const [isCreator, setIsCreator] = useState(false);
+  const [editingTitle, setEditingTitle] = useState(false);
+  const [titleInput, setTitleInput] = useState("");
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
 
-  const [newOpen, setNewOpen] = useState(false);
-  const [newTitle, setNewTitle] = useState("");
-  const [creating, setCreating] = useState(false);
 
   const setThread = useCallback(
     (id?: string) => {
@@ -40,167 +44,201 @@ export default function WorkspaceMessagesPage() {
     [router, pathname, searchParams]
   );
 
-  const onNewThread = useCallback(() => setNewOpen(true), []);
+  // Get current user
+  useEffect(() => {
+    const getUser = async () => {
+      const { data } = await supabase.auth.getUser();
+      setCurrentUserId(data.user?.id ?? null);
+    };
+    getUser();
+  }, [supabase]);
 
-  const canCreate = useMemo(() => newTitle.trim().length > 0 && !creating, [newTitle, creating]);
+  // Fetch thread title and check if user is creator
+  useEffect(() => {
+    if (!activeThreadId) {
+      setThreadTitle(null);
+      setIsCreator(false);
+      return;
+    }
+    
+    const fetchThread = async () => {
+      const { data } = await supabase
+        .from('message_threads')
+        .select('title, created_by')
+        .eq('id', activeThreadId)
+        .maybeSingle();
+      
+      setThreadTitle(data?.title || 'Untitled thread');
+      setIsCreator(currentUserId ? data?.created_by === currentUserId : false);
+    };
+    
+    fetchThread();
+
+    // Real-time subscription for title updates
+    const channel = supabase
+      .channel('thread-title-updates')
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'message_threads',
+          filter: `id=eq.${activeThreadId}`,
+        },
+        (payload) => {
+          const updated = payload.new as any;
+          if (updated.title !== undefined) {
+            setThreadTitle(updated.title || 'Untitled thread');
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [activeThreadId, currentUserId, supabase]);
+
+  const saveTitle = async () => {
+    if (!activeThreadId) return;
+    
+    try {
+      const { error } = await supabase
+        .from('message_threads')
+        .update({ title: titleInput.trim() || null })
+        .eq('id', activeThreadId);
+      
+      if (error) throw error;
+      
+      setThreadTitle(titleInput.trim() || 'Untitled thread');
+      setEditingTitle(false);
+      toast.success('Title updated');
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to update title');
+    }
+  };
+
 
   return (
-    <div className="w-full">
-
-
-      {/* App shell */}
-      <div className="mx-auto max-w-7xl p-3 sm:p-6 lg:px-8">
+    <div className="w-full h-screen bg-background">
+   
+      <div className="h-full pt-16 flex items-center justify-center px-3 sm:px-6">
         <div
-          className="
-            grid
-            rounded-2xl border border-border bg-card shadow-sm
-            overflow-hidden
-            md:grid-cols-[320px,1fr]
-            grid-cols-1
-            h-[calc(100vh-9.5rem)]
-          "
+          className="flex h-[calc(100vh-7rem)] w-full max-w-[1300px] rounded-2xl border border-border bg-background shadow-lg overflow-hidden"
           role="application"
           aria-label="Workspace messages"
         >
-          {/* Sidebar */}
+          {/* Minimalistic Sidebar - Thread List */}
           <aside
-            className="
-              border-b md:border-b-0 md:border-r border-border
-              bg-muted/30
-              md:h-full
-              flex flex-col
-            "
+            className={`
+              w-full md:w-[340px] lg:w-[380px]
+              border-r border-border
+              bg-card
+              flex-shrink-0
+              ${activeThreadId ? 'hidden md:flex' : 'flex'}
+              flex-col
+              h-full
+            `}
           >
-            {/* Sidebar header (sticky) */}
-            <div className="sticky top-0 z-10 border-b bg-card/70 backdrop-blur px-3 py-2">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-medium text-muted-foreground tracking-wide">
-                  Threads
-                </span>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-8 w-8 rounded-xl"
-                  onClick={onNewThread}
-                  aria-label="Quick create thread"
-                >
-                  <Plus className="h-4 w-4" />
-                </Button>
-              </div>
-            </div>
-
-            {/* Thread list */}
-            <div className="min-h-0 flex-1">
-              <ThreadList
-                workspaceId={workspaceId}
-                onSelect={(id) => setThread(id)}
-                activeThreadId={activeThreadId}
-              />
-            </div>
+            <ThreadList
+              workspaceId={workspaceId}
+              onSelect={(id) => setThread(id)}
+              activeThreadId={activeThreadId}
+            />
           </aside>
 
-          {/* Content */}
-          <main className="relative min-h-0">
+          {/* Chat Panel - Flexible width */}
+          <main className="flex-1 h-full bg-background flex flex-col overflow-hidden">
             {activeThreadId ? (
-              <MessagePanel threadId={activeThreadId} workspaceId={workspaceId} />
+              <>
+                {/* Back button for mobile - Instagram style */}
+                <div className="md:hidden border-b border-border bg-card px-4 py-3 flex items-center gap-3 shadow-sm flex-shrink-0">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-9 w-9 rounded-full hover:bg-accent flex-shrink-0"
+                    onClick={() => setThread(undefined)}
+                    aria-label="Back to messages"
+                  >
+                    <ArrowLeft className="h-5 w-5" />
+                  </Button>
+                  {editingTitle ? (
+                    <>
+                      <Input
+                        value={titleInput}
+                        onChange={(e) => setTitleInput(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') saveTitle();
+                          if (e.key === 'Escape') setEditingTitle(false);
+                        }}
+                        className="h-8 text-sm flex-1"
+                        autoFocus
+                      />
+                      <Button
+                        size="sm"
+                        onClick={saveTitle}
+                        className="h-8 px-3 text-xs"
+                      >
+                        Save
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => setEditingTitle(false)}
+                        className="h-8 px-3 text-xs"
+                      >
+                        Cancel
+                      </Button>
+                    </>
+                  ) : (
+                    <>
+                      <div className="flex-1 min-w-0">
+                        <h2 className="text-base font-semibold text-foreground truncate">{threadTitle || 'Loading...'}</h2>
+                      </div>
+                      {isCreator && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 rounded-full hover:bg-accent flex-shrink-0"
+                          onClick={() => {
+                            setTitleInput(threadTitle || '');
+                            setEditingTitle(true);
+                          }}
+                          aria-label="Edit title"
+                        >
+                          <Edit2 className="h-4 w-4" />
+                        </Button>
+                      )}
+                    </>
+                  )}
+                </div>
+                {/* Message Panel - takes remaining height */}
+                <div className="flex-1 overflow-hidden">
+                  <MessagePanel threadId={activeThreadId} workspaceId={workspaceId} />
+                </div>
+              </>
             ) : (
-              <EmptyState onNewThread={onNewThread} />
+              <EmptyState />
             )}
           </main>
         </div>
       </div>
-
-      {/* Create thread dialog */}
-      <Dialog open={newOpen} onOpenChange={(open) => !creating && setNewOpen(open)}>
-        <DialogContent
-          className="rounded-2xl sm:max-w-md"
-          onInteractOutside={(e) => creating && e.preventDefault()}
-        >
-          <DialogHeader>
-            <DialogTitle>Create a new thread</DialogTitle>
-            <DialogDescription>
-              Give your thread a clear, searchable title. You can rename it anytime.
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="py-2">
-            <Input
-              autoFocus
-              placeholder="e.g. Q4 Launch Plan, API Errors, Design Review"
-              value={newTitle}
-              onChange={(e) => setNewTitle(e.target.value)}
-              onKeyDown={async (e) => {
-                if (e.key === "Enter" && canCreate) {
-                  e.preventDefault();
-                  await handleCreate();
-                }
-              }}
-              aria-label="Thread title"
-              disabled={creating}
-              className="rounded-xl"
-            />
-          </div>
-
-          <DialogFooter className="gap-2 sm:gap-3">
-            <Button
-              variant="outline"
-              onClick={() => setNewOpen(false)}
-              disabled={creating}
-              className="rounded-xl"
-            >
-              Cancel
-            </Button>
-            <Button
-              onClick={handleCreate}
-              disabled={!canCreate}
-              className="rounded-xl"
-            >
-              {creating ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Creating…
-                </>
-              ) : (
-                "Create"
-              )}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   );
-
-  async function handleCreate() {
-    if (!newTitle.trim()) return;
-    setCreating(true);
-    try {
-      const { createThread } = await import("@/lib/workspaces");
-      const t = await createThread(workspaceId, newTitle.trim());
-      setThread(t.id);
-      setNewOpen(false);
-      setNewTitle("");
-    } finally {
-      setCreating(false);
-    }
-  }
 }
 
-/** Subtle, modern empty state */
-function EmptyState({ onNewThread }: { onNewThread: () => void }) {
+/** Modern empty state */
+function EmptyState() {
   return (
-    <div className="flex h-full items-center justify-center">
-      <div className="mx-auto flex max-w-sm flex-col items-center text-center">
-        <div className="mb-4 inline-flex h-12 w-12 items-center justify-center rounded-2xl border bg-muted/50">
-          <MessageSquare className="h-5 w-5 text-muted-foreground" />
+    <div className="flex h-full items-center justify-center bg-muted/20">
+      <div className="mx-auto flex max-w-md flex-col items-center text-center px-6">
+        <div className="mb-6 inline-flex h-16 w-16 items-center justify-center rounded-full bg-primary/10">
+          <MessageSquare className="h-8 w-8 text-primary" />
         </div>
-        <h2 className="text-base font-semibold">No thread selected</h2>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Choose a thread from the left, or start a new conversation.
+        <h2 className="text-xl font-semibold text-foreground">Select a Chat</h2>
+        <p className="mt-2 text-sm text-muted-foreground leading-relaxed">
+          Choose a conversation from the list to view messages and start chatting.
         </p>
-        <Button onClick={onNewThread} className="mt-4 rounded-xl">
-          <Plus className="mr-1.5 h-4 w-4" />
-          New Thread
-        </Button>
       </div>
     </div>
   );

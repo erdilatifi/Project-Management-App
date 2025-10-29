@@ -1,7 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Bell, MessageSquareText, UserPlus, CheckSquare } from 'lucide-react'
+import { Bell, MessageSquareText, UserPlus, CheckSquare, Loader2 } from 'lucide-react'
 import { createClient } from '@/utils/supabase/client'
 import { useAuth } from '@/app/context/ContextApiProvider'
 import { formatTimeAgo } from '@/lib/time'
@@ -27,8 +27,13 @@ export default function NotificationBell() {
   const router = useRouter()
   const [open, setOpen] = useState(false)
   const [items, setItems] = useState<Item[]>([])
+  const [hasMore, setHasMore] = useState(true)
+  const [cursor, setCursor] = useState<string | null>(null)
+  const [loadingMore, setLoadingMore] = useState(false)
   const subscribed = useRef(false)
   const containerRef = useRef<HTMLDivElement>(null)
+  const scrollContainerRef = useRef<HTMLDivElement>(null)
+  const loadMoreRef = useRef<HTMLLIElement | null>(null)
 
   const load = useCallback(async () => {
     if (!user?.id) return
@@ -37,15 +42,61 @@ export default function NotificationBell() {
       const json = await res.json()
       if (!res.ok) throw new Error(json?.error || 'Failed to load notifications')
       setItems(json.items as Item[])
+      setCursor(json.nextCursor)
+      setHasMore(!!json.nextCursor)
     } catch (e: any) {
       toast.error(e?.message ?? 'Failed to load notifications')
     }
   }, [user?.id])
 
+  const loadMore = useCallback(async () => {
+    if (!user?.id || !cursor || loadingMore || !hasMore) return
+    setLoadingMore(true)
+    try {
+      const res = await fetch(`/api/notifications?limit=15&cursor=${encodeURIComponent(cursor)}`, { cache: 'no-store' })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json?.error || 'Failed to load more notifications')
+      setItems((prev) => [...prev, ...json.items])
+      setCursor(json.nextCursor)
+      setHasMore(!!json.nextCursor)
+    } catch (e: any) {
+      toast.error(e?.message ?? 'Failed to load more notifications')
+    } finally {
+      setLoadingMore(false)
+    }
+  }, [user?.id, cursor, loadingMore, hasMore])
+
   useEffect(() => {
     setItems([])
+    setCursor(null)
+    setHasMore(true)
     if (user?.id) load()
   }, [user?.id, load])
+
+  // Infinite scroll observer
+  useEffect(() => {
+    if (!open || loadingMore || !hasMore) return
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting) {
+          loadMore()
+        }
+      },
+      { threshold: 0.1, root: scrollContainerRef.current }
+    )
+
+    const currentRef = loadMoreRef.current
+    if (currentRef) {
+      observer.observe(currentRef)
+    }
+
+    return () => {
+      if (currentRef) {
+        observer.unobserve(currentRef)
+      }
+    }
+  }, [open, loadMore, loadingMore, hasMore])
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -175,7 +226,7 @@ export default function NotificationBell() {
       </button>
 
       {open && (
-        <div className="absolute right-0 mt-2 w-[360px] max-h-[480px] overflow-auto rounded-xl border border-border bg-card shadow-lg z-50">
+        <div ref={scrollContainerRef} className="absolute right-0 mt-2 w-[360px] max-h-[480px] overflow-auto rounded-xl border border-border bg-card shadow-lg z-50">
           <div className="flex items-center justify-between px-4 py-3 border-b border-border">
             <div className="text-sm font-semibold text-foreground">Notifications</div>
             <div className="flex items-center gap-2">
@@ -268,6 +319,19 @@ export default function NotificationBell() {
                   </div>
                 </li>
               ))}
+              {/* Infinite scroll trigger */}
+              {hasMore && (
+                <li ref={loadMoreRef} className="px-4 py-3 text-center">
+                  {loadingMore ? (
+                    <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground">
+                      <Loader2 className="w-3 h-3 animate-spin" />
+                      Loading more...
+                    </div>
+                  ) : (
+                    <div className="text-xs text-muted-foreground">Scroll for more</div>
+                  )}
+                </li>
+              )}
             </ul>
           )}
         </div>

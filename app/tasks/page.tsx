@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, useCallback } from "react";
+import { useEffect, useMemo, useState, useCallback, useRef } from "react";
 import Link from "next/link";
 import { createClient } from "@/utils/supabase/client";
 import { Card } from "@/components/ui/card";
@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
+import { Loader2 } from "lucide-react";
 
 type Status = "todo" | "in_progress" | "done";
 
@@ -81,29 +82,53 @@ export default function MyTasksPage() {
 
   const [userId, setUserId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [tasks, setTasks] = useState<TaskRow[]>([]);
+  const [hasMore, setHasMore] = useState(true);
+  const [page, setPage] = useState(1);
   const [projects, setProjects] = useState<Record<string, ProjectRow>>({});
   const [statusFilter, setStatusFilter] = useState<"all" | Status>("all");
   const [search, setSearch] = useState("");
   const [groupBy, setGroupBy] = useState<"none" | "project" | "due">("none");
   const [dueFilter, setDueFilter] = useState<DueFilter>("all");
+  const observerRef = useRef<IntersectionObserver | null>(null);
+  const loadMoreRef = useRef<HTMLDivElement | null>(null);
 
   // No inline assignment controls on this page
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (pageNum: number, append = false) => {
     if (!userId) return;
-    setLoading(true);
+    if (append) {
+      setLoadingMore(true);
+    } else {
+      setLoading(true);
+    }
+    
+    const limit = 20;
+    const from = (pageNum - 1) * limit;
+    const to = from + limit - 1;
+    
     try {
-      const { data, error } = await supabase
+      const { data, error, count } = await supabase
         .from("tasks")
         .select(
-          "id, project_id, workspace_id, title, description, status, priority, assignee_id, due_at, created_by, created_at"
+          "id, project_id, workspace_id, title, description, status, priority, assignee_id, due_at, created_by, created_at",
+          { count: 'exact' }
         )
         .eq("assignee_id", userId)
-        .order("created_at", { ascending: false });
+        .order("created_at", { ascending: false })
+        .range(from, to);
+      
       if (error) throw error;
       const rows = (data ?? []) as TaskRow[];
-      setTasks(rows);
+      
+      setHasMore(count ? (pageNum * limit) < count : false);
+      
+      if (append) {
+        setTasks((prev) => [...prev, ...rows]);
+      } else {
+        setTasks(rows);
+      }
 
       // load project names for linking
       const ids = Array.from(new Set(rows.map((r) => r.project_id).filter(Boolean)));
@@ -124,7 +149,11 @@ export default function MyTasksPage() {
     } catch (e: unknown) {
       toast.error((e instanceof Error ? e.message : String(e)) || "Failed to load tasks");
     } finally {
-      setLoading(false);
+      if (append) {
+        setLoadingMore(false);
+      } else {
+        setLoading(false);
+      }
     }
   }, [supabase, userId]);
 
@@ -139,8 +168,45 @@ export default function MyTasksPage() {
   }, [supabase]);
 
   useEffect(() => {
-    if (userId) load();
+    if (userId) {
+      setTasks([]);
+      setPage(1);
+      setHasMore(true);
+      load(1, false);
+    }
   }, [userId, load]);
+
+  const loadMore = useCallback(() => {
+    if (loadingMore || !hasMore || search || statusFilter !== 'all' || dueFilter !== 'all') return;
+    const nextPage = page + 1;
+    setPage(nextPage);
+    load(nextPage, true);
+  }, [page, loadingMore, hasMore, search, statusFilter, dueFilter, load]);
+
+  // Infinite scroll observer
+  useEffect(() => {
+    if (loadingMore || !hasMore || search || statusFilter !== 'all' || dueFilter !== 'all') return;
+
+    observerRef.current = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting) {
+          loadMore();
+        }
+      },
+      { threshold: 0.1 }
+    );
+
+    const currentRef = loadMoreRef.current;
+    if (currentRef) {
+      observerRef.current.observe(currentRef);
+    }
+
+    return () => {
+      if (observerRef.current && currentRef) {
+        observerRef.current.unobserve(currentRef);
+      }
+    };
+  }, [loadMore, loadingMore, hasMore, search, statusFilter, dueFilter]);
 
   const filtered = tasks.filter((t) => {
     const matchesStatus = statusFilter === "all" ? true : (t.status ?? "todo") === statusFilter;
@@ -199,21 +265,21 @@ export default function MyTasksPage() {
 
   return (
     <div className="min-h-screen w-full">
-      <div className="mx-auto max-w-[1200px] px-6 lg:px-10 py-12">
+      <div className="mx-auto max-w-[1200px] px-3 sm:px-6 lg:px-10 py-8 sm:py-12">
         <div className="mb-6 pt-15 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h1 className="text-3xl font-semibold text-foreground tracking-tight">My Tasks</h1>
+            <h1 className="text-2xl sm:text-3xl font-semibold text-foreground tracking-tight">My Tasks</h1>
             <p className="text-sm text-muted-foreground mt-0.5">All tasks assigned to you across projects.</p>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full sm:w-auto">
             <Input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search tasks"
-              className="w-64 bg-background border-border focus-visible:ring-2 focus-visible:ring-ring rounded-xl"
+              className="w-full sm:w-64 bg-background border-border focus-visible:ring-2 focus-visible:ring-ring rounded-xl"
             />
             <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as any)}>
-              <SelectTrigger className="h-10 w-[180px] bg-background border-border rounded-xl">
+              <SelectTrigger className="h-10 w-full sm:w-[180px] bg-background border-border rounded-xl">
                 <SelectValue placeholder="All statuses" />
               </SelectTrigger>
               <SelectContent className="rounded-xl">
@@ -224,7 +290,7 @@ export default function MyTasksPage() {
               </SelectContent>
             </Select>
             <Select value={dueFilter} onValueChange={(v) => setDueFilter(v as DueFilter)}>
-              <SelectTrigger className="h-10 w-[180px] bg-background border-border rounded-xl">
+              <SelectTrigger className="h-10 w-full sm:w-[180px] bg-background border-border rounded-xl">
                 <SelectValue placeholder="All due dates" />
               </SelectTrigger>
               <SelectContent className="rounded-xl">
@@ -235,7 +301,7 @@ export default function MyTasksPage() {
               </SelectContent>
             </Select>
             <Select value={groupBy} onValueChange={(v) => setGroupBy(v as any)}>
-              <SelectTrigger className="h-10 w-[180px] bg-background border-border rounded-xl">
+              <SelectTrigger className="h-10 w-full sm:w-[180px] bg-background border-border rounded-xl">
                 <SelectValue placeholder="Group by" />
               </SelectTrigger>
               <SelectContent className="rounded-xl">
@@ -270,10 +336,10 @@ export default function MyTasksPage() {
                   <div className="space-y-4">
                     {g.tasks.map((t) => {
                       return (
-                        <Card key={t.id} className="rounded-2xl border-border bg-card p-5 shadow-sm hover:shadow-md transition-shadow">
+                        <Card key={t.id} className="rounded-2xl border-border bg-card p-4 sm:p-5 shadow-sm hover:shadow-md transition-shadow">
                           <div className="flex items-start justify-between gap-4">
                             <div>
-                              <div className="text-foreground font-semibold leading-6">{t.title}</div>
+                              <div className="text-foreground font-semibold leading-6 text-base sm:text-base">{t.title}</div>
                               {t.description ? (
                                 <div className="mt-1 text-sm text-muted-foreground line-clamp-2">{t.description}</div>
                               ) : null}
@@ -312,6 +378,19 @@ export default function MyTasksPage() {
                 )}
               </div>
             ))}
+            {/* Infinite scroll trigger - only when not filtering */}
+            {!search && statusFilter === 'all' && dueFilter === 'all' && hasMore && (
+              <div ref={loadMoreRef} className="py-8">
+                {loadingMore ? (
+                  <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Loading more tasks...
+                  </div>
+                ) : (
+                  <div className="text-center text-sm text-muted-foreground">Scroll for more</div>
+                )}
+              </div>
+            )}
           </div>
         )}
       </div>

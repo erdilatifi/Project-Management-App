@@ -12,7 +12,7 @@ import { Button } from '@/components/ui/button'
 import { toast } from 'sonner'
 import { getWorkspaceRole } from '@/utils/permissions'
 import { useRouter } from 'next/navigation'
-import { Search, X, UserMinus } from 'lucide-react'
+import { Search, X, UserMinus, Loader2 } from 'lucide-react'
 
 export default function WorkspacePeoplePage() {
   const { id } = useParams<{ id: string }>()
@@ -21,23 +21,41 @@ export default function WorkspacePeoplePage() {
   const router = useRouter()
   const [rows, setRows] = useState<Member[]>([])
   const [loading, setLoading] = useState(true)
+  const [loadingMore, setLoadingMore] = useState(false)
+  const [hasMore, setHasMore] = useState(false)
+  const [page, setPage] = useState(1)
   const [canManage, setCanManage] = useState(false)
   const [myRole, setMyRole] = useState<string | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
   const searchRef = useRef<HTMLInputElement>(null)
+  const observerRef = useRef<IntersectionObserver | null>(null)
+  const loadMoreRef = useRef<HTMLLIElement | null>(null)
 
-  useEffect(() => {
-    const load = async () => {
+  const loadMembers = useCallback(async (pageNum: number, append = false) => {
+    if (append) {
+      setLoadingMore(true)
+    } else {
       setLoading(true)
-      // fetch members
-      const { data: members, error } = await supabase
-        .from('workspace_members')
-        .select('workspace_id, user_id, role')
-        .eq('workspace_id', workspaceId)
-      if (error) {
-        setLoading(false)
-        return
-      }
+    }
+    
+    const limit = 20
+    const from = (pageNum - 1) * limit
+    const to = from + limit - 1
+    
+    // fetch members with pagination
+    const { data: members, error, count } = await supabase
+      .from('workspace_members')
+      .select('workspace_id, user_id, role', { count: 'exact' })
+      .eq('workspace_id', workspaceId)
+      .range(from, to)
+    
+    if (error) {
+      if (append) setLoadingMore(false)
+      else setLoading(false)
+      return
+    }
+    
+    setHasMore(count ? (pageNum * limit) < count : false)
       const ids = (members ?? []).map((m: any) => m.user_id)
       let emailMap: Record<string, string> = {}
       let avatarMap: Record<string, string | null> = {}
@@ -78,8 +96,7 @@ export default function WorkspacePeoplePage() {
           }
         }
       }
-      setRows(
-        (members ?? []).map((m: any) => {
+      const newRows = (members ?? []).map((m: any) => {
           const id = m.user_id
           const label =
             profileMap[id]?.username?.trim() ||
@@ -97,11 +114,54 @@ export default function WorkspacePeoplePage() {
             job_title: profileMap[id]?.job_title ?? null,
           }
         })
-      )
-      setLoading(false)
-    }
-    load()
+      
+      if (append) {
+        setRows((prev) => [...prev, ...newRows])
+        setLoadingMore(false)
+      } else {
+        setRows(newRows)
+        setLoading(false)
+      }
   }, [supabase, workspaceId])
+
+  useEffect(() => {
+    setRows([])
+    setPage(1)
+    setHasMore(false)
+    loadMembers(1, false)
+  }, [loadMembers])
+
+  const loadMore = useCallback(() => {
+    if (loadingMore || !hasMore) return
+    const nextPage = page + 1
+    setPage(nextPage)
+    loadMembers(nextPage, true)
+  }, [page, loadingMore, hasMore, loadMembers])
+
+  // Infinite scroll observer
+  useEffect(() => {
+    if (loadingMore || !hasMore || searchQuery) return
+
+    observerRef.current = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting) {
+          loadMore()
+        }
+      },
+      { threshold: 0.1 }
+    )
+
+    const currentRef = loadMoreRef.current
+    if (currentRef) {
+      observerRef.current.observe(currentRef)
+    }
+
+    return () => {
+      if (observerRef.current && currentRef) {
+        observerRef.current.unobserve(currentRef)
+      }
+    }
+  }, [loadMore, loadingMore, hasMore, searchQuery])
 
   useEffect(() => {
     (async () => {
@@ -182,15 +242,15 @@ export default function WorkspacePeoplePage() {
 
   return (
     <div className="min-h-screen w-full">
-      <div className="mx-auto max-w-[1200px] px-6 lg:px-10 py-12 space-y-6">
-        <div className="pt-15 flex items-start justify-between">
+      <div className="mx-auto max-w-[1200px] px-3 sm:px-6 lg:px-10 py-8 sm:py-12 space-y-6">
+        <div className="pt-15 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div>
-            <h1 className="text-3xl font-semibold tracking-tight text-foreground">People</h1>
+            <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight text-foreground">People</h1>
             <p className="text-sm text-muted-foreground mt-0.5">Invite teammates and manage access.</p>
           </div>
           {myRole && myRole !== 'owner' ? (
             <button
-              className="text-sm px-4 py-2 rounded-xl border border-border bg-card hover:bg-accent transition-colors font-medium"
+              className="text-sm px-4 py-2 rounded-xl border border-border bg-card hover:bg-accent transition-colors font-medium whitespace-nowrap"
               onClick={onLeave}
             >
               Leave workspace
@@ -202,7 +262,7 @@ export default function WorkspacePeoplePage() {
 
         <div className="space-y-4">
           <div className="flex items-center justify-between">
-            <h2 className="text-xl font-semibold text-foreground">Members ({rows.length})</h2>
+            <h2 className="text-lg sm:text-xl font-semibold text-foreground">Members ({rows.length})</h2>
           </div>
           
           {/* Search bar */}
@@ -234,7 +294,7 @@ export default function WorkspacePeoplePage() {
           </Card>
 
           <div className="rounded-xl border border-border overflow-hidden bg-card shadow-sm">
-            <div className="grid grid-cols-4 gap-4 px-4 py-3 text-xs font-semibold text-muted-foreground bg-muted/50 border-b border-border">
+            <div className="hidden md:grid grid-cols-4 gap-4 px-4 py-3 text-xs font-semibold text-muted-foreground bg-muted/50 border-b border-border">
               <div>Member</div>
               <div>Position</div>
               <div>Role</div>
@@ -249,23 +309,27 @@ export default function WorkspacePeoplePage() {
             ) : (
               <ul className="divide-y divide-border">
                 {filteredRows.map((m) => (
-                  <li key={m.user_id} className="grid grid-cols-4 gap-4 px-4 py-3 text-sm hover:bg-accent transition-colors">
-                    <div className="flex items-center gap-3 min-w-0">
-                      <Avatar className="h-8 w-8">
+                  <li key={m.user_id} className="grid grid-cols-1 md:grid-cols-4 gap-3 md:gap-4 px-4 py-4 md:py-3 text-sm hover:bg-accent transition-colors">
+                    <div className="flex items-center gap-3 min-w-0 md:col-span-1">
+                      <Avatar className="h-10 w-10 md:h-8 md:w-8">
                         {m.avatar_url ? (
                           <AvatarImage src={m.avatar_url} alt={m.email ?? 'Avatar'} />
                         ) : null}
                         <AvatarFallback className="text-xs font-medium">{m.email?.[0]?.toUpperCase() ?? 'U'}</AvatarFallback>
                       </Avatar>
-                      <span className="truncate font-medium text-foreground">{m.email}</span>
+                      <div className="flex-1 min-w-0">
+                        <span className="block truncate font-medium text-foreground">{m.email}</span>
+                        <span className="md:hidden block text-xs text-muted-foreground mt-0.5">{m.job_title || 'No Position'}</span>
+                      </div>
                     </div>
-                    <div className="flex items-center">
+                    <div className="hidden md:flex items-center">
                       <span className="text-sm text-muted-foreground">{m.job_title || 'No Position'}</span>
                     </div>
-                    <div className="flex items-center">
+                    <div className="flex items-center gap-2 md:gap-0">
+                      <span className="md:hidden text-xs text-muted-foreground">Role:</span>
                       <span className="uppercase text-[11px] tracking-wide font-semibold text-muted-foreground px-2 py-1 rounded-md bg-muted">{m.role}</span>
                     </div>
-                    <div className="flex items-center text-xs">
+                    <div className="flex items-center text-xs md:justify-start">
                       {canManage && m.role !== 'owner' ? (
                         <Button 
                           variant="outline" 
@@ -281,6 +345,19 @@ export default function WorkspacePeoplePage() {
                     </div>
                   </li>
                 ))}
+                {/* Infinite scroll trigger - only show when not searching */}
+                {!searchQuery && hasMore && (
+                  <li ref={loadMoreRef} className="grid grid-cols-1 md:grid-cols-4 gap-4 px-4 py-4">
+                    {loadingMore ? (
+                      <div className="col-span-4 flex items-center justify-center gap-2 text-sm text-muted-foreground">
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        Loading more members...
+                      </div>
+                    ) : (
+                      <div className="col-span-4 text-center text-sm text-muted-foreground">Scroll for more</div>
+                    )}
+                  </li>
+                )}
               </ul>
             )}
           </div>

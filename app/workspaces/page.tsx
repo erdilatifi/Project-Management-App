@@ -110,11 +110,11 @@ export default function WorkspacesPage() {
 
   return (
     <div className="min-h-screen w-full">
-      <div className="mx-auto max-w-[1200px] px-6 lg:px-10 py-12 space-y-6">
+      <div className="mx-auto max-w-[1200px] px-3 sm:px-6 lg:px-10 py-8 sm:py-12 space-y-6">
         {/* Header */}
         <div className="pt-15 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h1 className="text-3xl font-semibold tracking-tight text-foreground">Workspaces</h1>
+            <h1 className="text-2xl sm:text-3xl font-semibold text-foreground tracking-tight">Workspaces</h1>
             <p className="text-sm text-muted-foreground mt-0.5">All workspaces you can access.</p>
           </div>
           <div className="flex items-center gap-2">
@@ -138,8 +138,8 @@ export default function WorkspacesPage() {
 
         {/* Search / toolbar card */}
         <Card className="border-border shadow-sm rounded-2xl">
-          <CardContent className="px-4 sm:px-6 py-4">
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+          <CardContent className="px-3 sm:px-6 py-4">
+            <div className="flex flex-col gap-3">
               <div className="relative flex-1">
                 <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
@@ -151,7 +151,7 @@ export default function WorkspacesPage() {
                   }}
                   onKeyDown={(e) => { if (e.key === "Enter") reload(); }}
                   placeholder="Search workspaces (Ctrl/Cmd+K)"
-                  className="pl-9 pr-8 bg-background border-border focus-visible:ring-2 focus-visible:ring-ring rounded-xl"
+                  className="pl-9 h-10 w-full bg-background/50 backdrop-blur-sm border-border focus-visible:ring-2 focus-visible:ring-ring rounded-xl"
                 />
                 {search ? (
                   <button

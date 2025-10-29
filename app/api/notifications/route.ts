@@ -1,16 +1,21 @@
 import { NextResponse } from 'next/server'
 import { createClient as createServerSupabase } from '@/utils/supabase/server'
+import { authenticateRequest } from '@/lib/validation/middleware'
+import { sanitizeInteger } from '@/lib/validation/sanitize'
 
 export async function GET(req: Request) {
   try {
-    const url = new URL(req.url)
-    const limit = Math.min(parseInt(url.searchParams.get('limit') || '20', 10), 50)
-    const cursor = url.searchParams.get('cursor') // ISO date string
-
     const supabase = await createServerSupabase()
-    const { data: authRes, error: authErr } = await supabase.auth.getUser()
-    if (authErr || !authRes?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    const userId = authRes.user.id
+    const authResult = await authenticateRequest(supabase)
+    if (!authResult.success) {
+      return authResult.response
+    }
+    const userId = authResult.userId
+
+    // Validate and sanitize query parameters
+    const url = new URL(req.url)
+    const limit = Math.min(sanitizeInteger(url.searchParams.get('limit'), 20), 50)
+    const cursor = url.searchParams.get('cursor') || null // ISO date string
 
     let query = supabase
       .from('notifications')

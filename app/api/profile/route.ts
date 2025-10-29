@@ -1,5 +1,8 @@
 import { createClient } from '@/utils/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
+import { validateBody, authenticateRequest, errorResponse } from '@/lib/validation/middleware'
+import { updateProfileSchema, updatePreferencesSchema, toggle2FASchema } from '@/lib/validation/schemas'
+import { z } from 'zod'
 
 // GET - Fetch user profile and preferences
 export async function GET() {
@@ -55,21 +58,38 @@ export async function PATCH(request: NextRequest) {
   try {
     const supabase = await createClient()
     
-    const { data: { user }, error: userError } = await supabase.auth.getUser()
-    
-    if (userError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    // Authenticate user
+    const authResult = await authenticateRequest(supabase)
+    if (!authResult.success) {
+      return authResult.response
     }
+    const userId = authResult.userId
 
-    const body = await request.json()
-    const { type, data: updateData } = body
+    // Parse request body with basic structure validation
+    const bodySchema = z.object({
+      type: z.enum(['profile', 'preferences', '2fa']),
+      data: z.record(z.string(), z.any()),
+    })
+    
+    const bodyValidation = await validateBody(request, bodySchema)
+    if (!bodyValidation.success) {
+      return bodyValidation.response
+    }
+    
+    const { type, data: updateData } = bodyValidation.data
 
     if (type === 'profile') {
+      // Validate profile data
+      const profileValidation = updateProfileSchema.safeParse(updateData)
+      if (!profileValidation.success) {
+        return errorResponse('Invalid profile data', 400)
+      }
+      
       // Update user profile
       const { data, error } = await supabase
         .from('users')
-        .update(updateData)
-        .eq('id', user.id)
+        .update(profileValidation.data)
+        .eq('id', userId)
         .select()
         .single()
 
@@ -79,22 +99,28 @@ export async function PATCH(request: NextRequest) {
 
       // Log audit event
       await supabase.from('audit_logs').insert({
-        user_id: user.id,
+        user_id: userId,
         action: 'profile_updated',
         entity_type: 'user',
-        entity_id: user.id,
-        new_values: updateData
+        entity_id: userId,
+        new_values: profileValidation.data
       })
 
       return NextResponse.json({ data })
     }
 
     if (type === 'preferences') {
+      // Validate preferences data
+      const preferencesValidation = updatePreferencesSchema.safeParse(updateData)
+      if (!preferencesValidation.success) {
+        return errorResponse('Invalid preferences data', 400)
+      }
+      
       // Update preferences
       const { data, error } = await supabase
         .from('user_preferences')
-        .update(updateData)
-        .eq('user_id', user.id)
+        .update(preferencesValidation.data)
+        .eq('user_id', userId)
         .select()
         .single()
 
@@ -104,22 +130,28 @@ export async function PATCH(request: NextRequest) {
 
       // Log audit event
       await supabase.from('audit_logs').insert({
-        user_id: user.id,
+        user_id: userId,
         action: 'preferences_updated',
         entity_type: 'user_preferences',
-        entity_id: user.id,
-        new_values: updateData
+        entity_id: userId,
+        new_values: preferencesValidation.data
       })
 
       return NextResponse.json({ data })
     }
 
     if (type === '2fa') {
+      // Validate 2FA data
+      const twoFAValidation = toggle2FASchema.safeParse(updateData)
+      if (!twoFAValidation.success) {
+        return errorResponse('Invalid 2FA data', 400)
+      }
+      
       // Toggle 2FA
       const { data, error } = await supabase
         .from('users')
-        .update({ two_factor_enabled: updateData.enabled })
-        .eq('id', user.id)
+        .update({ two_factor_enabled: twoFAValidation.data.enabled })
+        .eq('id', userId)
         .select()
         .single()
 
@@ -129,10 +161,10 @@ export async function PATCH(request: NextRequest) {
 
       // Log audit event
       await supabase.from('audit_logs').insert({
-        user_id: user.id,
-        action: updateData.enabled ? '2fa_enabled' : '2fa_disabled',
+        user_id: userId,
+        action: twoFAValidation.data.enabled ? '2fa_enabled' : '2fa_disabled',
         entity_type: 'user',
-        entity_id: user.id
+        entity_id: userId
       })
 
       return NextResponse.json({ data })

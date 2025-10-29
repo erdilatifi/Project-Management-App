@@ -1,16 +1,25 @@
 import { NextResponse } from 'next/server'
 import { createClient as createServerSupabase } from '@/utils/supabase/server'
 import { createAdminClient } from '@/utils/supabase/admin'
+import { validateBody, authenticateRequest } from '@/lib/validation/middleware'
+import { acceptInvitationSchema } from '@/lib/validation/schemas'
 
 export async function POST(req: Request) {
   try {
-    const { workspaceId, notificationId } = (await req.json()) as { workspaceId: string; notificationId?: string }
-    if (!workspaceId) return NextResponse.json({ error: 'workspaceId required' }, { status: 400 })
-
     const supabase = await createServerSupabase()
-    const { data: authRes, error: authErr } = await supabase.auth.getUser()
-    if (authErr || !authRes?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    const userId = authRes.user.id
+    const authResult = await authenticateRequest(supabase)
+    if (!authResult.success) {
+      return authResult.response
+    }
+    const userId = authResult.userId
+
+    // Validate request body
+    const bodyValidation = await validateBody(req, acceptInvitationSchema)
+    if (!bodyValidation.success) {
+      return bodyValidation.response
+    }
+    
+    const { workspaceId, notificationId } = bodyValidation.data
 
     // Upsert membership as member (use admin to avoid RLS issues)
     const admin = createAdminClient()
@@ -24,7 +33,8 @@ export async function POST(req: Request) {
     }
     // Best-effort: mark related invitation row as accepted (by email if available)
     try {
-      const email = authRes.user.email ?? null
+      const { data: { user } } = await supabase.auth.getUser()
+      const email = user?.email ?? null
       if (email) {
         await admin
           .from('workspace_invitations')

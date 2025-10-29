@@ -138,11 +138,12 @@ export default function MessagePanel({ threadId, workspaceId }: Props) {
 
     if (thr?.created_by) {
       setCreatorId(thr.created_by);
+      // Only the creator can manage (edit title, delete thread)
       if (uid && thr.created_by === uid) manage = true;
     }
-    setThreadTitle(thr?.title ?? null);
+    setThreadTitle(thr?.title || null);
 
-    if (uid && (tp ?? []).some((r: any) => r.user_id === uid && !!r.is_admin)) manage = true;
+    // canManage is ONLY for the creator (not admins)
     setCanManage(!!manage);
 
     if (ids.length) {
@@ -214,6 +215,32 @@ export default function MessagePanel({ threadId, workspaceId }: Props) {
   useEffect(() => {
     loadParticipants();
   }, [loadParticipants]);
+
+  // Real-time subscription for thread updates (title changes)
+  useEffect(() => {
+    const channel = supabase
+      .channel('thread-updates')
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'message_threads',
+          filter: `id=eq.${threadId}`,
+        },
+        (payload) => {
+          const updated = payload.new as any
+          if (updated.title !== undefined) {
+            setThreadTitle(updated.title)
+          }
+        }
+      )
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [supabase, threadId])
 
   // presence: single channel
   useEffect(() => {
@@ -515,20 +542,35 @@ export default function MessagePanel({ threadId, workspaceId }: Props) {
   };
 
   const removeParticipant = async (uid: string) => {
-    if (!canManage) return;
     try {
-      // If the owner removes self → delete thread and navigate away
-      if (creatorId === uid && userId === uid) {
-        const { error } = await supabase.from("message_threads").delete().eq("id", threadId);
-        if (error) throw error;
+      // If user is leaving their own thread
+      if (userId === uid) {
+        // If owner leaves, delete the entire thread
+        if (creatorId === uid) {
+          if (!confirm("As the owner, leaving will delete this thread for everyone. Continue?")) return;
+          const { error } = await supabase.from("message_threads").delete().eq("id", threadId);
+          if (error) throw error;
+          toast.success("Thread deleted");
+        } else {
+          // Regular participant leaving
+          if (!confirm("Leave this conversation?")) return;
+          const { error } = await supabase.from("thread_participants").delete().eq("thread_id", threadId).eq("user_id", uid);
+          if (error) throw error;
+          toast.success("Left conversation");
+        }
+        // Navigate away
         const u = new URL(window.location.href);
         u.searchParams.delete("thread");
         window.location.href = u.toString();
         return;
       }
+      
+      // Admin removing another user
+      if (!canManage) return;
       if (creatorId === uid) return; // cannot remove the owner
       if (!confirm("Remove this participant?")) return;
       await supabase.from("thread_participants").delete().eq("thread_id", threadId).eq("user_id", uid);
+      toast.success("Participant removed");
     } catch (e: any) {
       toast.error(e?.message ?? "Failed to remove participant");
     }
@@ -564,9 +606,9 @@ export default function MessagePanel({ threadId, workspaceId }: Props) {
   };
 
   return (
-    <div className="h-full flex flex-col bg-muted/30">
-      <div className="px-4 py-3 border-b border-border bg-card flex items-center justify-between shadow-sm">
-        <div className="flex items-center gap-2 overflow-x-auto">
+    <div className="h-full flex flex-col bg-background">
+      <div className="px-4 py-3 border-b border-border bg-card flex items-center justify-between gap-3 shadow-sm flex-wrap">
+        <div className="flex items-center gap-2 overflow-x-auto flex-1 min-w-0">
           {participants.length === 0 ? (
             <div className="text-xs text-muted-foreground font-medium">Public to workspace</div>
           ) : (
@@ -608,13 +650,14 @@ export default function MessagePanel({ threadId, workspaceId }: Props) {
           )}
         </div>
 
-        {/* Removed "Add participant" UI as requested */}
-        {participants.some((p) => p.id === userId) && (
+        {/* Leave button - visible to all participants and owner */}
+        {userId && (participants.some((p) => p.id === userId) || creatorId === userId) && (
           <button
-            className="text-xs px-3 h-8 rounded-lg border border-border bg-card hover:bg-accent font-medium transition-colors"
-            onClick={() => removeParticipant(userId!)}
+            className="text-xs px-3 py-2 rounded-lg border border-border bg-card hover:bg-red-50 dark:hover:bg-red-950 hover:text-red-600 hover:border-red-300 font-medium transition-colors whitespace-nowrap"
+            onClick={() => removeParticipant(userId)}
+            title={creatorId === userId ? "Leave (will delete thread)" : "Leave conversation"}
           >
-            Leave thread
+            {creatorId === userId ? "Leave & Delete" : "Leave"}
           </button>
         )}
       </div>
@@ -625,17 +668,17 @@ export default function MessagePanel({ threadId, workspaceId }: Props) {
         </div>
       )}
 
-      <div className="px-4 py-3 border-b border-border flex items-center justify-between bg-card shadow-sm">
+      <div className="hidden md:flex px-4 py-3 border-b border-border items-center justify-between bg-card shadow-sm">
         <div className="flex items-center gap-2">
           {!titleEditing ? (
             <>
-              <h2 className="text-base font-semibold text-foreground">{threadTitle ?? "Untitled thread"}</h2>
+              <h2 className="text-base font-semibold text-foreground">{threadTitle || "Untitled thread"}</h2>
               {canManage && (
                 <button
                   className="text-xs px-2 py-1 rounded-md border border-border bg-card hover:bg-accent font-medium transition-colors"
                   onClick={() => {
                     setTitleEditing(true);
-                    setTitleInput(threadTitle ?? "");
+                    setTitleInput(threadTitle || "");
                   }}
                 >
                   Edit title
@@ -656,7 +699,7 @@ export default function MessagePanel({ threadId, workspaceId }: Props) {
                       .update({ title: titleInput.trim() || null } as any)
                       .eq("id", threadId);
                     if (error) throw error;
-                    setThreadTitle(titleInput.trim() || null);
+                    setThreadTitle(titleInput.trim() || "Untitled thread");
                     setTitleEditing(false);
                   } catch (e: any) {
                     toast.error(e?.message ?? "Failed to update title");
