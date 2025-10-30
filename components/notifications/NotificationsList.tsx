@@ -160,16 +160,16 @@ export default function NotificationsList() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div className="text-sm font-medium text-muted-foreground">Unread: <span className="text-foreground">{unread}</span></div>
-        <div className="flex items-center gap-2">
-          <Button size="sm" variant="outline" className="h-8 rounded-lg" onClick={() => load(true)} disabled={loading}>
+        <div className="flex flex-wrap items-center gap-2">
+          <Button size="sm" variant="outline" className="h-8 rounded-lg text-xs sm:text-sm" onClick={() => load(true)} disabled={loading}>
             {loading ? "Refreshing…" : "Refresh"}
           </Button>
-          <Button size="sm" variant="outline" className="h-8 rounded-lg" onClick={markAll} disabled={!unread}>
+          <Button size="sm" variant="outline" className="h-8 rounded-lg text-xs sm:text-sm" onClick={markAll} disabled={!unread}>
             Mark all read
           </Button>
-          <Button size="sm" variant="outline" className="h-8 rounded-lg" onClick={clearAll} disabled={items.length === 0}>
+          <Button size="sm" variant="outline" className="h-8 rounded-lg text-xs sm:text-sm" onClick={clearAll} disabled={items.length === 0}>
             Clear all
           </Button>
         </div>

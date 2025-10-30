@@ -4,10 +4,11 @@ import ThreadList from "@/components/chat/ThreadList";
 import MessagePanel from "@/components/chat/MessagePanel";
 import { useCallback, useMemo, useState, useEffect } from "react";
 import { usePathname, useRouter, useSearchParams, useParams } from "next/navigation";
-import { MessageSquare, ArrowLeft, Edit2 } from "lucide-react";
+import { MessageSquare, ArrowLeft, Edit2, Home } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { createClient } from "@/utils/supabase/client";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
 /**
@@ -25,6 +26,7 @@ export default function WorkspaceMessagesPage() {
   const router = useRouter();
   const pathname = usePathname();
   const supabase = useMemo(() => createClient(), []);
+  const queryClient = useQueryClient();
 
   const activeThreadId = searchParams.get("thread") ?? undefined;
   const [threadTitle, setThreadTitle] = useState<string | null>(null);
@@ -53,7 +55,7 @@ export default function WorkspaceMessagesPage() {
     getUser();
   }, [supabase]);
 
-  // Fetch thread title and check if user is creator
+  // Fetch thread title and check if user is creator/participant; redirect if unauthorized
   useEffect(() => {
     if (!activeThreadId) {
       setThreadTitle(null);
@@ -69,7 +71,22 @@ export default function WorkspaceMessagesPage() {
         .maybeSingle();
       
       setThreadTitle(data?.title || 'Untitled thread');
-      setIsCreator(currentUserId ? data?.created_by === currentUserId : false);
+      const creator = currentUserId ? data?.created_by === currentUserId : false;
+      setIsCreator(creator);
+
+      // If not creator, ensure current user is a participant; otherwise redirect
+      if (!creator && currentUserId) {
+        const { data: part } = await supabase
+          .from('thread_participants')
+          .select('user_id')
+          .eq('thread_id', activeThreadId)
+          .eq('user_id', currentUserId)
+          .maybeSingle();
+        if (!part) {
+          setThread(undefined);
+          toast.error('You do not have access to this conversation');
+        }
+      }
     };
     
     fetchThread();
@@ -97,25 +114,52 @@ export default function WorkspaceMessagesPage() {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [activeThreadId, currentUserId, supabase]);
+  }, [activeThreadId, currentUserId, supabase, setThread]);
+
+  // Redirect if current thread is deleted
+  useEffect(() => {
+    if (!activeThreadId) return;
+    const channel = supabase
+      .channel('thread-delete-watch')
+      .on(
+        'postgres_changes',
+        { event: 'DELETE', schema: 'public', table: 'message_threads', filter: `id=eq.${activeThreadId}` },
+        () => {
+          setThread(undefined);
+        }
+      )
+      .subscribe();
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [supabase, activeThreadId, setThread]);
+
+  // Optimistic title update for mobile header
+  const saveTitleMutation = useMutation({
+    mutationFn: async (vars: { id: string; title: string | null }) => {
+      const { error } = await supabase
+        .from('message_threads')
+        .update({ title: vars.title })
+        .eq('id', vars.id);
+      if (error) throw new Error(error.message);
+    },
+    onMutate: async (vars) => {
+      setThreadTitle(vars.title || 'Untitled thread');
+      await queryClient.invalidateQueries({ queryKey: ['threads', workspaceId] });
+    },
+    onError: (e: any) => {
+      toast.error(e?.message || 'Failed to update title');
+    },
+    onSettled: async () => {
+      setEditingTitle(false);
+      await queryClient.invalidateQueries({ queryKey: ['threads', workspaceId] });
+    },
+  });
 
   const saveTitle = async () => {
     if (!activeThreadId) return;
-    
-    try {
-      const { error } = await supabase
-        .from('message_threads')
-        .update({ title: titleInput.trim() || null })
-        .eq('id', activeThreadId);
-      
-      if (error) throw error;
-      
-      setThreadTitle(titleInput.trim() || 'Untitled thread');
-      setEditingTitle(false);
-      toast.success('Title updated');
-    } catch (error: any) {
-      toast.error(error.message || 'Failed to update title');
-    }
+    const next = (titleInput.trim() || null) as string | null;
+    saveTitleMutation.mutate({ id: activeThreadId, title: next });
   };
 
 
@@ -214,7 +258,13 @@ export default function WorkspaceMessagesPage() {
                 </div>
                 {/* Message Panel - takes remaining height */}
                 <div className="flex-1 overflow-hidden">
-                  <MessagePanel threadId={activeThreadId} workspaceId={workspaceId} />
+                  <MessagePanel
+                    threadId={activeThreadId}
+                    workspaceId={workspaceId}
+                    title={threadTitle}
+                    isCreator={isCreator}
+                    onTitleUpdated={(t) => setThreadTitle(t || 'Untitled thread')}
+                  />
                 </div>
               </>
             ) : (

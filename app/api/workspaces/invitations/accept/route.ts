@@ -9,6 +9,7 @@ export async function POST(req: Request) {
     const supabase = await createServerSupabase()
     const authResult = await authenticateRequest(supabase)
     if (!authResult.success) {
+      console.error('[accept-invite] unauthorized request')
       return authResult.response
     }
     const userId = authResult.userId
@@ -16,17 +17,64 @@ export async function POST(req: Request) {
     // Validate request body
     const bodyValidation = await validateBody(req, acceptInvitationSchema)
     if (!bodyValidation.success) {
+      console.error('[accept-invite] validation failed')
       return bodyValidation.response
     }
     
-    const { workspaceId, notificationId } = bodyValidation.data
+    let { workspaceId, notificationId, token } = bodyValidation.data as { workspaceId?: string; notificationId?: string; token?: string }
 
-    // Upsert membership as member (use admin to avoid RLS issues)
+    // If workspaceId missing, try resolving from notification
+    if (!workspaceId && notificationId) {
+      try {
+        const { data: notif } = await supabase
+          .from('notifications')
+          .select('workspace_id, ref_id, user_id')
+          .eq('id', notificationId)
+          .maybeSingle()
+        if (notif && notif.user_id === userId) {
+          workspaceId = (notif.workspace_id as string | null) || (notif.ref_id as string | null) || undefined
+        }
+      } catch {}
+    }
+
+    // If still missing, try resolving from invitation token
+    if (!workspaceId && token) {
+      try {
+        const admin = createAdminClient()
+        const { data: inv } = await admin
+          .from('workspace_invitations')
+          .select('workspace_id')
+          .eq('token', token)
+          .eq('status', 'pending')
+          .maybeSingle()
+        workspaceId = (inv?.workspace_id as string | null) || undefined
+      } catch {}
+    }
+
+    console.log('[accept-invite] resolved', { userId, workspaceId, notificationId, hasToken: !!token })
+
+    if (!workspaceId) {
+      console.error('[accept-invite] no workspaceId could be resolved')
+      return NextResponse.json({ error: 'Workspace not found for invitation', detail: { userId, notificationId, hasToken: !!token } }, { status: 400 })
+    }
+
+    // Ensure membership exists as 'member' (use admin to avoid RLS issues)
     const admin = createAdminClient()
-    const { error: upErr } = await admin
+    const { data: existing } = await admin
       .from('workspace_members')
-      .upsert({ workspace_id: workspaceId, user_id: userId, role: 'member' } as any, { onConflict: 'workspace_id,user_id' })
-    if (upErr) return NextResponse.json({ error: upErr.message }, { status: 400 })
+      .select('user_id')
+      .eq('workspace_id', workspaceId)
+      .eq('user_id', userId)
+      .maybeSingle()
+    if (!existing) {
+      const { error: insErr } = await admin
+        .from('workspace_members')
+        .insert({ workspace_id: workspaceId, user_id: userId, role: 'member' } as any)
+      if (insErr) {
+        console.error('[accept-invite] membership insert error', insErr.message)
+        return NextResponse.json({ error: insErr.message }, { status: 400 })
+      }
+    }
 
     if (notificationId) {
       await supabase.from('notifications').update({ is_read: true }).eq('id', notificationId).eq('user_id', userId)
@@ -46,6 +94,7 @@ export async function POST(req: Request) {
     } catch {}
     return NextResponse.json({ ok: true })
   } catch (e) {
+    console.error('[accept-invite] unhandled error', e)
     return NextResponse.json({ error: 'Accept failed' }, { status: 500 })
   }
 }

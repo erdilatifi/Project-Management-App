@@ -245,7 +245,7 @@ const Navbar = () => {
         </div>
       )}
       <span className="text-sm font-medium hidden lg:block">
-        {profileLoading ? 'â€¦' : displayName}
+        {profileLoading ? '...' : displayName}
       </span>
     </div>
   );
@@ -276,12 +276,7 @@ const Navbar = () => {
 
                 {/* Right cluster */}
                 <div className="flex items-center gap-4 pl-6 border-l border-border">
-                  {isLoading ? (
-                    <div className="flex items-center gap-2 text-muted-foreground">
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                      <span className="text-sm">Loadingâ€¦</span>
-                    </div>
-                  ) : user ? (
+                  {user ? (
                     <div className="flex items-center gap-4">
                       <NotificationBell />
                       <AvatarChip />
@@ -292,17 +287,8 @@ const Navbar = () => {
                         size="sm"
                         className="border-border hover:bg-accent"
                       >
-                        {isSigningOut ? (
-                          <>
-                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                            Signing outâ€¦
-                          </>
-                        ) : (
-                          <>
-                            <LogOut className="w-4 h-4 mr-2" />
-                            Sign Out
-                          </>
-                        )}
+                        <LogOut className="w-4 h-4 mr-2" />
+                        Sign Out
                       </Button>
                 </div>
                   ) : (
@@ -363,12 +349,7 @@ const Navbar = () => {
               ))}
 
               <div className="w-full pt-4 border-t border-border">
-                {isLoading ? (
-                  <div className="flex items-center justify-center gap-2 text-muted-foreground py-2">
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    <span className="text-sm">Loadingâ€¦</span>
-                  </div>
-                ) : user ? (
+                {user ? (
                   <div className="flex flex-col gap-3">
                     <div className="flex items-center justify-center gap-3 text-foreground">
                       {profile?.avatar_url ? (
@@ -384,7 +365,7 @@ const Navbar = () => {
                         </div>
                       )}
                       <span className="text-sm font-medium">
-                        {profileLoading ? 'â€¦' : displayName}
+                        {profileLoading ? '...' : displayName}
                       </span>
                     </div>
                     <Button
@@ -396,17 +377,8 @@ const Navbar = () => {
                       variant="outline"
                       className="w-full border-border hover:bg-accent" 
                     >
-                      {isSigningOut ? (
-                        <>
-                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                          Signing outâ€¦
-                        </>
-                      ) : (
-                        <>
-                          <LogOut className="w-4 h-4 mr-2" />
-                          Sign Out
-                        </>
-                      )}
+                      <LogOut className="w-4 h-4 mr-2" />
+                      Sign Out
                     </Button>
                   </div>
                 ) : (

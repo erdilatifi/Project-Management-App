@@ -48,26 +48,6 @@ export default function EditProjectMenu({ project, onUpdated, onDeleted }: Props
     }
   };
 
-  const onArchive = async () => {
-    try {
-      const { data, error } = await supabase
-        .from("projects")
-        .update({ is_archived: true })
-        .eq("id", project.id)
-        .select("id, name, description, is_archived")
-        .single();
-      if (error) throw error;
-      toast.success("Project archived");
-      if (data && onUpdated) onUpdated(data as any);
-    } catch (e: any) {
-      const msg = e?.message || 'Failed to archive project'
-      if (String(msg).toLowerCase().includes('permission') || String(msg).toLowerCase().includes('not allowed')) {
-        toast.error('Not allowed')
-      } else {
-        toast.error(msg)
-      }
-    }
-  };
 
   const onDelete = () => setDeleteOpen(true);
 
@@ -118,12 +98,9 @@ export default function EditProjectMenu({ project, onUpdated, onDeleted }: Props
             </div>
           </div>
           <DialogFooter className="flex items-center justify-between gap-2">
-            <div className="flex items-center gap-2">
-              <Button onClick={onArchive} variant="outline">Archive</Button>
-              <Button onClick={onDelete} variant="outline">Delete</Button>
-            </div>
+            <Button onClick={onDelete} variant="outline">Delete</Button>
             <Button onClick={onRename} disabled={saving} variant="outline">
-              {saving ? "Saving�?�" : "Save"}
+              {saving ? "Saving…" : "Save"}
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -8,6 +8,7 @@ export async function GET(req: Request) {
     const supabase = await createServerSupabase()
     const authResult = await authenticateRequest(supabase)
     if (!authResult.success) {
+      console.error('[notifications] unauthorized request')
       return authResult.response
     }
     const userId = authResult.userId
@@ -37,7 +38,10 @@ export async function GET(req: Request) {
         .eq('is_read', false),
     ])
 
-    if (listRes.error) throw listRes.error
+    if (listRes.error) {
+      console.error('[notifications] database error', listRes.error)
+      throw listRes.error
+    }
 
     const items = (listRes.data ?? []) as Array<{
       id: string
@@ -48,14 +52,19 @@ export async function GET(req: Request) {
       is_read: boolean
       workspace_id: string | null
       ref_id: string | null
+      thread_id: string | null
+      message_id: string | null
+      task_id: string | null
+      project_id: string | null
     }>
 
     const nextCursor = items.length === limit ? items[items.length - 1].created_at : null
     const unread = unreadRes.count ?? 0
 
     return NextResponse.json({ items, nextCursor, unread })
-  } catch (e) {
-    return NextResponse.json({ error: 'Failed to fetch notifications' }, { status: 500 })
+  } catch (e: any) {
+    console.error('[notifications] unhandled error', e)
+    return NextResponse.json({ error: e?.message ?? 'Failed to fetch notifications' }, { status: 500 })
   }
 }
 

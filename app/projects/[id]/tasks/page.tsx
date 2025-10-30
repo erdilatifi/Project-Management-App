@@ -28,7 +28,8 @@ import {
 } from "@/components/ui/dialog";
 
 import { toast } from "sonner";
-import { Pencil, Trash2, Plus, GripVertical, Calendar } from "lucide-react";
+import { Pencil, Trash2, Plus, GripVertical, Calendar, ArrowLeft } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { TaskAssignees } from "@/components/tasks/TaskAssignees";
 import { CreateTaskDialog } from "@/components/tasks/CreateTaskDialog";
@@ -313,6 +314,7 @@ const priorityClass = (p?: number | null) => {
 type DueFilter = "all" | DueCategory;
 
 export default function ProjectTasksBoardPage() {
+  const router = useRouter();
   const { id: projectIdParam } = useParams<{ id: string }>();
   const projectId = projectIdParam as string;
   const supabase = useMemo(() => createClient(), []);
@@ -689,7 +691,18 @@ export default function ProjectTasksBoardPage() {
       <div className="mx-auto max-w-[1200px] px-6 lg:px-10 py-10">
         {/* Header with Create Task Dialog */}
         <div className="mb-6 flex items-center justify-between">
-          <h1 className="text-3xl font-bold tracking-tight">Tasks Board</h1>
+          <div className="flex items-center gap-3">
+            <Button
+              size="icon"
+              variant="ghost"
+              className="h-9 w-9 rounded-full hover:bg-accent"
+              onClick={() => router.push('/projects')}
+              title="Back to projects"
+            >
+              <ArrowLeft className="h-5 w-5" />
+            </Button>
+            <h1 className="text-3xl font-bold tracking-tight">Tasks Board</h1>
+          </div>
           {canCreate && workspaceId && (
             <CreateTaskDialog
               projectId={projectId}

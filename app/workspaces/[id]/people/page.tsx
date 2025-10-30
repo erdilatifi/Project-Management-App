@@ -12,7 +12,7 @@ import { Button } from '@/components/ui/button'
 import { toast } from 'sonner'
 import { getWorkspaceRole } from '@/utils/permissions'
 import { useRouter } from 'next/navigation'
-import { Search, X, UserMinus, Loader2 } from 'lucide-react'
+import { Search, X, UserMinus, Loader2, ArrowLeft } from 'lucide-react'
 
 export default function WorkspacePeoplePage() {
   const { id } = useParams<{ id: string }>()
@@ -244,9 +244,20 @@ export default function WorkspacePeoplePage() {
     <div className="min-h-screen w-full">
       <div className="mx-auto max-w-[1200px] px-3 sm:px-6 lg:px-10 py-8 sm:py-12 space-y-6">
         <div className="pt-15 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-          <div>
-            <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight text-foreground">People</h1>
-            <p className="text-sm text-muted-foreground mt-0.5">Invite teammates and manage access.</p>
+          <div className="flex items-start gap-3">
+            <Button
+              size="icon"
+              variant="ghost"
+              className="h-9 w-9 rounded-full hover:bg-accent mt-0.5"
+              onClick={() => router.push('/workspaces')}
+              title="Back to workspaces"
+            >
+              <ArrowLeft className="h-5 w-5" />
+            </Button>
+            <div>
+              <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight text-foreground">People</h1>
+              <p className="text-sm text-muted-foreground mt-0.5">Invite teammates and manage access.</p>
+            </div>
           </div>
           {myRole && myRole !== 'owner' ? (
             <button

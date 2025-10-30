@@ -296,8 +296,7 @@ export default function ProfilePage() {
 
   return (
     <div className="mx-auto max-w-[1200px] p-6 space-y-6">
-      <div className="flex items-center justify-center pt-15">
-        <h1 className="text-2xl font-semibold">Profile</h1>
+      <div className="flex items-center pt-15">
       </div>
 
       <Tabs defaultValue="personal" className="space-y-6 max-w-3xl mx-auto">

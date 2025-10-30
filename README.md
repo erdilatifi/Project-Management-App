@@ -6,37 +6,85 @@ A modern, full-featured project management application built with Next.js 16, Su
 
 ### Core Functionality
 - **User Authentication** - Secure sign-up, login, and password recovery with Supabase Auth
-- **Workspaces** - Multi-tenant architecture with role-based access control
+- **Workspaces** - Multi-tenant architecture with workspace management
+  - Create and manage workspaces
+  - Invite team members via email
+  - Leave workspace functionality
+  - Back navigation to workspaces list
 - **Projects** - Organize work into projects with full CRUD operations
+  - Create, edit, and delete projects
+  - Project descriptions and metadata
+  - Navigate back to projects list
 - **Kanban Board** - Drag-and-drop task management with status columns (To Do, In Progress, Done)
+  - Visual drag-and-drop interface
+  - Permission-based task movement (assignees only)
+  - Real-time task updates
+  - Back navigation to projects
 - **Task Management** - Create, assign, and track tasks with:
   - Priority levels (P1-P5) with color coding
   - Due date tracking with smart categorization (Overdue, Today, Next Week)
-  - Assignee management
+  - Multi-assignee support
+  - Task filtering by due date
   - Real-time status updates
-- **Real-time Collaboration** - Live updates using Supabase real-time subscriptions
+  - Optimistic UI updates
 - **Messaging System** - In-app chat with threads and real-time messaging
+  - Thread-based conversations
+  - Real-time message delivery
+  - Unread message counts per thread
+  - Message editing and deletion
+  - Thread title editing
+  - Participant management
+  - Back navigation to workspaces
+  - TanStack Query for optimistic updates
 - **Notifications** - Comprehensive notification system with:
   - Real-time in-app notifications
-  - Notification bell with unread count
-  - Mark as read/unread functionality
-  - Clear all notifications
-  - Click-outside to close dropdown
+  - Notification bell with unread count badge
+  - Message notifications with navigation
+  - Task assignment notifications
+  - Workspace invitation notifications
+  - Mark as read functionality
+  - Polling fallback for reliability
+  - Responsive design for mobile devices
 - **User Profiles** - Customizable profiles with:
   - Avatar upload to Supabase Storage
-  - Display name and job title
+  - Full name and job title
+  - Email display
   - Theme preferences (Light/Dark/System)
-- **People Management** - View workspace members with their roles and positions
+  - Notification preferences
+  - Real-time profile updates
+- **People Management** - View and manage workspace members
+  - Member list with roles
+  - Search functionality
+  - Remove members (admin only)
+  - Leave workspace option
+  - Back navigation to workspaces
 
 ### UI/UX
-- **Responsive Design** - Mobile-first interface that works on all devices
+- **Responsive Design** - Mobile-first interface optimized for all devices
+  - Adaptive layouts for mobile, tablet, and desktop
+  - Mobile-optimized notification bell (full-width on small screens)
+  - Responsive navigation with back buttons
+  - Optimized for 400px width devices (Samsung Galaxy S20 Ultra)
+  - Flexible button layouts that wrap on small screens
+  - Hidden sidebars on mobile for better space utilization
 - **Dark/Light Mode** - Full theme support with:
   - System preference detection
   - Instant theme switching
   - Consistent theme variables throughout
+  - Smooth theme transitions
 - **Modern UI** - Built with shadcn/ui components and Tailwind CSS
+  - Clean, professional design
+  - Consistent spacing and typography
+  - Polished component library
 - **Smooth Animations** - Polished transitions and interactions
+  - Hover states and visual feedback
+  - Loading states and skeletons
+  - Optimistic UI updates
 - **Accessible** - WCAG AA compliant with proper contrast ratios
+- **Navigation** - Intuitive back buttons throughout the app
+  - Messages → Workspaces
+  - People → Workspaces  
+  - Tasks → Projects
 
 ## 🛠️ Tech Stack
 
@@ -132,11 +180,11 @@ npm install
 ```
 
 3. Set up environment variables:
-Create a `.env.local` file in the root directory with the following variables:
-```env
-NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
-NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
+Copy `env.example` to `.env.local` and fill in your Supabase credentials:
+```bash
+cp env.example .env.local
 ```
+Then edit `.env.local` with your actual values from your Supabase project settings.
 
 4. Run the development server:
 ```bash
@@ -144,19 +192,6 @@ npm run dev
 ```
 
 5. Open [http://localhost:3000](http://localhost:3000) in your browser.
-
-## Database Schema
-
-The application uses the following main tables in Supabase:
-
-- **profiles** - User profile information
-- **workspaces** - Workspace data
-- **workspace_members** - Workspace membership
-- **projects** - Project information
-- **tasks** - Task data
-- **notifications** - User notifications
-- **messages** - Chat messages
-- **threads** - Message threads
 
 ## 🔑 Key Features Explained
 
@@ -180,6 +215,9 @@ The application uses the following main tables in Supabase:
 - **Full CRUD Operations** - Create, Read, Update, Delete
 - **Project Details** - Name, description, and metadata
 - **Access Control** - Workspace-level permissions
+- **Project Management** - Edit and delete projects (archive removed)
+- **Navigation** - Link to task board for each project
+- **Workspace Switching** - Create and switch between workspaces
 
 ### Kanban Task Board
 - **Drag & Drop** - Intuitive task movement between columns
@@ -203,32 +241,40 @@ The application uses the following main tables in Supabase:
 - **Permission Control** - Only task creator can edit/delete
 
 ### Notifications
-- **Real-time System** - Supabase-powered notifications
-- **Notification Bell** - Unread count badge in navbar
-- **Dropdown Panel** - Quick access to recent notifications
+- **Real-time System** - Custom-built notification system with Supabase
+- **Notification Bell** - Responsive dropdown with unread count badge
+  - Full-width on mobile devices
+  - Fixed positioning for better UX
+  - Polling fallback (10-second intervals when open)
+- **Notification Fanout API** - Server-side notification distribution
 - **Notification Types**:
+  - Message notifications (new messages)
   - Task assignments
   - Task updates
   - Workspace invites
-  - Message mentions
 - **Actions**:
-  - Mark individual as read/unread
+  - Mark as read functionality
   - Mark all as read
   - Clear all notifications
+  - Manual refresh button
   - Click-outside to close
-- **Profile Page** - Full notification history with management
+- **Profile Page** - Full notification history with responsive controls
+- **ID Handling** - Supports both numeric and string notification IDs
 
 ### Messaging System
-- **Thread-based Chat** - Organized conversations
-- **Real-time Messages** - Instant message delivery
-- **Message Panel** - Dedicated chat interface
-- **Thread List** - View all conversations
-- **Unread Indicators** - Visual unread message counts
+- **Thread-based Chat** - Organized conversations in workspaces
+- **Real-time Messages** - Instant message delivery using Supabase subscriptions
+- **Message Panel** - Dedicated chat interface with TanStack Query
+- **Thread List** - View all conversations with unread counts
+- **Unread Tracking** - Smart unread message counts using `last_read_at` timestamps
+- **Thread Management** - Create, edit titles, and delete threads
+- **Participant System** - Add/remove participants from threads
+- **Optimistic Updates** - Immediate UI feedback for better UX
+- **Back Navigation** - Easy navigation back to workspaces list
 
 ### Profile Management
 - **Avatar Upload** - Image upload to Supabase Storage (2MB limit)
 - **Profile Fields**:
-  - Full name
   - Job title
   - Display name
   - Email (read-only)
@@ -244,53 +290,15 @@ The application uses the following main tables in Supabase:
 - **WCAG AA Compliant** - Proper contrast ratios
 - **Smooth Transitions** - Animated theme changes
 
-## 🔔 Notification System Architecture
-
-The application uses a **custom-built notification system** powered by Supabase (not Novu or third-party services):
-
-### Database Schema
-```sql
-notifications (
-  id: uuid
-  user_id: uuid (foreign key to users)
-  type: text (task_assigned, task_update, workspace_invite, message_mention)
-  title: text
-  body: text
-  data: jsonb (additional metadata)
-  is_read: boolean
-  created_at: timestamp
-  workspace_id: uuid (optional)
-  ref_id: uuid (optional reference to related entity)
-)
-```
-
-### Real-time Subscriptions
-- Uses Supabase Real-time to push notifications instantly
-- Client subscribes to `notifications` table filtered by `user_id`
-- New notifications appear immediately without polling
-
-### Components
-- **NotificationBell** - Navbar dropdown with unread count
-- **NotificationsList** - Full notification history in profile
-- **Toast Notifications** - Sonner for temporary feedback messages
-
-### API Routes
-- `POST /api/notifications` - Create notification
-- `GET /api/notifications` - Fetch user notifications
-- `PATCH /api/notifications` - Mark as read/unread
-
-### Utilities
-- `utils/supabase/notifications.ts` - CRUD operations
-- `lib/notifications/subscribe.ts` - Real-time subscription logic
-
 ## 💻 Development
 
 ### Code Style
 - **TypeScript** - Strict mode enabled for type safety
 - **ESLint** - Code linting with Next.js config
 - **Consistent Structure** - Organized component patterns
-- **Meaningful Comments** - Clear documentation for complex logic
-- **No Console Logs** - Production code is clean (debug logs removed)
+- **Professional Comments** - Clear documentation for complex logic
+- **Structured Logging** - Prefixed console logs for debugging (e.g., `[component-name]`)
+- **Clean Code** - No debug endpoints or test code in production
 
 ### Component Organization
 - **Reusable UI** - `components/ui/` (shadcn/ui components)
@@ -329,16 +337,13 @@ npm run build
 
 ## 📄 License
 
-**Copyright © 2025 Flowfoundry. All Rights Reserved.**
+MIT License - See [LICENSE](LICENSE) file for details.
 
-This project is proprietary software. Unauthorized copying, distribution, modification, or use is strictly prohibited. See the [LICENSE](LICENSE) file for full terms and conditions.
+## 🤝 Contributing
 
-### What This Means:
-- ❌ **No Distribution** - Cannot share or publish this code
-- ❌ **No Modification** - Cannot create derivative works
-- ❌ **No Commercial Use** - Cannot use for commercial purposes
-- ❌ **No Public Hosting** - Cannot deploy publicly without permission
-- ✅ **Personal Use Only** - For development and testing purposes
+Contributions are welcome! Please feel free to submit a Pull Request.
 
-For licensing inquiries or permissions, please contact the copyright holder.
+## 📧 Contact
+
+For questions or support, please open an issue on GitHub.
 

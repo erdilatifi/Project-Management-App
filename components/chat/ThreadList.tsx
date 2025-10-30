@@ -9,9 +9,10 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { createClient } from '@/utils/supabase/client'
 import { createThread } from '@/lib/workspaces'
 import type { MessageThread } from '@/types/workspaces'
-import { Plus, MessageSquare, Trash2, Search, Loader2 } from 'lucide-react'
+import { Plus, MessageSquare, Trash2, Search, Loader2, ArrowLeft } from 'lucide-react'
 import { toast } from 'sonner'
 import UserSelectionDialog from './UserSelectionDialog'
+import { useRouter } from 'next/navigation'
 
 type Props = {
   workspaceId: string
@@ -20,6 +21,7 @@ type Props = {
 }
 
 export default function ThreadList({ workspaceId, onSelect, activeThreadId }: Props) {
+  const router = useRouter()
   const supabase = useMemo(() => createClient(), [])
   const [userId, setUserId] = useState<string | null>(null)
   const [search, setSearch] = useState('')
@@ -30,7 +32,7 @@ export default function ThreadList({ workspaceId, onSelect, activeThreadId }: Pr
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null)
   const [hasMore, setHasMore] = useState(true)
   const [loadingMore, setLoadingMore] = useState(false)
-  const [page, setPage] = useState(1)
+  const [cursor, setCursor] = useState<string | null>(null) // ISO created_at of the last item
   const loadMoreRef = useRef<HTMLLIElement | null>(null)
   const observerRef = useRef<IntersectionObserver | null>(null)
   const [unreadCounts, setUnreadCounts] = useState<Record<string, number>>({})
@@ -39,23 +41,47 @@ export default function ThreadList({ workspaceId, onSelect, activeThreadId }: Pr
 
   const queryClient = useQueryClient()
 const threadsQ = useQuery({
-  queryKey: ['threads', workspaceId, page],
+  queryKey: ['threads', workspaceId, userId, cursor],
+  enabled: !!userId,
+  staleTime: 30000,
+  gcTime: 300000,
+  placeholderData: (prev) => prev,
   queryFn: async () => {
     const limit = 20
-    const from = (page - 1) * limit
-    const to = from + limit - 1
-    
-    const { data, error, count } = await supabase
+
+    // Find threads where current user is creator or a participant
+    const participantIdsRes = await supabase
+      .from('thread_participants')
+      .select('thread_id')
+      .eq('user_id', userId)
+    if (participantIdsRes.error) throw new Error(participantIdsRes.error.message)
+    const ids = (participantIdsRes.data ?? []).map((r: any) => r.thread_id as string)
+
+    // Build OR filter: created_by = me OR id IN (my participant threads)
+    let orFilter = `created_by.eq.${userId}`
+    if (ids.length > 0) {
+      const inList = ids.map((id) => id.replaceAll(',', '')).join(',')
+      orFilter += `,id.in.(${inList})`
+    }
+
+    let q = supabase
       .from('message_threads')
-      .select('*', { count: 'exact' })
+      .select('id, title, created_at, created_by')
       .eq('workspace_id', workspaceId)
+      .or(orFilter)
       .order('created_at', { ascending: false })
-      .range(from, to)
-    
+      .limit(limit)
+
+    if (cursor) {
+      q = q.lt('created_at', cursor)
+    }
+
+    const { data, error } = await q
     if (error) throw new Error(error.message)
-    
-    setHasMore(count ? (page * limit) < count : false)
-    return (data ?? []) as MessageThread[]
+
+    const rows = (data ?? []) as unknown as MessageThread[]
+    setHasMore(rows.length === limit)
+    return rows
   },
 })
 
@@ -69,16 +95,19 @@ const threadsQ = useQuery({
 
   useEffect(() => {
     threadsQ.refetch()
-  }, [workspaceId])
+  }, [workspaceId, userId, cursor])
 
-  // Infinite scroll observer
+  // Infinite scroll observer (keyset pagination)
   useEffect(() => {
     if (loadingMore || !hasMore || search) return
 
     observerRef.current = new IntersectionObserver(
       (entries) => {
         if (entries[0].isIntersecting) {
-          setPage((prev) => prev + 1)
+          if (threadsQ.data && threadsQ.data.length) {
+            const last = threadsQ.data[threadsQ.data.length - 1]
+            setCursor(last.created_at as any)
+          }
         }
       },
       { threshold: 0.1 }
@@ -100,18 +129,14 @@ const threadsQ = useQuery({
     const channel = supabase
       .channel('rt-threads')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'message_threads', filter: `workspace_id=eq.${workspaceId}` }, (payload) => {
-                queryClient.setQueryData<MessageThread[]>(['threads', workspaceId], (cur = []) => {
-          if (payload.eventType === 'INSERT') [payload.new as MessageThread, ...cur]
-          if (payload.eventType === 'UPDATE') cur.map((t) => (t.id === (payload.new as any).id ? (payload.new as MessageThread) : t))
-          if (payload.eventType === 'DELETE') return cur.filter((t) => t.id !== (payload.old as any).id)
-          return cur
-        })
+        // Re-evaluate accessible threads on any change
+        queryClient.invalidateQueries({ queryKey: ['threads', workspaceId, userId] })
       })
       .subscribe()
     return () => {
       supabase.removeChannel(channel)
     }
-  }, [supabase, workspaceId])
+  }, [supabase, workspaceId, userId, queryClient])
 
   const onNew = async () => { setNewOpen(true) }
 
@@ -131,10 +156,8 @@ const threadsQ = useQuery({
       if (error) throw error
       
       // Add selected participants
-      if (userIds.length > 0 && thread) {
+      if (thread && userIds.length > 0) {
         const threadId = thread.id
-        
-        // Add each user as participant
         for (const participantId of userIds) {
           await supabase
             .from('thread_participants')
@@ -149,8 +172,8 @@ const threadsQ = useQuery({
       return thread
     },
     onMutate: async ({ title }: { title: string; userIds: string[] }) => {
-      await queryClient.cancelQueries({ queryKey: ['threads', workspaceId] })
-      const prev = queryClient.getQueryData<MessageThread[]>(['threads', workspaceId]) || []
+      await queryClient.cancelQueries({ queryKey: ['threads', workspaceId, userId] })
+      const prev = queryClient.getQueryData<MessageThread[]>(['threads', workspaceId, userId, 1]) || []
       const optimistic: MessageThread = { 
         id: 'temp-' + Date.now().toString(), 
         workspace_id: workspaceId, 
@@ -158,67 +181,89 @@ const threadsQ = useQuery({
         created_by: userId, 
         created_at: new Date().toISOString() 
       }
-      queryClient.setQueryData(['threads', workspaceId], [optimistic, ...prev])
+      queryClient.setQueryData(['threads', workspaceId, userId, 1], [optimistic, ...prev])
       return { prev }
     },
-    onError: (_err, _vars, ctx) => { if (ctx?.prev) queryClient.setQueryData(['threads', workspaceId], ctx.prev) },
-    onSettled: () => { queryClient.invalidateQueries({ queryKey: ['threads', workspaceId] }) },
+    onError: (_err, _vars, ctx) => { if (ctx?.prev) queryClient.setQueryData(['threads', workspaceId, userId, 1], ctx.prev) },
+    onSettled: () => { queryClient.invalidateQueries({ queryKey: ['threads', workspaceId, userId] }) },
   })
 
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => { const { error } = await supabase.from('message_threads').delete().eq('id', id); if (error) throw new Error(error.message) },
     onMutate: async (id: string) => {
-      await queryClient.cancelQueries({ queryKey: ['threads', workspaceId] })
-      const prev = queryClient.getQueryData<MessageThread[]>(['threads', workspaceId]) || []
-      queryClient.setQueryData(['threads', workspaceId], prev.filter(t => t.id !== id))
+      await queryClient.cancelQueries({ queryKey: ['threads', workspaceId, userId] })
+      const prev = queryClient.getQueryData<MessageThread[]>(['threads', workspaceId, userId, 1]) || []
+      queryClient.setQueryData(['threads', workspaceId, userId, 1], prev.filter(t => t.id !== id))
       return { prev }
     },
-    onError: (_err, _vars, ctx) => { if (ctx?.prev) queryClient.setQueryData(['threads', workspaceId], ctx.prev) },
-    onSettled: () => { queryClient.invalidateQueries({ queryKey: ['threads', workspaceId] }) },
+    onError: (_err, _vars, ctx) => { if (ctx?.prev) queryClient.setQueryData(['threads', workspaceId, userId, 1], ctx.prev) },
+    onSettled: () => { queryClient.invalidateQueries({ queryKey: ['threads', workspaceId, userId] }) },
   })
 
-  const allThreads = queryClient.getQueryData<MessageThread[]>(['threads', workspaceId, page]) ?? []
+  const allThreads = threadsQ.data ?? []
   const shown = allThreads.filter((t) => (t.title ?? '').toLowerCase().includes(search.trim().toLowerCase()))
 
-  // Fetch unread message counts for all threads
+  // Load unread message counts for all threads (messages after last read timestamp)
   useEffect(() => {
-    if (!userId || shown.length === 0) return
-
-    const fetchUnreadCounts = async () => {
-      const threadIds = shown.map(t => t.id)
+    if (!userId || !threadsQ.data || threadsQ.data.length === 0) return
+    
+    const loadUnreadCounts = async () => {
+      const threadIds = threadsQ.data.map(t => t.id)
       
-      // Get last message for each thread
-      const { data: messages } = await supabase
-        .from('messages')
-        .select('thread_id, created_at, author_id')
-        .in('thread_id', threadIds)
-        .order('created_at', { ascending: false })
-
-      if (!messages) return
-
-      // Group messages by thread and count unread (messages not by current user)
-      const counts: Record<string, number> = {}
-      
-      for (const threadId of threadIds) {
-        const threadMessages = messages.filter(m => m.thread_id === threadId)
-        // Count messages from others (not from current user)
-        const unreadFromOthers = threadMessages.filter(m => m.author_id !== userId).length
+      try {
+        // Get last read timestamps for all threads
+        const { data: readData } = await supabase
+          .from('thread_participants')
+          .select('thread_id, last_read_at')
+          .eq('user_id', userId)
+          .in('thread_id', threadIds)
         
-        // If there are any messages from others, mark as unread
-        if (unreadFromOthers > 0 && threadId !== activeThreadId) {
-          counts[threadId] = unreadFromOthers
+        const lastReadMap: Record<string, string | null> = {}
+        readData?.forEach((r: any) => {
+          lastReadMap[r.thread_id] = r.last_read_at
+        })
+        
+        // Get unread message counts per thread
+        const counts: Record<string, number> = {}
+        
+        for (const threadId of threadIds) {
+          // Skip active thread
+          if (threadId === activeThreadId) continue
+          
+          const lastRead = lastReadMap[threadId]
+          
+          // Count messages after last read (or all if never read)
+          let query = supabase
+            .from('messages')
+            .select('*', { count: 'exact', head: true })
+            .eq('thread_id', threadId)
+            .neq('author_id', userId)
+          
+          if (lastRead) {
+            query = query.gt('created_at', lastRead)
+          }
+          
+          const { count, error } = await query
+          
+          if (!error && count && count > 0) {
+            counts[threadId] = count
+          }
         }
+        
+        console.log('[thread-list] Loaded unread counts', counts)
+        setUnreadCounts(counts)
+      } catch (e) {
+        console.error('[thread-list] Failed to load unread counts', e)
       }
-      
-      setUnreadCounts(counts)
     }
-
-    fetchUnreadCounts()
-  }, [supabase, userId, shown, activeThreadId])
+    
+    loadUnreadCounts()
+  }, [userId, threadsQ.data, supabase, activeThreadId])
 
   // Clear unread count when thread is selected
   useEffect(() => {
     if (activeThreadId && unreadCounts[activeThreadId]) {
+      console.log('[thread-list] Clearing unread count for active thread', activeThreadId)
       setUnreadCounts(prev => {
         const next = { ...prev }
         delete next[activeThreadId]
@@ -244,8 +289,16 @@ const threadsQ = useQuery({
         (payload) => {
           const newMessage = payload.new as any
           
+          console.log('[thread-list] New message received', { 
+            threadId: newMessage.thread_id, 
+            authorId: newMessage.author_id, 
+            currentUserId: userId,
+            activeThreadId 
+          })
+          
           // Only count if message is from someone else and not in active thread
           if (newMessage.author_id !== userId && newMessage.thread_id !== activeThreadId) {
+            console.log('[thread-list] Incrementing unread count for thread', newMessage.thread_id)
             setUnreadCounts(prev => ({
               ...prev,
               [newMessage.thread_id]: (prev[newMessage.thread_id] || 0) + 1
@@ -260,12 +313,58 @@ const threadsQ = useQuery({
     }
   }, [supabase, userId, workspaceId, activeThreadId])
 
+  // Listen for thread_participants updates to refresh unread counts when last_read_at changes
+  useEffect(() => {
+    if (!userId) return
+
+    const channel = supabase
+      .channel('thread-read-status')
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'thread_participants',
+          filter: `user_id=eq.${userId}`,
+        },
+        (payload) => {
+          const updated = payload.new as any
+          console.log('[thread-list] Thread read status updated', updated)
+          
+          // If last_read_at was updated, clear the unread count for this thread
+          if (updated.last_read_at) {
+            setUnreadCounts(prev => {
+              const next = { ...prev }
+              delete next[updated.thread_id]
+              return next
+            })
+          }
+        }
+      )
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [supabase, userId])
+
   return (
     <div className="h-full flex flex-col">
       {/* Header */}
       <div className="px-4 py-4 border-b border-border bg-card">
         <div className="flex items-center justify-between mb-3">
-          <h2 className="text-lg font-semibold text-foreground">Messages</h2>
+          <div className="flex items-center gap-2">
+            <Button
+              size="icon"
+              variant="ghost"
+              className="h-9 w-9 rounded-full hover:bg-accent"
+              onClick={() => router.push('/workspaces')}
+              title="Back to workspaces"
+            >
+              <ArrowLeft className="h-5 w-5" />
+            </Button>
+            <h2 className="text-lg font-semibold text-foreground">Messages</h2>
+          </div>
           <Button
             size="icon"
             variant="ghost"
@@ -289,7 +388,7 @@ const threadsQ = useQuery({
 
       {/* Thread List */}
       <div className="flex-1 overflow-auto">
-        {threadsQ.isFetching && page === 1 ? (
+        {threadsQ.isFetching && (!threadsQ.data || threadsQ.data.length === 0) ? (
           <div className="p-3 space-y-2">
             {Array.from({ length: 5 }).map((_, i) => (
               <div key={i} className="flex items-center gap-3 px-3 py-3">

@@ -1,7 +1,7 @@
 import { createClient } from '@/utils/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
 import { validateBody, authenticateRequest, errorResponse } from '@/lib/validation/middleware'
-import { updateProfileSchema, updatePreferencesSchema, toggle2FASchema } from '@/lib/validation/schemas'
+import { updateProfileSchema } from '@/lib/validation/schemas'
 import { z } from 'zod'
 
 // GET - Fetch user profile and preferences
@@ -110,64 +110,11 @@ export async function PATCH(request: NextRequest) {
     }
 
     if (type === 'preferences') {
-      // Validate preferences data
-      const preferencesValidation = updatePreferencesSchema.safeParse(updateData)
-      if (!preferencesValidation.success) {
-        return errorResponse('Invalid preferences data', 400)
-      }
-      
-      // Update preferences
-      const { data, error } = await supabase
-        .from('user_preferences')
-        .update(preferencesValidation.data)
-        .eq('user_id', userId)
-        .select()
-        .single()
-
-      if (error) {
-        return NextResponse.json({ error: 'Update failed' }, { status: 500 })
-      }
-
-      // Log audit event
-      await supabase.from('audit_logs').insert({
-        user_id: userId,
-        action: 'preferences_updated',
-        entity_type: 'user_preferences',
-        entity_id: userId,
-        new_values: preferencesValidation.data
-      })
-
-      return NextResponse.json({ data })
+      return errorResponse('Preferences updates not supported', 400)
     }
 
     if (type === '2fa') {
-      // Validate 2FA data
-      const twoFAValidation = toggle2FASchema.safeParse(updateData)
-      if (!twoFAValidation.success) {
-        return errorResponse('Invalid 2FA data', 400)
-      }
-      
-      // Toggle 2FA
-      const { data, error } = await supabase
-        .from('users')
-        .update({ two_factor_enabled: twoFAValidation.data.enabled })
-        .eq('id', userId)
-        .select()
-        .single()
-
-      if (error) {
-        return NextResponse.json({ error: 'Update failed' }, { status: 500 })
-      }
-
-      // Log audit event
-      await supabase.from('audit_logs').insert({
-        user_id: userId,
-        action: twoFAValidation.data.enabled ? '2fa_enabled' : '2fa_disabled',
-        entity_type: 'user',
-        entity_id: userId
-      })
-
-      return NextResponse.json({ data })
+      return errorResponse('2FA updates not supported', 400)
     }
 
     return NextResponse.json({ error: 'Invalid type' }, { status: 400 })

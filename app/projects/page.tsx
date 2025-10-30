@@ -14,9 +14,11 @@ import CreateProjectDialog from "@/components/projects/CreateProjectDialog";
 import CreateWorkspaceDialog from "@/components/workspaces/CreateWorkspaceDialog";
 import EditProjectMenu from "@/components/projects/EditProjectMenu";
 import { useProjects, ProjectRow } from "@/hooks/useProjects";
-import { Search, RefreshCcw, FolderPlus, ChevronLeft, ChevronRight, X } from "lucide-react";
+import { Search, RefreshCcw, FolderPlus, ChevronLeft, ChevronRight, X, ArrowLeft } from "lucide-react";
+import { useRouter } from "next/navigation";
 
 export default function ProjectsPage() {
+  const router = useRouter();
   const supabase = useMemo(() => createClient(), []);
   const [booting, setBooting] = useState(true);
   const [userId, setUserId] = useState<string | null>(null);

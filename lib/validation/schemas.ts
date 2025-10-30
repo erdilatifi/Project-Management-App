@@ -145,17 +145,6 @@ export const updateProfileSchema = z.object({
   avatar_url: urlSchema.optional().nullable(),
 })
 
-export const updatePreferencesSchema = z.object({
-  theme: z.enum(['light', 'dark', 'system']).optional(),
-  language: z.string().max(10).optional(),
-  notifications_enabled: z.boolean().optional(),
-  email_notifications: z.boolean().optional(),
-})
-
-export const toggle2FASchema = z.object({
-  enabled: z.boolean(),
-})
-
 // ============================================================================
 // Workspace Schemas
 // ============================================================================
@@ -182,15 +171,28 @@ export const inviteUserSchema = z.object({
   message: 'Either userId or email must be provided',
 })
 
-export const acceptInvitationSchema = z.object({
-  workspaceId: uuidSchema,
-  notificationId: uuidSchema.optional(),
-})
+const optionalStr = z.string().min(1).optional().nullable().transform((v) => (v == null ? undefined : v))
 
-export const declineInvitationSchema = z.object({
-  workspaceId: uuidSchema,
-  notificationId: uuidSchema.optional(),
-})
+export const acceptInvitationSchema = z
+  .object({
+    workspaceId: optionalStr,
+    notificationId: optionalStr,
+    token: z.string().min(6).max(64).optional().nullable().transform((v) => (v == null ? undefined : v)),
+  })
+  .refine((data) => !!(data.workspaceId || data.notificationId || data.token), {
+    message: 'workspaceId, notificationId, or token is required',
+    path: ['workspaceId'],
+  })
+
+export const declineInvitationSchema = z
+  .object({
+    workspaceId: optionalStr,
+    notificationId: optionalStr,
+  })
+  .refine((data) => !!(data.workspaceId || data.notificationId), {
+    message: 'workspaceId or notificationId is required',
+    path: ['workspaceId'],
+  })
 
 // ============================================================================
 // Notification Schemas

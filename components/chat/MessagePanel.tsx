@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { createClient } from "@/utils/supabase/client";
 import type { Message } from "@/types/workspaces";
 import { Input } from "@/components/ui/input";
@@ -10,12 +10,12 @@ import { X, Pencil, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { formatTimeAgo } from "@/lib/time";
 
-type Props = { threadId: string; workspaceId: string };
+type Props = { threadId: string; workspaceId: string; title?: string | null; isCreator?: boolean; onTitleUpdated?: (title: string | null) => void };
 type UserLite = { id: string; email: string | null };
 
-export default function MessagePanel({ threadId, workspaceId }: Props) {
+export default function MessagePanel({ threadId, workspaceId, title: titleProp, isCreator: isCreatorProp, onTitleUpdated }: Props) {
   const supabase = useMemo(() => createClient(), []);
-  const [items, setItems] = useState<Message[]>([]);
+  const queryClient = useQueryClient();
   const [authors, setAuthors] = useState<Record<string, UserLite>>({});
   const [text, setText] = useState("");
   const [userId, setUserId] = useState<string | null>(null);
@@ -37,6 +37,64 @@ export default function MessagePanel({ threadId, workspaceId }: Props) {
   const [titleInput, setTitleInput] = useState("");
   const [savingTitle, setSavingTitle] = useState(false);
 
+  // Title update mutation with optimistic UI
+  const updateTitleMutation = useMutation({
+    mutationFn: async (nextTitle: string | null) => {
+      const { error } = await supabase
+        .from("message_threads")
+        .update({ title: nextTitle })
+        .eq("id", threadId);
+      if (error) throw new Error(error.message);
+      return nextTitle;
+    },
+    onMutate: async (nextTitle) => {
+      setSavingTitle(true);
+      
+      // Cancel outgoing refetches
+      await queryClient.cancelQueries({ queryKey: ["threads", workspaceId] });
+      
+      // Snapshot previous values
+      const previousThreads = queryClient.getQueryData(["threads", workspaceId]);
+      const previousTitle = threadTitle;
+      
+      // Optimistically update local state
+      setThreadTitle(nextTitle);
+      onTitleUpdated?.(nextTitle ?? null);
+      
+      // Optimistically update thread list cache
+      queryClient.setQueriesData(
+        { queryKey: ["threads", workspaceId] },
+        (old: any) => {
+          if (!old) return old;
+          return old.map((thread: any) =>
+            thread.id === threadId ? { ...thread, title: nextTitle } : thread
+          );
+        }
+      );
+      
+      return { previousThreads, previousTitle };
+    },
+    onError: (e: any, _nextTitle, context) => {
+      // Rollback on error
+      if (context?.previousTitle !== undefined) {
+        setThreadTitle(context.previousTitle);
+        onTitleUpdated?.(context.previousTitle);
+      }
+      if (context?.previousThreads) {
+        queryClient.setQueryData(["threads", workspaceId], context.previousThreads);
+      }
+      toast.error(e?.message ?? "Failed to update title");
+    },
+    onSuccess: () => {
+      toast.success("Title updated");
+    },
+    onSettled: () => {
+      setSavingTitle(false);
+      // Refetch to ensure we have the latest data
+      queryClient.invalidateQueries({ queryKey: ["threads", workspaceId] });
+    },
+  });
+
   const [typingIds, setTypingIds] = useState<Set<string>>(new Set());
   const [typingEmails, setTypingEmails] = useState<Record<string, string>>({});
   const typingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -53,7 +111,7 @@ export default function MessagePanel({ threadId, workspaceId }: Props) {
     el.scrollTop = el.scrollHeight;
   };
 
-  // messages (initial)
+  // messages query with stale time for better performance
   const messagesQ = useQuery({
     queryKey: ["messages", threadId],
     queryFn: async (): Promise<Message[]> => {
@@ -65,11 +123,14 @@ export default function MessagePanel({ threadId, workspaceId }: Props) {
       if (error) throw new Error(error.message);
       return (data ?? []) as Message[];
     },
+    staleTime: 10000, // Consider data fresh for 10 seconds
+    gcTime: 300000, // Keep in cache for 5 minutes
   });
+
+  const items = messagesQ.data ?? [];
 
   useEffect(() => {
     if (!messagesQ.data) return;
-    setItems(messagesQ.data);
     const ids = Array.from(new Set(messagesQ.data.map((m) => m.author_id)));
     if (ids.length) {
       (async () => {
@@ -143,8 +204,8 @@ export default function MessagePanel({ threadId, workspaceId }: Props) {
     }
     setThreadTitle(thr?.title || null);
 
-    // canManage is ONLY for the creator (not admins)
-    setCanManage(!!manage);
+    // canManage is ONLY for the creator (not admins). Allow override via prop.
+    setCanManage(isCreatorProp ?? !!manage);
 
     if (ids.length) {
       let authUsers: any[] | null = null;
@@ -210,11 +271,41 @@ export default function MessagePanel({ threadId, workspaceId }: Props) {
     } else {
       setParticipants([]);
     }
-  }, [supabase, threadId]);
+  }, [supabase, threadId, isCreatorProp]);
 
   useEffect(() => {
     loadParticipants();
   }, [loadParticipants]);
+
+  // Mark thread as read when opened
+  useEffect(() => {
+    if (!userId || !threadId) return
+    
+    const markAsRead = async () => {
+      try {
+        console.log('[message-panel] Marking thread as read', { threadId, userId })
+        
+        // Update last_read_at timestamp in thread_participants
+        const { error } = await supabase
+          .from('thread_participants')
+          .update({ last_read_at: new Date().toISOString() })
+          .eq('thread_id', threadId)
+          .eq('user_id', userId)
+        
+        if (error) {
+          console.error('[message-panel] Failed to mark thread as read', error)
+        } else {
+          console.log('[message-panel] Thread marked as read successfully')
+        }
+      } catch (e) {
+        console.error('[message-panel] Error marking thread as read', e)
+      }
+    }
+    
+    // Mark as read after a short delay to ensure messages are loaded
+    const timer = setTimeout(markAsRead, 500)
+    return () => clearTimeout(timer)
+  }, [supabase, threadId, userId])
 
   // Real-time subscription for thread updates (title changes)
   useEffect(() => {
@@ -232,6 +323,7 @@ export default function MessagePanel({ threadId, workspaceId }: Props) {
           const updated = payload.new as any
           if (updated.title !== undefined) {
             setThreadTitle(updated.title)
+            onTitleUpdated?.(updated.title ?? null)
           }
         }
       )
@@ -240,7 +332,7 @@ export default function MessagePanel({ threadId, workspaceId }: Props) {
     return () => {
       supabase.removeChannel(channel)
     }
-  }, [supabase, threadId])
+  }, [supabase, threadId, onTitleUpdated])
 
   // presence: single channel
   useEffect(() => {
@@ -328,7 +420,7 @@ export default function MessagePanel({ threadId, workspaceId }: Props) {
     })();
   }, [supabase, typingIds, typingEmails]);
 
-  // realtime messages
+  // realtime messages - update query cache for INSERT, UPDATE, DELETE
   useEffect(() => {
     const channel = supabase
       .channel("rt-messages")
@@ -337,12 +429,16 @@ export default function MessagePanel({ threadId, workspaceId }: Props) {
         { event: "INSERT", schema: "public", table: "messages", filter: `thread_id=eq.${threadId}` },
         (payload) => {
           const m = payload.new as Message;
-          setItems((cur) => {
-            if (cur.some((x) => x.id === m.id)) return cur;
-            return [...cur, m];
+          
+          // Update the query cache with the new message
+          queryClient.setQueryData<Message[]>(["messages", threadId], (old) => {
+            if (!old) return [m];
+            if (old.some((x) => x.id === m.id)) return old;
+            return [...old, m];
           });
-          setAuthors((cur) => {
-            if (cur[m.author_id]) return cur;
+          
+          // Fetch author info if not already present
+          if (!authors[m.author_id]) {
             (async () => {
               try {
                 const [{ data: authRow }, { data: appRow }] = await Promise.all([
@@ -367,16 +463,42 @@ export default function MessagePanel({ threadId, workspaceId }: Props) {
                 if (authRow) setAuthors((c2) => ({ ...c2, [authRow.id]: { id: authRow.id, email: authRow.email } }));
               }
             })();
-            return { ...cur };
-          });
+          }
+          
           setTimeout(scrollToBottom, 0);
+        }
+      )
+      .on(
+        "postgres_changes",
+        { event: "UPDATE", schema: "public", table: "messages", filter: `thread_id=eq.${threadId}` },
+        (payload) => {
+          const m = payload.new as Message;
+          
+          // Update the message in the cache
+          queryClient.setQueryData<Message[]>(["messages", threadId], (old) => {
+            if (!old) return old;
+            return old.map((msg) => (msg.id === m.id ? m : msg));
+          });
+        }
+      )
+      .on(
+        "postgres_changes",
+        { event: "DELETE", schema: "public", table: "messages", filter: `thread_id=eq.${threadId}` },
+        (payload) => {
+          const deletedId = (payload.old as any).id;
+          
+          // Remove the message from the cache
+          queryClient.setQueryData<Message[]>(["messages", threadId], (old) => {
+            if (!old) return old;
+            return old.filter((msg) => msg.id !== deletedId);
+          });
         }
       )
       .subscribe();
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [supabase, threadId]);
+  }, [supabase, threadId, queryClient, authors]);
 
   // realtime participants
   useEffect(() => {
@@ -466,7 +588,7 @@ export default function MessagePanel({ threadId, workspaceId }: Props) {
     };
   }, [supabase, threadId]);
 
-  // send message mutation
+  // send message mutation with optimistic update
   const sendMutation = useMutation({
     mutationFn: async (body: string) => {
       const { data: u } = await supabase.auth.getUser();
@@ -480,16 +602,61 @@ export default function MessagePanel({ threadId, workspaceId }: Props) {
       if (error) throw new Error(error.message);
       return data as Message;
     },
-    onError: (e: any) => toast.error(e?.message ?? "Failed to send message"),
+    onMutate: async (body: string) => {
+      // Cancel outgoing refetches
+      await queryClient.cancelQueries({ queryKey: ["messages", threadId] });
+
+      // Snapshot previous value
+      const previousMessages = queryClient.getQueryData<Message[]>(["messages", threadId]);
+
+      // Optimistically update to the new value
+      if (userId) {
+        const optimisticMessage: Message = {
+          id: `temp-${Date.now()}`,
+          thread_id: threadId,
+          workspace_id: workspaceId,
+          author_id: userId,
+          body,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        };
+        queryClient.setQueryData<Message[]>(
+          ["messages", threadId],
+          (old) => [...(old ?? []), optimisticMessage]
+        );
+        setTimeout(scrollToBottom, 0);
+      }
+
+      return { previousMessages };
+    },
+    onError: (e: any, _body, context) => {
+      // Rollback on error
+      if (context?.previousMessages) {
+        queryClient.setQueryData(["messages", threadId], context.previousMessages);
+      }
+      toast.error(e?.message ?? "Failed to send message");
+    },
     onSuccess: async (msg) => {
-      setItems((cur) => (cur.some((x) => x.id === msg.id) ? cur : [...cur, msg]));
+      // Replace optimistic message with real one
+      queryClient.setQueryData<Message[]>(["messages", threadId], (old) => {
+        if (!old) return [msg];
+        // Remove temp message and add real one
+        const filtered = old.filter((m) => !m.id.startsWith('temp-'));
+        return filtered.some((x) => x.id === msg.id) ? filtered : [...filtered, msg];
+      });
       setTimeout(scrollToBottom, 0);
 
       // Fanout notifications to participants or workspace members (exclude author)
       try {
         const actor = userId;
-        if (!actor) return;
+        if (!actor) {
+          console.warn('[message-fanout] No actor ID available')
+          return;
+        }
+        
         let recipients = participants.map((p) => p.id).filter((id) => id && id !== actor);
+        
+        // If no participants, notify all workspace members
         if (!recipients.length) {
           const { data: members } = await supabase
             .from('workspace_members')
@@ -499,9 +666,12 @@ export default function MessagePanel({ threadId, workspaceId }: Props) {
             .map((m: any) => String(m.user_id))
             .filter((id) => id && id !== actor);
         }
+        
         if (recipients.length) {
           const type = /@\w+/.test(msg.body) ? 'message_mention' : 'message_new';
-          await fetch('/api/notifications/fanout', {
+          console.log('[message-fanout] Sending notifications', { type, recipients: recipients.length, threadId, messageId: msg.id })
+          
+          const res = await fetch('/api/notifications/fanout', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -514,8 +684,20 @@ export default function MessagePanel({ threadId, workspaceId }: Props) {
               meta: { actor_name: null, snippet: (msg.body || '').slice(0, 140) },
             }),
           });
+          
+          if (!res.ok) {
+            const error = await res.json();
+            console.error('[message-fanout] Failed to send notifications', error);
+          } else {
+            const result = await res.json();
+            console.log('[message-fanout] Notifications sent successfully', result);
+          }
+        } else {
+          console.warn('[message-fanout] No recipients to notify')
         }
-      } catch {}
+      } catch (e) {
+        console.error('[message-fanout] Error sending notifications', e);
+      }
     },
   });
 
@@ -526,55 +708,114 @@ export default function MessagePanel({ threadId, workspaceId }: Props) {
     sendMutation.mutate(body);
   };
 
-  const toggleAdmin = async (uid: string, makeAdmin: boolean) => {
-    if (!canManage) return;
-    try {
-      if (creatorId === uid && !makeAdmin) return;
-      await supabase
+  // Admin controls removed
+
+  // Remove participant mutation with optimistic update
+  const removeParticipantMutation = useMutation({
+    mutationFn: async (uid: string) => {
+      const { error } = await supabase
         .from("thread_participants")
-        .upsert({ thread_id: threadId, user_id: uid, is_admin: makeAdmin } as any, {
-          onConflict: "thread_id,user_id",
-        });
-      setParticipants((cur) => cur.map((p) => (p.id === uid ? { ...p, is_admin: makeAdmin } : p)));
-    } catch (e: any) {
-      toast.error(e?.message ?? "Failed to update admin");
-    }
-  };
+        .delete()
+        .eq("thread_id", threadId)
+        .eq("user_id", uid);
+      if (error) throw new Error(error.message);
+      return uid;
+    },
+    onMutate: async (uid: string) => {
+      const previousParticipants = participants;
+      
+      // Optimistically remove participant
+      setParticipants((cur) => cur.filter((p) => p.id !== uid));
+      
+      return { previousParticipants };
+    },
+    onError: (e: any, _uid, context) => {
+      if (context?.previousParticipants) {
+        setParticipants(context.previousParticipants);
+      }
+      toast.error(e?.message ?? "Failed to remove participant");
+    },
+    onSuccess: () => {
+      toast.success("Participant removed");
+    },
+  });
 
   const removeParticipant = async (uid: string) => {
-    try {
-      // If user is leaving their own thread
-      if (userId === uid) {
-        // If owner leaves, delete the entire thread
-        if (creatorId === uid) {
-          if (!confirm("As the owner, leaving will delete this thread for everyone. Continue?")) return;
+    // If user is leaving their own thread
+    if (userId === uid) {
+      // If owner leaves, delete the entire thread
+      if (creatorId === uid) {
+        if (!confirm("As the owner, leaving will delete this thread for everyone. Continue?")) return;
+        try {
           const { error } = await supabase.from("message_threads").delete().eq("id", threadId);
           if (error) throw error;
           toast.success("Thread deleted");
-        } else {
-          // Regular participant leaving
-          if (!confirm("Leave this conversation?")) return;
+          // Navigate away
+          const u = new URL(window.location.href);
+          u.searchParams.delete("thread");
+          window.location.href = u.toString();
+        } catch (e: any) {
+          toast.error(e?.message ?? "Failed to delete thread");
+        }
+        return;
+      } else {
+        // Regular participant leaving
+        if (!confirm("Leave this conversation?")) return;
+        try {
           const { error } = await supabase.from("thread_participants").delete().eq("thread_id", threadId).eq("user_id", uid);
           if (error) throw error;
           toast.success("Left conversation");
+          // Navigate away
+          const u = new URL(window.location.href);
+          u.searchParams.delete("thread");
+          window.location.href = u.toString();
+        } catch (e: any) {
+          toast.error(e?.message ?? "Failed to leave conversation");
         }
-        // Navigate away
-        const u = new URL(window.location.href);
-        u.searchParams.delete("thread");
-        window.location.href = u.toString();
         return;
       }
-      
-      // Admin removing another user
-      if (!canManage) return;
-      if (creatorId === uid) return; // cannot remove the owner
-      if (!confirm("Remove this participant?")) return;
-      await supabase.from("thread_participants").delete().eq("thread_id", threadId).eq("user_id", uid);
-      toast.success("Participant removed");
-    } catch (e: any) {
-      toast.error(e?.message ?? "Failed to remove participant");
     }
+    
+    // Admin removing another user
+    if (!canManage) return;
+    if (creatorId === uid) return; // cannot remove the owner
+    if (!confirm("Remove this participant?")) return;
+    removeParticipantMutation.mutate(uid);
   };
+
+  // Edit message mutation with optimistic update
+  const editMessageMutation = useMutation({
+    mutationFn: async ({ id, body }: { id: string; body: string }) => {
+      const { error } = await supabase.from("messages").update({ body }).eq("id", id);
+      if (error) throw new Error(error.message);
+      return { id, body };
+    },
+    onMutate: async ({ id, body }) => {
+      setSavingMsg(true);
+      await queryClient.cancelQueries({ queryKey: ["messages", threadId] });
+      const previousMessages = queryClient.getQueryData<Message[]>(["messages", threadId]);
+      
+      // Optimistically update
+      queryClient.setQueryData<Message[]>(["messages", threadId], (old) =>
+        old?.map((m) => (m.id === id ? { ...m, body } : m)) ?? []
+      );
+      
+      return { previousMessages };
+    },
+    onError: (e: any, _vars, context) => {
+      if (context?.previousMessages) {
+        queryClient.setQueryData(["messages", threadId], context.previousMessages);
+      }
+      toast.error(e?.message ?? "Failed to update message");
+    },
+    onSuccess: ({ id }) => {
+      setEditedIds((cur) => new Set(cur).add(id));
+      setEditingId(null);
+    },
+    onSettled: () => {
+      setSavingMsg(false);
+    },
+  });
 
   const saveEdit = async (id: string) => {
     const body = editingText.trim();
@@ -582,27 +823,38 @@ export default function MessagePanel({ threadId, workspaceId }: Props) {
       toast.error("Message cannot be empty");
       return;
     }
-    setSavingMsg(true);
-    try {
-      await updateMessageBody(supabase, id, body);
-      setItems((cur) => cur.map((m) => (m.id === id ? { ...m, body } : m)));
-      setEditedIds((cur) => new Set(cur).add(id));
-      setEditingId(null);
-    } catch (e: any) {
-      toast.error(e?.message ?? "Failed to update message");
-    } finally {
-      setSavingMsg(false);
-    }
+    editMessageMutation.mutate({ id, body });
   };
 
-  const deleteMessage = async (id: string) => {
-    try {
+  // Delete message mutation with optimistic update
+  const deleteMessageMutation = useMutation({
+    mutationFn: async (id: string) => {
       const { error } = await supabase.from("messages").delete().eq("id", id);
-      if (error) throw error;
-      setItems((cur) => cur.filter((m) => m.id !== id));
-    } catch (e: any) {
+      if (error) throw new Error(error.message);
+      return id;
+    },
+    onMutate: async (id: string) => {
+      await queryClient.cancelQueries({ queryKey: ["messages", threadId] });
+      const previousMessages = queryClient.getQueryData<Message[]>(["messages", threadId]);
+      
+      // Optimistically remove
+      queryClient.setQueryData<Message[]>(["messages", threadId], (old) =>
+        old?.filter((m) => m.id !== id) ?? []
+      );
+      
+      return { previousMessages };
+    },
+    onError: (e: any, _id, context) => {
+      if (context?.previousMessages) {
+        queryClient.setQueryData(["messages", threadId], context.previousMessages);
+      }
       toast.error(e?.message ?? "Failed to delete message");
-    }
+    },
+  });
+
+  const deleteMessage = async (id: string) => {
+    if (!confirm("Delete this message?")) return;
+    deleteMessageMutation.mutate(id);
   };
 
   return (
@@ -634,17 +886,7 @@ export default function MessagePanel({ threadId, workspaceId }: Props) {
                     <X className="w-3.5 h-3.5" />
                   </button>
                 ) : null}
-                {canManage && creatorId !== p.id ? (
-                  <button
-                    className={`ml-1 text-[10px] px-1.5 py-0.5 rounded ${
-                      p.is_admin ? "bg-blue-600 text-white" : "bg-muted text-muted-foreground"
-                    }`}
-                    onClick={() => toggleAdmin(p.id, !p.is_admin)}
-                    title={p.is_admin ? "Remove admin" : "Make admin"}
-                  >
-                    {p.is_admin ? "Admin" : "Make admin"}
-                  </button>
-                ) : null}
+                {/* Admin toggle removed */}
               </div>
             ))
           )}
@@ -672,18 +914,22 @@ export default function MessagePanel({ threadId, workspaceId }: Props) {
         <div className="flex items-center gap-2">
           {!titleEditing ? (
             <>
-              <h2 className="text-base font-semibold text-foreground">{threadTitle || "Untitled thread"}</h2>
-              {canManage && (
-                <button
-                  className="text-xs px-2 py-1 rounded-md border border-border bg-card hover:bg-accent font-medium transition-colors"
-                  onClick={() => {
-                    setTitleEditing(true);
-                    setTitleInput(threadTitle || "");
-                  }}
-                >
-                  Edit title
-                </button>
-              )}
+              <h2 className="text-base font-semibold text-foreground flex items-center gap-2">
+                {(titleProp ?? threadTitle) || "Untitled thread"}
+                {canManage && (
+                  <button
+                    className="inline-flex items-center justify-center h-7 w-7 rounded-md border border-border bg-card hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"
+                    title="Edit title"
+                    onClick={() => {
+                      setTitleEditing(true);
+                      setTitleInput((titleProp ?? threadTitle) || "");
+                    }}
+                    aria-label="Edit title"
+                  >
+                    <Pencil className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </h2>
             </>
           ) : (
             <div className="flex items-center gap-2">
@@ -692,20 +938,12 @@ export default function MessagePanel({ threadId, workspaceId }: Props) {
                 className="text-xs px-3 h-9 rounded-lg border border-border bg-card hover:bg-accent font-medium transition-colors"
                 disabled={savingTitle}
                 onClick={async () => {
-                  try {
-                    setSavingTitle(true);
-                    const { error } = await supabase
-                      .from("message_threads")
-                      .update({ title: titleInput.trim() || null } as any)
-                      .eq("id", threadId);
-                    if (error) throw error;
-                    setThreadTitle(titleInput.trim() || "Untitled thread");
-                    setTitleEditing(false);
-                  } catch (e: any) {
-                    toast.error(e?.message ?? "Failed to update title");
-                  } finally {
-                    setSavingTitle(false);
-                  }
+                  const next = (titleInput.trim() || null) as string | null;
+                  updateTitleMutation.mutate(next, {
+                    onSuccess: () => {
+                      setTitleEditing(false);
+                    },
+                  });
                 }}
               >
                 Save
@@ -833,9 +1071,4 @@ export default function MessagePanel({ threadId, workspaceId }: Props) {
       </div>
     </div>
   );
-}
-
-async function updateMessageBody(supabase: ReturnType<typeof createClient>, id: string, body: string) {
-  const { error } = await supabase.from("messages").update({ body }).eq("id", id);
-  if (error) throw new Error(error.message);
 }

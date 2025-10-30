@@ -11,7 +11,7 @@ import { subscribeToNotifications } from '@/lib/notifications/subscribe'
 import { useRouter } from 'next/navigation'
 
 type Item = {
-  id: string
+  id: string | number
   type: string
   title: string | null
   body: string | null
@@ -19,6 +19,10 @@ type Item = {
   is_read: boolean
   workspace_id?: string | null
   ref_id?: string | null
+  thread_id?: string | null
+  message_id?: string | null
+  task_id?: string | null
+  project_id?: string | null
 }
 
 export default function NotificationBell() {
@@ -36,15 +40,55 @@ export default function NotificationBell() {
   const loadMoreRef = useRef<HTMLLIElement | null>(null)
 
   const load = useCallback(async () => {
-    if (!user?.id) return
+    if (!user?.id) {
+      console.log('[notification-bell] No user ID, skipping load')
+      return
+    }
+    
+    console.log('[notification-bell] Loading notifications for user', user.id)
+    
     try {
       const res = await fetch(`/api/notifications?limit=15`, { cache: 'no-store' })
       const json = await res.json()
+      
+      console.log('[notification-bell] API response', { ok: res.ok, itemCount: json.items?.length, json })
+      
       if (!res.ok) throw new Error(json?.error || 'Failed to load notifications')
-      setItems(json.items as Item[])
+      
+      // Log each item to see what's wrong
+      console.log('[notification-bell] Raw items:', json.items)
+      json.items?.forEach((item: any, index: number) => {
+        console.log(`[notification-bell] Item ${index}:`, {
+          hasItem: !!item,
+          hasId: !!item?.id,
+          idType: typeof item?.id,
+          idValue: item?.id,
+          fullItem: item
+        })
+      })
+      
+      // Filter out invalid notifications and convert ID to string if needed
+      const validItems = (json.items as Item[]).map((item) => {
+        // Convert numeric ID to string
+        if (item && item.id && typeof item.id === 'number') {
+          return { ...item, id: String(item.id) }
+        }
+        return item
+      }).filter((item) => {
+        const isValid = item && item.id && (typeof item.id === 'string' || typeof item.id === 'number')
+        if (!isValid) {
+          console.warn('[notification-bell] Filtering out invalid item:', item)
+        }
+        return isValid
+      })
+      
+      console.log('[notification-bell] Setting items', { total: json.items?.length, valid: validItems.length })
+      
+      setItems(validItems)
       setCursor(json.nextCursor)
       setHasMore(!!json.nextCursor)
     } catch (e: any) {
+      console.error('[notification-bell] Failed to load notifications', e)
       toast.error(e?.message ?? 'Failed to load notifications')
     }
   }, [user?.id])
@@ -56,7 +100,17 @@ export default function NotificationBell() {
       const res = await fetch(`/api/notifications?limit=15&cursor=${encodeURIComponent(cursor)}`, { cache: 'no-store' })
       const json = await res.json()
       if (!res.ok) throw new Error(json?.error || 'Failed to load more notifications')
-      setItems((prev) => [...prev, ...json.items])
+      
+      // Filter out invalid notifications and convert ID to string if needed
+      const validItems = (json.items as Item[]).map((item) => {
+        // Convert numeric ID to string
+        if (item && item.id && typeof item.id === 'number') {
+          return { ...item, id: String(item.id) }
+        }
+        return item
+      }).filter((item) => item && item.id && (typeof item.id === 'string' || typeof item.id === 'number'))
+      
+      setItems((prev) => [...prev, ...validItems])
       setCursor(json.nextCursor)
       setHasMore(!!json.nextCursor)
     } catch (e: any) {
@@ -72,6 +126,27 @@ export default function NotificationBell() {
     setHasMore(true)
     if (user?.id) load()
   }, [user?.id, load])
+
+  // Polling fallback - refresh notifications every 10 seconds when bell is open
+  useEffect(() => {
+    if (!open || !user?.id) return
+    
+    console.log('[notification-bell] Starting polling (bell is open)')
+    
+    // Immediate load when opening
+    load()
+    
+    // Poll every 10 seconds
+    const interval = setInterval(() => {
+      console.log('[notification-bell] Polling for new notifications')
+      load()
+    }, 10000)
+    
+    return () => {
+      console.log('[notification-bell] Stopping polling (bell closed)')
+      clearInterval(interval)
+    }
+  }, [open, user?.id, load])
 
   // Infinite scroll observer
   useEffect(() => {
@@ -117,14 +192,52 @@ export default function NotificationBell() {
 
   useEffect(() => {
     if (!user?.id || subscribed.current) return
+    
+    console.log('[notification-bell] Setting up real-time subscription for user', user.id)
+    
     const unsubscribe = subscribeToNotifications(supabase as any, user.id, (p) => {
-      setItems((prev) => ([
-        { id: p.id, type: (p.type ?? 'message_new') as string, title: p.title ?? null, body: p.body ?? null, created_at: p.created_at, is_read: false },
-        ...prev,
-      ]).slice(0, 15))
+      // Validate incoming notification
+      if (!p || !p.id || typeof p.id !== 'string') {
+        console.error('[real-time-notification] Invalid notification received', p)
+        return
+      }
+      
+      console.log('[notification-bell] Received real-time notification', p)
+      
+      setItems((prev) => {
+        // Check if notification already exists
+        if (prev.some((item) => item.id === p.id)) {
+          console.log('[notification-bell] Notification already exists, skipping', p.id)
+          return prev
+        }
+        
+        console.log('[notification-bell] Adding new notification to list', p.id)
+        
+        return ([
+          { 
+            id: p.id, 
+            type: (p.type ?? 'message_new') as string, 
+            title: p.title ?? null, 
+            body: p.body ?? null, 
+            created_at: p.created_at, 
+            is_read: false,
+            workspace_id: p.workspace_id ?? null,
+            ref_id: p.ref_id ?? null,
+            thread_id: p.thread_id ?? null,
+            message_id: p.message_id ?? null,
+            task_id: p.task_id ?? null,
+            project_id: p.project_id ?? null,
+          },
+          ...prev,
+        ]).slice(0, 15)
+      })
     })
+    
     subscribed.current = true
+    console.log('[notification-bell] Real-time subscription active')
+    
     return () => {
+      console.log('[notification-bell] Cleaning up real-time subscription')
       unsubscribe()
       subscribed.current = false
     }
@@ -162,38 +275,102 @@ export default function NotificationBell() {
   }
 
   const markRead = async (id: string) => {
+    // Validate ID before sending
+    if (!id || typeof id !== 'string' || !id.trim()) {
+      console.error('[mark-read] Invalid notification ID', { id })
+      return
+    }
+
     const prev = items
     setItems((cur) => cur.map((n) => (n.id === id ? { ...n, is_read: true } : n)))
     try {
-      const res = await fetch('/api/notifications/mark-read', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ids: [id] }) })
+      const res = await fetch('/api/notifications/mark-read', { 
+        method: 'POST', 
+        headers: { 'Content-Type': 'application/json' }, 
+        body: JSON.stringify({ ids: [id] }) 
+      })
       const json = await res.json()
-      if (!res.ok) throw new Error(json?.error || 'Failed to mark read')
+      if (!res.ok) {
+        console.error('[mark-read] API error', { status: res.status, json })
+        throw new Error(json?.error || 'Failed to mark read')
+      }
     } catch (e: any) {
+      console.error('[mark-read] Failed to mark notification as read', e)
       toast.error(e?.message ?? 'Failed to mark read')
       setItems(prev)
     }
   }
 
   const onClickItem = async (n: Item) => {
-    await markRead(n.id)
-    switch (n.type) {
-      case 'message':
-      case 'message_new':
-      case 'message_mention':
-        if (n.workspace_id && n.ref_id) router.push(`/workspaces/${n.workspace_id}/messages?thread=${n.ref_id}`)
-        break
-      case 'task_assigned':
-      case 'task_update':
-        router.push(`/projects`)
-        break
-      case 'invite':
-      case 'workspace_invite':
-        if (n.workspace_id) router.push(`/workspaces/${n.workspace_id}`)
-        else router.push('/workspaces')
-        break
-      default:
-        break
+    // Validate notification data
+    if (!n) {
+      console.error('[notification-click] Notification is null or undefined')
+      toast.error('Invalid notification')
+      return
     }
+
+    if (!n.id || typeof n.id !== 'string' || !n.id.trim()) {
+      console.error('[notification-click] Invalid notification ID', { notification: n })
+      toast.error('Invalid notification ID')
+      return
+    }
+
+    // Mark as read (with validation inside)
+    await markRead(n.id)
+    
+    try {
+      switch (n.type) {
+        case 'message':
+        case 'message_new':
+        case 'message_mention':
+          // Try multiple fields to find the thread ID (ref_id, thread_id)
+          const threadId = n.ref_id || n.thread_id
+          const workspaceId = n.workspace_id
+          
+          // Validate required fields for message notifications
+          if (workspaceId && typeof workspaceId === 'string' && workspaceId.trim() &&
+              threadId && typeof threadId === 'string' && threadId.trim()) {
+            router.push(`/workspaces/${workspaceId}/messages?thread=${threadId}`)
+          } else {
+            console.warn('[notification-click] Missing workspace_id or thread_id for message notification', {
+              workspace_id: n.workspace_id,
+              ref_id: n.ref_id,
+              thread_id: n.thread_id,
+              full: n
+            })
+            toast.error('Cannot open message - missing information')
+          }
+          break
+        case 'task_assigned':
+        case 'task_update':
+          // Try to navigate to specific task if we have the IDs
+          const taskWorkspaceId = n.workspace_id
+          const taskProjectId = n.project_id
+          const taskId = n.task_id || n.ref_id
+          
+          if (taskWorkspaceId && taskProjectId && taskId) {
+            router.push(`/workspaces/${taskWorkspaceId}/projects/${taskProjectId}?task=${taskId}`)
+          } else {
+            router.push(`/projects`)
+          }
+          break
+        case 'invite':
+        case 'workspace_invite':
+          if (n.workspace_id && typeof n.workspace_id === 'string' && n.workspace_id.trim()) {
+            router.push(`/workspaces/${n.workspace_id}`)
+          } else {
+            router.push('/workspaces')
+          }
+          break
+        default:
+          console.log('[notification-click] Unknown notification type', n.type)
+          break
+      }
+    } catch (error) {
+      console.error('[notification-click] Navigation error', error)
+      toast.error('Failed to open notification')
+    }
+    
     setOpen(false)
   }
 
@@ -214,9 +391,25 @@ export default function NotificationBell() {
     }
   }
 
+  // Debug: Log state changes
+  useEffect(() => {
+    console.log('[notification-bell] State updated', { 
+      itemsCount: items.length, 
+      unread, 
+      items: items.slice(0, 3) // Log first 3 items
+    })
+  }, [items, unread])
+
   return (
     <div className="relative" ref={containerRef}>
-      <button aria-label="Notifications" className="relative p-2 rounded-md hover:bg-accent text-foreground transition-colors" onClick={() => setOpen((v) => !v)}>
+      <button 
+        aria-label="Notifications" 
+        className="relative p-2 rounded-md hover:bg-accent text-foreground transition-colors" 
+        onClick={() => {
+          console.log('[notification-bell] Bell clicked, current state:', { itemsCount: items.length, unread, open: !open })
+          setOpen((v) => !v)
+        }}
+      >
         <Bell className="w-5 h-5" />
         {unread > 0 && (
           <span className="absolute -top-1 -right-1 min-w-4 h-4 px-1 rounded-full bg-red-600 text-[10px] leading-4 text-white text-center font-medium">
@@ -226,10 +419,21 @@ export default function NotificationBell() {
       </button>
 
       {open && (
-        <div ref={scrollContainerRef} className="absolute right-0 mt-2 w-[360px] max-h-[480px] overflow-auto rounded-xl border border-border bg-card shadow-lg z-50">
+        <div ref={scrollContainerRef} className="fixed sm:absolute right-0 sm:right-0 left-0 sm:left-auto top-14 sm:top-auto sm:mt-2 w-full sm:w-[360px] max-h-[calc(100vh-4rem)] sm:max-h-[480px] overflow-auto rounded-none sm:rounded-xl border-t sm:border border-border bg-card shadow-lg z-50">
           <div className="flex items-center justify-between px-4 py-3 border-b border-border">
             <div className="text-sm font-semibold text-foreground">Notifications</div>
             <div className="flex items-center gap-2">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-8 text-xs rounded-lg"
+                onClick={() => {
+                  console.log('[notification-bell] Manual refresh triggered')
+                  load()
+                }}
+              >
+                Refresh
+              </Button>
               <Button
                 variant="ghost"
                 size="sm"
@@ -254,7 +458,7 @@ export default function NotificationBell() {
             <div className="p-4 text-sm text-muted-foreground text-center">No notifications</div>
           ) : (
             <ul className="divide-y divide-border">
-              {items.map((n) => (
+              {items.filter((n) => n && n.id).map((n) => (
                 <li key={n.id} className={`px-4 py-3 hover:bg-accent cursor-pointer transition-colors ${n.is_read ? 'opacity-60' : ''}`} onClick={() => onClickItem(n)}>
                   <div className="flex items-start gap-3">
                     <div className={`mt-1.5 w-2 h-2 rounded-full flex-shrink-0 ${n.is_read ? 'bg-muted-foreground' : 'bg-blue-500'}`} />
@@ -274,16 +478,42 @@ export default function NotificationBell() {
                             onClick={async (e) => {
                               e.stopPropagation()
                               try {
+                                // Build payload - only include fields with valid values
+                                const payload: Record<string, string> = {}
+                                
+                                // Always include notificationId if available
+                                if (n.id && typeof n.id === 'string' && n.id.trim()) {
+                                  payload.notificationId = n.id
+                                }
+                                
+                                // Include workspaceId if available
+                                const wsId = n.workspace_id || n.ref_id
+                                if (wsId && typeof wsId === 'string' && wsId.trim()) {
+                                  payload.workspaceId = wsId
+                                }
+                                
                                 const res = await fetch('/api/workspaces/invitations/accept', {
                                   method: 'POST',
                                   headers: { 'Content-Type': 'application/json' },
-                                  body: JSON.stringify({ workspaceId: n.workspace_id, notificationId: n.id }),
+                                  body: JSON.stringify(payload),
                                 })
                                 const json = await res.json()
-                                if (!res.ok) throw new Error(json?.error || 'Failed to accept invitation')
-                                await markRead(n.id)
+                                if (!res.ok) {
+                                  // Surface server error in console for debugging
+                                  // eslint-disable-next-line no-console
+                                  console.error('[accept-invite] client error', { status: res.status, json })
+                                  throw new Error(json?.error || 'Failed to accept invitation')
+                                }
+                                // Remove notification from list immediately
+                                setItems((prev) => prev.filter((item) => item.id !== n.id))
                                 toast.success('Invitation accepted')
+                                // Reload to refresh workspace data
+                                setTimeout(() => {
+                                  router.refresh()
+                                }, 500)
                               } catch (err: any) {
+                                // eslint-disable-next-line no-console
+                                console.error('[accept-invite] client catch', err)
                                 toast.error(err?.message ?? 'Failed to accept invitation')
                               }
                             }}
@@ -297,16 +527,37 @@ export default function NotificationBell() {
                             onClick={async (e) => {
                               e.stopPropagation()
                               try {
+                                // Build payload - only include fields with valid values
+                                const payload2: Record<string, string> = {}
+                                
+                                // Always include notificationId if available
+                                if (n.id && typeof n.id === 'string' && n.id.trim()) {
+                                  payload2.notificationId = n.id
+                                }
+                                
+                                // Include workspaceId if available
+                                const wsId2 = n.workspace_id || n.ref_id
+                                if (wsId2 && typeof wsId2 === 'string' && wsId2.trim()) {
+                                  payload2.workspaceId = wsId2
+                                }
+                                
                                 const res = await fetch('/api/workspaces/invitations/decline', {
                                   method: 'POST',
                                   headers: { 'Content-Type': 'application/json' },
-                                  body: JSON.stringify({ workspaceId: n.workspace_id, notificationId: n.id }),
+                                  body: JSON.stringify(payload2),
                                 })
                                 const json = await res.json()
-                                if (!res.ok) throw new Error(json?.error || 'Failed to decline invitation')
-                                await markRead(n.id)
+                                if (!res.ok) {
+                                  // eslint-disable-next-line no-console
+                                  console.error('[decline-invite] client error', { status: res.status, json })
+                                  throw new Error(json?.error || 'Failed to decline invitation')
+                                }
+                                // Remove notification from list immediately
+                                setItems((prev) => prev.filter((item) => item.id !== n.id))
                                 toast.success('Invitation declined')
                               } catch (err: any) {
+                                // eslint-disable-next-line no-console
+                                console.error('[decline-invite] client catch', err)
                                 toast.error(err?.message ?? 'Failed to decline invitation')
                               }
                             }}

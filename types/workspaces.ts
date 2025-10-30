@@ -26,6 +26,7 @@ export type Message = {
   author_id: string
   body: string
   created_at: string
+  updated_at?: string
 }
 
 export type NotificationType = 'message' | 'task_assigned' | 'invite' | 'task_update'
