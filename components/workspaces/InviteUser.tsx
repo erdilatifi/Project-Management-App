@@ -1,8 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { createClient } from "@/utils/supabase/client";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -12,7 +11,6 @@ import { Mail } from "lucide-react";
 type Props = { workspaceId: string };
 
 export function InviteUser({ workspaceId }: Props) {
-  const supabase = useMemo(() => createClient(), []);
   const queryClient = useQueryClient();
   const [email, setEmail] = useState("");
 
@@ -27,39 +25,18 @@ export function InviteUser({ workspaceId }: Props) {
         throw new Error('Please enter a valid email address');
       }
 
-      // Check if user exists with this email
-      const { data: authUser } = await supabase
-        .from('auth_users_public')
-        .select('id, email')
-        .eq('email', emailAddress.toLowerCase())
-        .maybeSingle();
-
-      if (!authUser) {
-        throw new Error('No user found with this email. Ask them to sign up first.');
-      }
-
-      // Check if already a member
-      const { data: existing } = await supabase
-        .from('workspace_members')
-        .select('user_id')
-        .eq('workspace_id', workspaceId)
-        .eq('user_id', authUser.id)
-        .maybeSingle();
-
-      if (existing) {
-        throw new Error('This user is already a member of this workspace');
-      }
+      const normalizedEmail = emailAddress.trim().toLowerCase();
 
       // Send invitation
       const res = await fetch('/api/workspaces/invitations', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ workspaceId, userId: authUser.id }),
+        body: JSON.stringify({ workspaceId, email: normalizedEmail }),
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json?.error || 'Failed to send invitation');
-      
-      return emailAddress;
+
+      return normalizedEmail;
     },
     onSuccess: (emailAddress) => {
       toast.success(`Invitation sent to ${emailAddress}`);
@@ -85,7 +62,7 @@ export function InviteUser({ workspaceId }: Props) {
           Invite Team Members
         </label>
         <p className="text-xs text-muted-foreground -mt-2">
-          Enter the email address of the person you want to invite
+          Enter the email address of the person you want to invite.
         </p>
         <div className="flex gap-2">
           <div className="relative flex-1">
@@ -111,7 +88,7 @@ export function InviteUser({ workspaceId }: Props) {
           </Button>
         </div>
         <p className="text-xs text-muted-foreground">
-          💡 The user must have an account. If they don't, ask them to sign up first.
+          The user must already have an account. If they do not, ask them to sign up first.
         </p>
       </form>
     </Card>

@@ -71,9 +71,9 @@ export async function POST(request: NextRequest) {
         .from('profile-images')
         .getPublicUrl(filePath)
 
-      // Update user profile with new avatar URL
+      // Update user profile with new avatar URL in profiles table
       const { data: updateData, error: updateError } = await supabase
-        .from('users')
+        .from('profiles')
         .update({ 
           avatar_url: publicUrl,
           updated_at: new Date().toISOString()

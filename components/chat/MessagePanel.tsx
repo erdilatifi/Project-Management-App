@@ -12,6 +12,7 @@ import { formatTimeAgo } from "@/lib/time";
 
 type Props = { threadId: string; workspaceId: string; title?: string | null; isCreator?: boolean; onTitleUpdated?: (title: string | null) => void };
 type UserLite = { id: string; email: string | null };
+type UserMeta = { label: string | null; email: string | null; avatar_url: string | null };
 
 export default function MessagePanel({ threadId, workspaceId, title: titleProp, isCreator: isCreatorProp, onTitleUpdated }: Props) {
   const supabase = useMemo(() => createClient(), []);
@@ -36,6 +37,53 @@ export default function MessagePanel({ threadId, workspaceId, title: titleProp, 
   const [titleEditing, setTitleEditing] = useState(false);
   const [titleInput, setTitleInput] = useState("");
   const [savingTitle, setSavingTitle] = useState(false);
+
+  const fetchUserMeta = useCallback(
+    async (userIds: string[]): Promise<Record<string, UserMeta>> => {
+      const unique = Array.from(new Set(userIds.filter((id) => !!id)));
+      if (!unique.length) return {};
+      try {
+        const { data: profs } = await supabase
+          .from("profiles")
+          .select("id, email, avatar_url, username, full_name")
+          .in("id", unique);
+        const meta: Record<string, UserMeta> = {};
+        ((profs ?? []) as any[]).forEach((row) => {
+          const id = String(row.id);
+          const username = (row.username as string | null) ?? null;
+          const fullName = (row.full_name as string | null) ?? null;
+          const email = (row.email as string | null) ?? null;
+          const label =
+            username?.trim() ||
+            fullName?.trim() ||
+            email?.trim() ||
+            null;
+          meta[id] = {
+            label,
+            email: email?.trim() ?? null,
+            avatar_url: (row.avatar_url as string | null) ?? null,
+          };
+        });
+        return meta;
+      } catch {
+        const { data: profs } = await supabase
+          .from("profiles")
+          .select("id, email, avatar_url")
+          .in("id", unique);
+        const meta: Record<string, UserMeta> = {};
+        (profs ?? []).forEach((row: any) => {
+          const id = String(row.id);
+          meta[id] = {
+            label: (row.email as string | null) ?? null,
+            email: (row.email as string | null) ?? null,
+            avatar_url: (row.avatar_url as string | null) ?? null,
+          };
+        });
+        return meta;
+      }
+    },
+    [supabase]
+  );
 
   // Title update mutation with optimistic UI
   const updateTitleMutation = useMutation({
@@ -134,42 +182,13 @@ export default function MessagePanel({ threadId, workspaceId, title: titleProp, 
     const ids = Array.from(new Set(messagesQ.data.map((m) => m.author_id)));
     if (ids.length) {
       (async () => {
-        try {
-          const [{ data: authUsers }, { data: appUsers }, { data: profs } ] = await Promise.all([
-            (supabase as any).from("auth_users_public").select("id, email").in("id", ids),
-            supabase.from("users").select("id, username, display_name").in("id", ids),
-            supabase.from("profiles").select("id, username").in("id", ids),
-          ]);
-          const appMap: Record<string, { username: string | null; display: string | null }> = Object.fromEntries(
-            ((appUsers ?? []) as any[]).map((x) => [
-              String(x.id),
-              { username: (x.username as string | null) ?? null, display: (x.display_name as string | null) ?? null },
-            ])
-          );
-          const profMap: Record<string, { username: string | null }> = Object.fromEntries(
-            ((profs ?? []) as any[]).map((x) => [String(x.id), { username: (x.username as string | null) ?? null }])
-          );
-          const map: Record<string, UserLite> = {};
-          ((authUsers ?? []) as any[]).forEach((u) => {
-            const id = String(u.id);
-            const label =
-              profMap[id]?.username?.trim() ||
-              appMap[id]?.username?.trim() ||
-              appMap[id]?.display?.trim() ||
-              (u.email as string | null);
-            map[id] = { id, email: label ?? null };
-          });
-          setAuthors(map);
-        } catch {
-          // fallback: only emails
-          const { data: authUsers } = await (supabase as any)
-            .from("auth_users_public")
-            .select("id, email")
-            .in("id", ids);
-          const map: Record<string, UserLite> = {};
-          (authUsers ?? []).forEach((u: any) => (map[u.id] = { id: u.id, email: u.email }));
-          setAuthors(map);
-        }
+      const meta = await fetchUserMeta(ids);
+      const map: Record<string, UserLite> = {};
+      ids.forEach((id) => {
+        const info = meta[id];
+        map[id] = { id, email: info?.label ?? info?.email ?? null };
+      });
+      setAuthors(map);
       })();
     } else {
       setAuthors({});
@@ -183,7 +202,19 @@ export default function MessagePanel({ threadId, workspaceId, title: titleProp, 
       .from("thread_participants")
       .select("user_id, is_admin")
       .eq("thread_id", threadId);
-    if (error) return;
+    if (error) {
+      console.error("[message-panel] Failed to load participants", {
+        threadId,
+        error,
+      });
+      return;
+    }
+
+    console.log("[message-panel] Loaded participants", {
+      threadId,
+      count: tp?.length ?? 0,
+      participants: tp,
+    });
 
     const ids = Array.from(new Set((tp ?? []).map((r: any) => r.user_id as string)));
 
@@ -191,11 +222,17 @@ export default function MessagePanel({ threadId, workspaceId, title: titleProp, 
     const { data: u } = await supabase.auth.getUser();
     const uid = u.user?.id;
 
-    const { data: thr } = await supabase
+    const { data: thr, error: threadErr } = await supabase
       .from("message_threads")
       .select("created_by, title")
       .eq("id", threadId)
       .maybeSingle<{ created_by: string | null; title: string | null }>();
+    if (threadErr) {
+      console.error("[message-panel] Failed to load thread metadata", {
+        threadId,
+        error: threadErr,
+      });
+    }
 
     if (thr?.created_by) {
       setCreatorId(thr.created_by);
@@ -208,70 +245,22 @@ export default function MessagePanel({ threadId, workspaceId, title: titleProp, 
     setCanManage(isCreatorProp ?? !!manage);
 
     if (ids.length) {
-      let authUsers: any[] | null = null;
-      let appUsers: any[] | null = null;
-      let profs: any[] | null = null;
-      try {
-        const res = await Promise.all([
-          (supabase as any).from("auth_users_public").select("id, email").in("id", ids),
-          supabase.from("users").select("id, username, display_name").in("id", ids),
-          supabase.from("profiles").select("id, avatar_url, username, full_name").in("id", ids),
-        ]);
-        authUsers = (res[0].data as any[]) ?? null;
-        appUsers = (res[1].data as any[]) ?? null;
-        profs = (res[2].data as any[]) ?? null;
-      } catch {
-        const res = await Promise.all([
-          (supabase as any).from("auth_users_public").select("id, email").in("id", ids),
-          supabase.from("profiles").select("id, avatar_url, username, full_name").in("id", ids),
-        ]);
-        authUsers = (res[0].data as any[]) ?? null;
-        appUsers = null;
-        profs = (res[1].data as any[]) ?? null;
-      }
-      const emailMapRaw: Record<string, string | null> = Object.fromEntries(
-        ((authUsers ?? []) as any[]).map((x) => [String(x.id), (x.email as string | null) ?? null])
-      );
-      const appMap: Record<string, { username: string | null; display: string | null }> = Object.fromEntries(
-        ((appUsers ?? []) as any[]).map((x) => [
-          String(x.id),
-          { username: (x.username as string | null) ?? null, display: (x.display_name as string | null) ?? null },
-        ])
-      );
-      const profMap: Record<string, { username: string | null; full_name: string | null }> = Object.fromEntries(
-        ((profs ?? []) as any[]).map((x) => [
-          String(x.id),
-          { username: (x.username as string | null) ?? null, full_name: (x.full_name as string | null) ?? null },
-        ])
-      );
-      const labelMap: Record<string, string | null> = {};
-      Object.keys({ ...emailMapRaw, ...appMap, ...profMap }).forEach((id) => {
-        labelMap[id] =
-          profMap[id]?.username?.trim() ||
-          appMap[id]?.username?.trim() ||
-          appMap[id]?.display?.trim() ||
-          profMap[id]?.full_name?.trim() ||
-          emailMapRaw[id]?.trim() ||
-          null;
-      });
-      const avatarMap: Record<string, string | null> = Object.fromEntries(
-        ((profs ?? []) as any[]).map((x) => [String(x.id), (x.avatar_url as string | null) ?? null])
-      );
+      const meta = await fetchUserMeta(ids);
       const adminMap: Record<string, boolean> = Object.fromEntries(
         ((tp ?? []) as any[]).map((x) => [String(x.user_id), !!x.is_admin])
       );
       setParticipants(
         ids.map((id) => ({
           id,
-          email: labelMap[String(id)] ?? null,
-          avatar_url: avatarMap[String(id)] ?? null,
+          email: meta[id]?.label ?? meta[id]?.email ?? null,
+          avatar_url: meta[id]?.avatar_url ?? null,
           is_admin: !!adminMap[String(id)],
         }))
       );
     } else {
       setParticipants([]);
     }
-  }, [supabase, threadId, isCreatorProp]);
+  }, [supabase, threadId, isCreatorProp, fetchUserMeta]);
 
   useEffect(() => {
     loadParticipants();
@@ -379,46 +368,19 @@ export default function MessagePanel({ threadId, workspaceId, title: titleProp, 
     const ids = Array.from(typingIds).filter((id) => !typingEmails[id]);
     if (!ids.length) return;
     (async () => {
-      try {
-        const [{ data: authUsers }, { data: appUsers }, { data: profs }] = await Promise.all([
-          supabase.from("auth_users_public").select("id, email").in("id", ids),
-          supabase.from("users").select("id, username, display_name").in("id", ids),
-          supabase.from("profiles").select("id, username").in("id", ids),
-        ]);
-        const appMap: Record<string, { username: string | null; display: string | null }> = Object.fromEntries(
-          ((appUsers ?? []) as any[]).map((x) => [
-            String(x.id),
-            { username: (x.username as string | null) ?? null, display: (x.display_name as string | null) ?? null },
-          ])
-        );
-        const profMap: Record<string, { username: string | null }> = Object.fromEntries(
-          ((profs ?? []) as any[]).map((x) => [String(x.id), { username: (x.username as string | null) ?? null }])
-        );
-        setTypingEmails((cur) => {
-          const next = { ...cur } as Record<string, string>;
-          ((authUsers ?? []) as any[]).forEach((u) => {
-            const id = String(u.id);
-            const label =
-              profMap[id]?.username?.trim() ||
-              appMap[id]?.username?.trim() ||
-              appMap[id]?.display?.trim() ||
-              (u.email as string | null);
-            if (id && label) next[id] = label;
-          });
-          return next;
+      const meta = await fetchUserMeta(ids);
+      setTypingEmails((cur) => {
+        const next = { ...cur } as Record<string, string>;
+        ids.forEach((id) => {
+          const info = meta[id];
+          if (!info) return;
+          const label = info.label ?? info.email;
+          if (label) next[id] = label;
         });
-      } catch {
-        const { data } = await supabase.from("auth_users_public").select("id, email").in("id", ids);
-        setTypingEmails((cur) => {
-          const next = { ...cur } as Record<string, string>;
-          (data ?? []).forEach((u: any) => {
-            if (u.id && u.email) next[u.id] = u.email;
-          });
-          return next;
-        });
-      }
+        return next;
+      });
     })();
-  }, [supabase, typingIds, typingEmails]);
+  }, [fetchUserMeta, typingIds, typingEmails]);
 
   // realtime messages - update query cache for INSERT, UPDATE, DELETE
   useEffect(() => {
@@ -438,32 +400,15 @@ export default function MessagePanel({ threadId, workspaceId, title: titleProp, 
           });
           
           // Fetch author info if not already present
-          if (!authors[m.author_id]) {
-            (async () => {
-              try {
-                const [{ data: authRow }, { data: appRow }] = await Promise.all([
-                  (supabase as any)
-                    .from("auth_users_public")
-                    .select("id, email")
-                    .eq("id", m.author_id)
-                    .maybeSingle(),
-                  supabase.from("users").select("id, username, display_name").eq("id", m.author_id).maybeSingle(),
-                ]);
-                const id = (authRow?.id ?? appRow?.id) as string | undefined;
-                if (id) {
-                  const label = (appRow?.username?.trim() || appRow?.display_name?.trim() || authRow?.email?.trim() || null) as string | null;
-                  setAuthors((c2) => ({ ...c2, [id]: { id, email: label } }));
+            if (!authors[m.author_id]) {
+              (async () => {
+                const meta = await fetchUserMeta([m.author_id]);
+                const info = meta[m.author_id];
+                if (info) {
+                  setAuthors((c2) => ({ ...c2, [m.author_id]: { id: m.author_id, email: info.label ?? info.email ?? null } }));
                 }
-              } catch {
-                const { data: authRow } = await (supabase as any)
-                  .from("auth_users_public")
-                  .select("id, email")
-                  .eq("id", m.author_id)
-                  .maybeSingle();
-                if (authRow) setAuthors((c2) => ({ ...c2, [authRow.id]: { id: authRow.id, email: authRow.email } }));
-              }
-            })();
-          }
+              })();
+            }
           
           setTimeout(scrollToBottom, 0);
         }
@@ -511,51 +456,23 @@ export default function MessagePanel({ threadId, workspaceId, title: titleProp, 
           if (payload.eventType === "INSERT") {
             const uid = (payload.new as any).user_id as string;
             (async () => {
-              try {
-                const [{ data: authRow }, { data: appRow }, { data: profRow }] = await Promise.all([
-                  (supabase as any).from("auth_users_public").select("id, email").eq("id", uid).maybeSingle(),
-                  supabase.from("users").select("id, username, display_name").eq("id", uid).maybeSingle(),
-                  supabase.from("profiles").select("id, avatar_url, username, full_name").eq("id", uid).maybeSingle(),
-                ]);
-                const isAdmin = !!(payload.new as any).is_admin;
-                if (authRow || appRow) {
-                  setParticipants((cur) =>
-                    cur.find((p) => p.id === uid)
-                      ? cur
-                      : [
-                          ...cur,
-                          {
-                            id: (authRow?.id ?? appRow?.id) as string,
-                            email: (
-                              (profRow?.username?.trim() as string | undefined) ||
-                              (appRow?.username?.trim() as string | undefined) ||
-                              (appRow?.display_name?.trim() as string | undefined) ||
-                              (profRow?.full_name?.trim() as string | undefined) ||
-                              (authRow?.email?.trim() as string | undefined) ||
-                              null
-                            ) as string | null,
-                            avatar_url: profRow?.avatar_url ?? null,
-                            is_admin: isAdmin,
-                          },
-                        ]
-                  );
-                }
-              } catch {
-                const [{ data: authRow }, { data: profRow }] = await Promise.all([
-                  (supabase as any).from("auth_users_public").select("id, email").eq("id", uid).maybeSingle(),
-                  supabase.from("profiles").select("id, avatar_url, username, full_name").eq("id", uid).maybeSingle(),
-                ]);
-                const isAdmin = !!(payload.new as any).is_admin;
-                if (authRow) {
-                  setParticipants((cur) =>
-                    cur.find((p) => p.id === uid)
-                      ? cur
-                      : [
-                          ...cur,
-                          { id: authRow.id, email: (profRow?.username?.trim() || profRow?.full_name?.trim() || authRow.email), avatar_url: profRow?.avatar_url ?? null, is_admin: isAdmin },
-                        ]
-                  );
-                }
+              const meta = await fetchUserMeta([uid]);
+              const info = meta[uid];
+              const isAdmin = !!(payload.new as any).is_admin;
+              if (info) {
+                setParticipants((cur) =>
+                  cur.find((p) => p.id === uid)
+                    ? cur
+                    : [
+                        ...cur,
+                        {
+                          id: uid,
+                          email: info.label ?? info.email ?? null,
+                          avatar_url: info.avatar_url ?? null,
+                          is_admin: isAdmin,
+                        },
+                      ]
+                );
               }
             })();
           } else if (payload.eventType === "DELETE") {

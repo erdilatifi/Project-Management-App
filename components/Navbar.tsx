@@ -16,10 +16,7 @@ type ProfileRow = {
   full_name: string | null;
   avatar_url: string | null;
 };
-type AppUserRow = {
-  username: string | null;
-  display_name: string | null;
-};
+// AppUserRow removed - users table no longer exists
 
 const Navbar = () => {
   const router = useRouter();
@@ -35,7 +32,6 @@ const Navbar = () => {
 
   // User profile data from database
   const [profile, setProfile] = useState<ProfileRow | null>(null);
-  const [appUser, setAppUser] = useState<AppUserRow | null>(null);
   const [profileLoading, setProfileLoading] = useState(false);
   const [avatarSalt, setAvatarSalt] = useState<number>(Date.now()); // Cache buster for avatar updates
 
@@ -78,18 +74,6 @@ const Navbar = () => {
         prof = data ? { username: null, full_name: data.full_name ?? null, avatar_url: data.avatar_url ?? null } : null;
       }
       setProfile(prof);
-
-      // Fetch from users table as fallback for display name
-      try {
-        const { data: app } = await supabase
-          .from('users')
-          .select('username, display_name')
-          .eq('id', uid)
-          .maybeSingle<AppUserRow>();
-        setAppUser(app ?? null);
-      } catch {
-        setAppUser(null);
-      }
     } finally {
       setProfileLoading(false);
     }
@@ -97,7 +81,7 @@ const Navbar = () => {
 
   useEffect(() => {
     if (user?.id) fetchProfile(user.id);
-    else { setProfile(null); setAppUser(null); }
+    else { setProfile(null); }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id]);
 
@@ -132,31 +116,8 @@ const Navbar = () => {
     )
     .subscribe();
 
-  const userChannel = supabase
-    .channel('navbar-users')
-    .on(
-      'postgres_changes',
-      {
-        event: '*',
-        schema: 'public',
-        table: 'users',
-        filter: `id=eq.${user.id}`,
-      },
-      (payload) => {
-        const deleted = payload.eventType === 'DELETE' || !payload.new;
-        if (deleted) {
-          setAppUser(null);
-          return;
-        }
-        const next = payload.new as AppUserRow & { id: string };
-        setAppUser({ username: (next as any).username ?? null, display_name: (next as any).display_name ?? null });
-      }
-    )
-    .subscribe();
-
   return () => {
     supabase.removeChannel(profChannel);
-    supabase.removeChannel(userChannel);
   };
 }, [user?.id, supabase]);
 
@@ -189,16 +150,14 @@ const Navbar = () => {
     { name: 'Profile', path: '/profile' },
   ];
 
-  // Determine display name with fallback priority: username > display_name > full_name > email
+  // Determine display name with fallback priority: username > full_name > email
   const displayName = useMemo(
     () =>
       profile?.username?.trim() ||
-      appUser?.username?.trim() ||
-      appUser?.display_name?.trim() ||
       profile?.full_name?.trim() ||
       user?.email?.split('@')[0] ||
       '',
-    [profile?.username, profile?.full_name, appUser?.username, appUser?.display_name, user?.email]
+    [profile?.username, profile?.full_name, user?.email]
   );
 
   // Navigation item with animated underline on hover and active state

@@ -16,33 +16,30 @@ export async function GET(req: Request) {
     // Validate and sanitize search query
     const url = new URL(req.url)
     const rawQuery = url.searchParams.get('q') || ''
-    const q = sanitizeSearchQuery(rawQuery).toLowerCase()
+    const q = sanitizeSearchQuery(rawQuery)
     
     if (!q || q.length < 2) {
       return NextResponse.json([], { status: 200 })
     }
 
-    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
-    if (!serviceKey) return NextResponse.json({ error: 'Service key not configured' }, { status: 500 })
+    // Search profiles by email using profiles.email column
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('id, email')
+      .ilike('email', `%${q}%`)
+      .not('email', 'is', null)
+      .limit(10)
 
-    const admin = createAdminClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, serviceKey)
-
-    // Scan users and filter by search query
-    const out: Array<{ id: string; email: string }> = []
-    const perPage = 50
-    
-    // Search through first two pages
-    for (let page = 1; page <= 2 && out.length < 10; page++) {
-      const { data } = await admin.auth.admin.listUsers({ page, perPage })
-      const matches = (data?.users ?? []).filter((u) => (u.email || '').toLowerCase().includes(q))
-      for (const u of matches) {
-        if (u.id && u.email && !out.some((x) => x.id === u.id)) {
-          out.push({ id: u.id, email: u.email })
-        }
-        if (out.length >= 10) break
-      }
+    if (error) {
+      return NextResponse.json({ error: 'Search failed' }, { status: 500 })
     }
-    return NextResponse.json(out.slice(0, 10))
+
+    const out = ((data ?? []) as Array<{ id: string; email: string | null }>)
+      .filter((u) => !!u.email && !!u.id)
+      .map((u) => ({ id: u.id, email: u.email! }))
+      .slice(0, 10)
+
+    return NextResponse.json(out)
   } catch (e) {
     return NextResponse.json({ error: 'Search failed' }, { status: 500 })
   }

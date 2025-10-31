@@ -54,7 +54,22 @@ const threadsQ = useQuery({
       .from('thread_participants')
       .select('thread_id')
       .eq('user_id', userId)
-    if (participantIdsRes.error) throw new Error(participantIdsRes.error.message)
+    if (participantIdsRes.error) {
+      console.error('[thread-list] Failed to load participant thread ids', {
+        workspaceId,
+        userId,
+        error: participantIdsRes.error,
+        message: participantIdsRes.error?.message,
+        details: participantIdsRes.error?.details,
+      })
+      throw new Error(participantIdsRes.error.message)
+    }
+    console.log('[thread-list] Loaded participant thread ids', {
+      workspaceId,
+      userId,
+      count: participantIdsRes.data?.length ?? 0,
+      threadIds: participantIdsRes.data?.map((row: any) => row.thread_id),
+    })
     const ids = (participantIdsRes.data ?? []).map((r: any) => r.thread_id as string)
 
     // Build OR filter: created_by = me OR id IN (my participant threads)
@@ -77,9 +92,24 @@ const threadsQ = useQuery({
     }
 
     const { data, error } = await q
-    if (error) throw new Error(error.message)
+    if (error) {
+      console.error('[thread-list] Failed to load threads', {
+        workspaceId,
+        userId,
+        filter: orFilter,
+        cursor,
+        error,
+      })
+      throw new Error(error.message)
+    }
 
     const rows = (data ?? []) as unknown as MessageThread[]
+    console.log('[thread-list] Loaded threads', {
+      workspaceId,
+      userId,
+      count: rows.length,
+      hasMore: rows.length === limit,
+    })
     setHasMore(rows.length === limit)
     return rows
   },
@@ -94,6 +124,9 @@ const threadsQ = useQuery({
   }, [supabase])
 
   useEffect(() => {
+    if (!userId) {
+      return
+    }
     threadsQ.refetch()
   }, [workspaceId, userId, cursor])
 
@@ -142,33 +175,55 @@ const threadsQ = useQuery({
 
   const createMutation = useMutation({
     mutationFn: async ({ title, userIds }: { title: string; userIds: string[] }) => {
-      // Create thread with title
+      const trimmedTitle = title.trim()
+
       const { data: thread, error } = await supabase
         .from('message_threads')
         .insert({
           workspace_id: workspaceId,
-          title: title.trim() || null,
-          created_by: userId
+          title: trimmedTitle || null,
+          created_by: userId,
         })
         .select()
         .single()
-      
+
       if (error) throw error
-      
-      // Add selected participants
-      if (thread && userIds.length > 0) {
-        const threadId = thread.id
-        for (const participantId of userIds) {
-          await supabase
-            .from('thread_participants')
-            .insert({
+      if (!thread) throw new Error('Failed to create thread')
+
+      const threadId: string = (thread as MessageThread).id
+
+      // Ensure the creator is always a participant so last_read_at updates succeed
+      if (userId) {
+        const { error: creatorError } = await supabase
+          .from('thread_participants')
+          .upsert(
+            {
               thread_id: threadId,
-              user_id: participantId,
-              is_admin: false
-            })
-        }
+              user_id: userId,
+              is_admin: true,
+            },
+            { onConflict: 'thread_id,user_id' }
+          )
+
+        if (creatorError) throw creatorError
       }
-      
+
+      const participantPayload = userIds
+        .filter((participantId) => participantId && participantId !== userId)
+        .map((participantId) => ({
+          thread_id: threadId,
+          user_id: participantId,
+          is_admin: false,
+        }))
+
+      if (participantPayload.length) {
+        const { error: participantError } = await supabase
+          .from('thread_participants')
+          .upsert(participantPayload, { onConflict: 'thread_id,user_id' })
+
+        if (participantError) throw participantError
+      }
+
       return thread
     },
     onMutate: async ({ title }: { title: string; userIds: string[] }) => {

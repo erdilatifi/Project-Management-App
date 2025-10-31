@@ -1,11 +1,36 @@
 import { createClient } from '@/utils/supabase/server'
 import { NextResponse } from 'next/server'
+import { createAdminClient } from '@/utils/supabase/admin'
 
 function sanitizeUsername(input: string): string {
   const base = (input || '').toLowerCase().trim().replace(/[^a-z0-9_.-]/g, '');
   const collapsed = base.replace(/\.{2,}/g, '.').replace(/_{2,}/g, '_').replace(/-{2,}/g, '-');
   const trimmed = collapsed.replace(/^[._-]+|[._-]+$/g, '');
   return trimmed.slice(0, 32);
+}
+
+function deriveDisplayName(user: any): string | null {
+  if (!user) return null;
+  const meta = (user as any).user_metadata || {};
+  const candidates = [
+    meta.full_name,
+    meta.name,
+    meta.preferred_username,
+    meta.user_name,
+    meta.username,
+  ];
+  for (const cand of candidates) {
+    if (typeof cand === 'string') {
+      const trimmed = cand.trim();
+      if (trimmed) return trimmed;
+    }
+  }
+  const email: string | undefined = (user.email as string | undefined) ?? (meta.email as string | undefined);
+  if (email && typeof email === 'string') {
+    const local = email.split('@')[0]?.trim();
+    if (local) return local;
+  }
+  return null;
 }
 
 async function ensureUsername(supabase: Awaited<ReturnType<typeof createClient>>) {
@@ -16,22 +41,17 @@ async function ensureUsername(supabase: Awaited<ReturnType<typeof createClient>>
     if (!user) return;
     const uid = user.id;
 
+    const admin = createAdminClient();
+
     // Fetch existing values (do not overwrite if already set)
-    let existingUsername: string | null = null;
     let existingProfileUsername: string | null = null;
-    try {
-      const { data: row } = await supabase
-        .from('users')
-        .select('id, username')
-        .eq('id', uid)
-        .maybeSingle<any>();
-      existingUsername = (row?.username as string | null) ?? null;
-    } catch {}
     let hasProfileRow = false;
+    const meta = (user as any).user_metadata || {};
+    const email: string | null = (user.email as string | null) ?? (meta.email as string | null) ?? null;
     try {
       const { data: prow } = await supabase
         .from('profiles')
-        .select('id, username')
+        .select('id, username, email, full_name')
         .eq('id', uid)
         .maybeSingle<any>();
       existingProfileUsername = (prow?.username as string | null) ?? null;
@@ -39,26 +59,48 @@ async function ensureUsername(supabase: Awaited<ReturnType<typeof createClient>>
     } catch {}
 
     // Ensure a profile row exists for this auth user (non-destructive)
+    // Also ensure email is saved to profiles.email
     if (!hasProfileRow) {
       try {
         await supabase
           .from('profiles')
-          .upsert({ id: uid } as any, { onConflict: 'id' });
+          .upsert({ 
+            id: uid,
+            email: email ? email.toLowerCase() : null
+          } as any, { onConflict: 'id' });
         hasProfileRow = true;
+      } catch {}
+    } else if (email) {
+      // Update email if profile exists but email is missing
+      try {
+        const { data: existingProfile } = await supabase
+          .from('profiles')
+          .select('email')
+          .eq('id', uid)
+          .maybeSingle();
+        if (!existingProfile?.email) {
+          await supabase
+            .from('profiles')
+            .update({ email: email.toLowerCase() } as any)
+            .eq('id', uid);
+        }
       } catch {}
     }
 
-    // If users.username already exists, use it as the canonical value
-    let finalUsername: string | null = existingUsername;
+    // Use profile username if it exists
+    let finalUsername: string | null = existingProfileUsername;
 
     // Otherwise, compute it from metadata (SignUp provided value or provider info)
     if (!finalUsername) {
-      const meta = (user as any).user_metadata || {};
-      const email: string | undefined = user.email || meta.email;
+      const emailForUsername: string | undefined = user.email || meta.email;
       const preferred: string | undefined = meta.preferred_username || meta.user_name || meta.username;
       const name: string | undefined = meta.name || meta.full_name;
 
-      let candidate = preferred || (email ? email.split('@')[0] : undefined) || name || `user_${uid.slice(0, 6)}`;
+      let candidate =
+        preferred ||
+        (emailForUsername ? emailForUsername.split('@')[0] : undefined) ||
+        name ||
+        `user_${uid.slice(0, 6)}`;
       candidate = sanitizeUsername(String(candidate || '')) || `user_${uid.slice(0, 6)}`;
       if (candidate.length < 3) candidate = `${candidate}${Math.random().toString(36).slice(2, 6)}`;
       candidate = sanitizeUsername(candidate);
@@ -73,7 +115,7 @@ async function ensureUsername(supabase: Awaited<ReturnType<typeof createClient>>
       let unique = candidate;
       for (let i = 0; i < 10; i++) {
         const { data: clash, error } = await supabase
-          .from('users')
+          .from('profiles')
           .select('id')
           .eq('username', unique)
           .maybeSingle<any>();
@@ -85,9 +127,6 @@ async function ensureUsername(supabase: Awaited<ReturnType<typeof createClient>>
     }
 
     // Persist only where missing
-    if (!existingUsername && finalUsername) {
-      try { await supabase.from('users').update({ username: finalUsername } as any).eq('id', uid); } catch {}
-    }
     if (!existingProfileUsername && finalUsername) {
       try { await supabase.from('profiles').update({ username: finalUsername } as any).eq('id', uid); } catch {}
     }

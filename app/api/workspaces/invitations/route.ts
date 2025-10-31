@@ -30,9 +30,23 @@ export async function POST(req: Request) {
       return bodyValidation.response
     }
     
-    const { workspaceId, userId, email } = bodyValidation.data
+    const { workspaceId } = bodyValidation.data
+    let { userId, email } = bodyValidation.data
 
     const admin = createAdminClient()
+
+    // Ensure provided email (if any) is valid
+    const requestedEmail = email ? sanitizeEmail(email) : ''
+    if (email && !requestedEmail) {
+      return NextResponse.json({ error: 'Please provide a valid email address' }, { status: 400 })
+    }
+    let targetEmail: string | null = requestedEmail || null
+
+    const normalizeProfileEmail = (value: string | null | undefined) => {
+      if (!value) return null
+      const sanitized = sanitizeEmail(value)
+      return sanitized || null
+    }
 
     // Prevent auto-membership: ensure we do not already have a membership
     const { data: existingMember } = await admin
@@ -45,13 +59,62 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'User is already a member' }, { status: 409 })
     }
 
-    // Resolve invitee email if only userId provided
-    let targetEmail = email ? sanitizeEmail(email) : null
-    if (!targetEmail && userId) {
-      try {
-        const { data: byId } = await (admin as any).auth.admin.getUserById(userId)
-        targetEmail = byId?.user?.email ?? null
-      } catch {}
+    // Resolve invitee identity strictly via profiles table
+    if (userId) {
+      const { data: profile, error: profileErr } = await admin
+        .from('profiles')
+        .select('id, email')
+        .eq('id', userId)
+        .maybeSingle()
+
+      if (profileErr) {
+        console.error('[invite] Failed to resolve profile by id', profileErr)
+        return NextResponse.json({ error: 'Failed to resolve user profile' }, { status: 500 })
+      }
+      if (!profile) {
+        return NextResponse.json({ error: 'No user found with this identifier' }, { status: 404 })
+      }
+
+      const profileEmail = normalizeProfileEmail(profile.email as string | null)
+      if (profileEmail) {
+        targetEmail = profileEmail
+      } else if (targetEmail) {
+        // Best-effort backfill missing email
+        try {
+          await admin.from('profiles').update({ email: targetEmail } as any).eq('id', userId)
+        } catch (e) {
+          console.warn('[invite] Failed to backfill profile email', e)
+        }
+      } else {
+        return NextResponse.json(
+          { error: 'User profile is missing an email address. Ask the user to complete their profile.' },
+          { status: 422 }
+        )
+      }
+    } else if (targetEmail) {
+      const { data: profile, error: profileErr } = await admin
+        .from('profiles')
+        .select('id, email')
+        .eq('email', targetEmail)
+        .maybeSingle()
+
+      if (profileErr) {
+        console.error('[invite] Failed to resolve profile by email', profileErr)
+        return NextResponse.json({ error: 'Failed to resolve user profile' }, { status: 500 })
+      }
+      if (!profile) {
+        return NextResponse.json({ error: 'No user found with this email' }, { status: 404 })
+      }
+
+      userId = profile.id as string
+      const profileEmail = normalizeProfileEmail(profile.email as string | null)
+      targetEmail = profileEmail ?? targetEmail
+    } else {
+      return NextResponse.json({ error: 'Either userId or email is required' }, { status: 400 })
+    }
+
+    if (!userId || !targetEmail) {
+      return NextResponse.json({ error: 'Unable to resolve user for invitation' }, { status: 422 })
     }
 
     // Create invitation row if table exists

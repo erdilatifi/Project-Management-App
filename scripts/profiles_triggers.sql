@@ -12,12 +12,14 @@ begin
     returns trigger
     language plpgsql
     security definer
-    set search_path = public
+    set search_path = public, auth
     as $$
     begin
-      insert into public.profiles (id)
-      values (new.id)
-      on conflict (id) do nothing;
+      insert into public.profiles (id, email)
+      values (new.id, lower(new.email))
+      on conflict (id) do update
+        set email = coalesce(profiles.email, lower(new.email))
+        where profiles.email is null;
       return new;
     end;
     $$;
@@ -38,10 +40,19 @@ begin
 end
 $plpgsql$;
 
--- 3) Backfill any missing profile rows for existing auth users
-insert into public.profiles (id)
-select u.id
+-- 3) Backfill any missing profile rows for existing auth users with email
+insert into public.profiles (id, email)
+select u.id, lower(u.email)
 from auth.users u
 left join public.profiles p on p.id = u.id
-where p.id is null;
+where p.id is null and u.email is not null
+on conflict (id) do nothing;
+
+-- 4) Update existing profiles to populate email from auth.users where missing
+update public.profiles p
+set email = lower(u.email)
+from auth.users u
+where p.id = u.id
+  and p.email is null
+  and u.email is not null;
 

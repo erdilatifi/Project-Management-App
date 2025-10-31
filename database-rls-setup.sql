@@ -62,8 +62,13 @@ DROP POLICY IF EXISTS "notifications_insert_system" ON notifications;
 DROP POLICY IF EXISTS "notifications_update_own" ON notifications;
 DROP POLICY IF EXISTS "notifications_delete_own" ON notifications;
 
-DROP POLICY IF EXISTS "auth_users_public_select_authenticated" ON auth_users_public;
-DROP POLICY IF EXISTS "auth_users_public_select_workspace_context" ON auth_users_public;
+-- Drop helper functions
+DROP FUNCTION IF EXISTS public.is_workspace_member(uuid, uuid);
+DROP FUNCTION IF EXISTS public.is_workspace_admin(uuid, uuid);
+DROP FUNCTION IF EXISTS public.profile_email(uuid);
+DROP FUNCTION IF EXISTS public.get_auth_users_by_ids(uuid[]);
+DROP FUNCTION IF EXISTS public.search_auth_users(text, integer);
+-- auth_users_public view removed - use profiles.email instead
 
 -- ============================================================================
 -- STEP 2: Enable RLS on all tables
@@ -80,22 +85,60 @@ ALTER TABLE messages ENABLE ROW LEVEL SECURITY;
 ALTER TABLE thread_participants ENABLE ROW LEVEL SECURITY;
 ALTER TABLE notifications ENABLE ROW LEVEL SECURITY;
 
--- Note: auth_users_public is a VIEW, not a table
--- Views inherit RLS from their underlying tables (auth.users)
--- The auth.users table is managed by Supabase and already has RLS enabled
--- No action needed for auth_users_public
+-- Note: auth_users_public view and helper functions removed
+-- Use profiles.email column instead. Add email column to profiles table:
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS email text;
+-- Create index for faster email searches:
+CREATE INDEX IF NOT EXISTS idx_profiles_email ON profiles(email);
+
+-- ============================================================================
+-- STEP 2B: Ensure grants for application roles (Supabase requires explicit grants)
+-- ============================================================================
+
+-- Profiles table access
+GRANT SELECT, INSERT, UPDATE ON TABLE profiles TO authenticated;
+GRANT ALL ON TABLE profiles TO service_role;
+
+-- Workspace tables
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE workspaces TO authenticated;
+GRANT ALL ON TABLE workspaces TO service_role;
+
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE workspace_members TO authenticated;
+GRANT ALL ON TABLE workspace_members TO service_role;
+
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE workspace_invitations TO authenticated;
+GRANT ALL ON TABLE workspace_invitations TO service_role;
+
+-- Project/task tables
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE projects TO authenticated;
+GRANT ALL ON TABLE projects TO service_role;
+
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE tasks TO authenticated;
+GRANT ALL ON TABLE tasks TO service_role;
+
+-- Messaging tables
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE message_threads TO authenticated;
+GRANT ALL ON TABLE message_threads TO service_role;
+
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE messages TO authenticated;
+GRANT ALL ON TABLE messages TO service_role;
+
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE thread_participants TO authenticated;
+GRANT ALL ON TABLE thread_participants TO service_role;
+
+-- Notifications
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE notifications TO authenticated;
+GRANT ALL ON TABLE notifications TO service_role;
 
 -- ============================================================================
 -- STEP 3: Create RLS Policies (Optimized to avoid recursion)
 -- ============================================================================
 
 -- ----------------------------------------------------------------------------
--- AUTH_USERS_PUBLIC VIEW - No policies needed
+-- PROFILES TABLE - email column should exist
 -- ----------------------------------------------------------------------------
--- auth_users_public is a VIEW that selects from auth.users
--- Views inherit RLS from their underlying tables
--- The auth.users table (managed by Supabase) already has RLS enabled
--- Access control is handled at the auth.users level
+-- Note: profiles.email replaces auth_users_public view
+-- Ensure email column exists: ALTER TABLE profiles ADD COLUMN IF NOT EXISTS email text;
 -- No policies can be created on views in PostgreSQL
 
 -- ----------------------------------------------------------------------------
@@ -121,59 +164,113 @@ CREATE POLICY "profiles_select_workspace_members" ON profiles
   USING (auth.uid() IS NOT NULL);
 
 -- ----------------------------------------------------------------------------
+-- HELPER FUNCTIONS (avoid RLS recursion when resolving profile email)
+-- ----------------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION public.profile_email(user_id_param uuid)
+RETURNS text
+LANGUAGE sql
+SECURITY DEFINER
+SET search_path = public
+SET row_security = off
+AS $$
+  SELECT lower(email) FROM public.profiles WHERE id = user_id_param;
+$$;
+
+CREATE OR REPLACE FUNCTION public.is_thread_participant(thread_id_param uuid, user_id_param uuid)
+RETURNS boolean
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+SET row_security = off
+AS $$
+DECLARE
+  participant_exists boolean;
+BEGIN
+  SELECT EXISTS (
+    SELECT 1
+    FROM public.thread_participants tp
+    WHERE tp.thread_id = thread_id_param
+      AND tp.user_id = user_id_param
+  ) INTO participant_exists;
+
+  RETURN participant_exists;
+END;
+$$;
+
+-- ----------------------------------------------------------------------------
 -- WORKSPACE_MEMBERS TABLE - Foundation table (no circular dependencies)
 -- ----------------------------------------------------------------------------
+-- Helper function to check workspace membership without triggering RLS recursion
+-- This function runs with SECURITY DEFINER to bypass RLS
+CREATE OR REPLACE FUNCTION public.is_workspace_member(workspace_id_param uuid, user_id_param uuid)
+RETURNS boolean
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+SET row_security = off
+AS $$
+BEGIN
+  RETURN EXISTS (
+    SELECT 1 FROM workspace_members
+    WHERE workspace_id = workspace_id_param
+    AND user_id = user_id_param
+  );
+END;
+$$;
+
+-- Helper function to check if user is workspace owner/admin without triggering RLS recursion
+CREATE OR REPLACE FUNCTION public.is_workspace_admin(workspace_id_param uuid, user_id_param uuid)
+RETURNS boolean
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+SET row_security = off
+AS $$
+BEGIN
+  RETURN EXISTS (
+    SELECT 1 FROM workspace_members
+    WHERE workspace_id = workspace_id_param
+    AND user_id = user_id_param
+    AND role IN ('owner', 'admin')
+  ) OR EXISTS (
+    SELECT 1 FROM workspaces
+    WHERE id = workspace_id_param
+    AND owner_id = user_id_param
+  );
+END;
+$$;
+
 -- Users can view members of workspaces they belong to
+-- To avoid recursion, we use a security definer function
 CREATE POLICY "workspace_members_select_member" ON workspace_members
   FOR SELECT
   USING (
-    EXISTS (
-      SELECT 1 FROM workspace_members wm
-      WHERE wm.workspace_id = workspace_members.workspace_id
-      AND wm.user_id = auth.uid()
-    )
+    -- Allow users to see their own membership records
+    user_id = auth.uid()
+    OR
+    -- Allow users to see other members if they are a member of the workspace
+    public.is_workspace_member(workspace_id, auth.uid())
   );
 
 -- Only workspace owners and admins can add members
 CREATE POLICY "workspace_members_insert_owner_admin" ON workspace_members
   FOR INSERT
   WITH CHECK (
-    EXISTS (
-      SELECT 1 FROM workspace_members wm
-      WHERE wm.workspace_id = workspace_members.workspace_id
-      AND wm.user_id = auth.uid()
-      AND wm.role IN ('owner', 'admin')
-    )
-    OR
-    EXISTS (
-      SELECT 1 FROM workspaces w
-      WHERE w.id = workspace_members.workspace_id
-      AND w.owner_id = auth.uid()
-    )
+    public.is_workspace_admin(workspace_id, auth.uid())
   );
 
 -- Only workspace owners and admins can update member roles
 CREATE POLICY "workspace_members_update_owner_admin" ON workspace_members
   FOR UPDATE
   USING (
-    EXISTS (
-      SELECT 1 FROM workspace_members wm
-      WHERE wm.workspace_id = workspace_members.workspace_id
-      AND wm.user_id = auth.uid()
-      AND wm.role IN ('owner', 'admin')
-    )
+    public.is_workspace_admin(workspace_id, auth.uid())
   );
 
 -- Only workspace owners and admins can remove members (except self)
 CREATE POLICY "workspace_members_delete_owner_admin" ON workspace_members
   FOR DELETE
   USING (
-    EXISTS (
-      SELECT 1 FROM workspace_members wm
-      WHERE wm.workspace_id = workspace_members.workspace_id
-      AND wm.user_id = auth.uid()
-      AND wm.role IN ('owner', 'admin')
-    )
+    public.is_workspace_admin(workspace_id, auth.uid())
   );
 
 -- Users can remove themselves from workspaces
@@ -217,7 +314,8 @@ CREATE POLICY "workspaces_delete_owner" ON workspaces
 CREATE POLICY "workspace_invitations_select_own" ON workspace_invitations
   FOR SELECT
   USING (
-    email = (SELECT email FROM auth.users WHERE id = auth.uid())
+    auth.uid() IS NOT NULL
+    AND email = public.profile_email(auth.uid())
   );
 
 -- Workspace admins can view all invitations for their workspace
@@ -248,7 +346,8 @@ CREATE POLICY "workspace_invitations_insert_workspace_admin" ON workspace_invita
 CREATE POLICY "workspace_invitations_update_own" ON workspace_invitations
   FOR UPDATE
   USING (
-    email = (SELECT email FROM auth.users WHERE id = auth.uid())
+    auth.uid() IS NOT NULL
+    AND email = public.profile_email(auth.uid())
   );
 
 -- Workspace admins can delete invitations
@@ -365,10 +464,10 @@ CREATE POLICY "tasks_delete_creator" ON tasks
 CREATE POLICY "message_threads_select_participant" ON message_threads
   FOR SELECT
   USING (
-    EXISTS (
-      SELECT 1 FROM thread_participants tp
-      WHERE tp.thread_id = message_threads.id
-      AND tp.user_id = auth.uid()
+    auth.uid() IS NOT NULL
+    AND (
+      public.is_thread_participant(message_threads.id, auth.uid())
+      OR message_threads.created_by = auth.uid()
     )
   );
 
@@ -376,10 +475,10 @@ CREATE POLICY "message_threads_select_participant" ON message_threads
 CREATE POLICY "message_threads_insert_workspace_member" ON message_threads
   FOR INSERT
   WITH CHECK (
-    EXISTS (
-      SELECT 1 FROM workspace_members wm
-      WHERE wm.workspace_id = message_threads.workspace_id
-      AND wm.user_id = auth.uid()
+    auth.uid() IS NOT NULL
+    AND (
+      public.is_workspace_member(message_threads.workspace_id, auth.uid())
+      OR public.is_workspace_admin(message_threads.workspace_id, auth.uid())
     )
   );
 
@@ -399,24 +498,12 @@ CREATE POLICY "message_threads_delete_creator" ON message_threads
 -- Thread participants can view messages
 CREATE POLICY "messages_select_participant" ON messages
   FOR SELECT
-  USING (
-    EXISTS (
-      SELECT 1 FROM thread_participants tp
-      WHERE tp.thread_id = messages.thread_id
-      AND tp.user_id = auth.uid()
-    )
-  );
+  USING (auth.uid() IS NOT NULL AND public.is_thread_participant(messages.thread_id, auth.uid()));
 
 -- Thread participants can send messages
 CREATE POLICY "messages_insert_participant" ON messages
   FOR INSERT
-  WITH CHECK (
-    EXISTS (
-      SELECT 1 FROM thread_participants tp
-      WHERE tp.thread_id = messages.thread_id
-      AND tp.user_id = auth.uid()
-    )
-  );
+  WITH CHECK (auth.uid() IS NOT NULL AND public.is_thread_participant(messages.thread_id, auth.uid()));
 
 -- Users can update their own messages
 CREATE POLICY "messages_update_own" ON messages
@@ -434,13 +521,7 @@ CREATE POLICY "messages_delete_own" ON messages
 -- Thread participants can view participant list
 CREATE POLICY "thread_participants_select_participant" ON thread_participants
   FOR SELECT
-  USING (
-    EXISTS (
-      SELECT 1 FROM thread_participants tp
-      WHERE tp.thread_id = thread_participants.thread_id
-      AND tp.user_id = auth.uid()
-    )
-  );
+  USING (auth.uid() IS NOT NULL AND public.is_thread_participant(thread_participants.thread_id, auth.uid()));
 
 -- Thread creators can add participants
 CREATE POLICY "thread_participants_insert_creator" ON thread_participants
@@ -456,7 +537,8 @@ CREATE POLICY "thread_participants_insert_creator" ON thread_participants
 -- Users can update their own participant record (for last_read_at)
 CREATE POLICY "thread_participants_update_own" ON thread_participants
   FOR UPDATE
-  USING (auth.uid() = user_id);
+  USING (auth.uid() = user_id)
+  WITH CHECK (auth.uid() = user_id);
 
 -- Thread creators can remove participants
 CREATE POLICY "thread_participants_delete_creator" ON thread_participants
@@ -499,14 +581,14 @@ CREATE POLICY "notifications_delete_own" ON notifications
 -- Your database is now secured with Row Level Security.
 -- 
 -- Key Design Decisions to Prevent Recursion:
--- 1. auth_users_public: Broadly accessible to authenticated users (no workspace checks)
+-- 1. profiles.email: Use profiles table with email column (replaces auth_users_public view)
 -- 2. profiles: Accessible to all authenticated users (needed for member lists)
 -- 3. workspace_members: Foundation table with no external dependencies
 -- 4. All other tables: Check workspace_members for access control
 -- 5. Admin client bypasses RLS for system operations (invitations, notifications)
 -- 
 -- Tables secured:
--- ✅ auth_users_public (view)
+-- ✅ profiles.email (column) - replace auth_users_public view
 -- ✅ profiles
 -- ✅ workspaces
 -- ✅ workspace_members

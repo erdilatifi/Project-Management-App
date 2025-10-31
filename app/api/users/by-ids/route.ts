@@ -1,5 +1,4 @@
 import { NextResponse } from 'next/server'
-import { createClient as createAdminClient } from '@supabase/supabase-js'
 import { createClient as createServerSupabase } from '@/utils/supabase/server'
 
 export async function GET(req: Request) {
@@ -13,18 +12,21 @@ export async function GET(req: Request) {
     const { data: authRes } = await supabase.auth.getUser()
     if (!authRes?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
-    if (!serviceKey) return NextResponse.json({ error: 'Service key not configured' }, { status: 500 })
+    // Fetch from profiles table using profiles.email column
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('id, email')
+      .in('id', ids)
+      .not('email', 'is', null)
 
-    const admin = createAdminClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, serviceKey)
-    const out: Array<{ id: string; email: string }> = []
-    // Fetch individually to avoid huge pages; this is fine for small lists
-    await Promise.all(ids.map(async (id) => {
-      try {
-        const { data } = await admin.auth.admin.getUserById(id)
-        if (data?.user?.id && data.user.email) out.push({ id: data.user.id, email: data.user.email })
-      } catch {}
-    }))
+    if (error) {
+      return NextResponse.json({ error: 'Lookup failed' }, { status: 500 })
+    }
+
+    const out = ((data ?? []) as Array<{ id: string; email: string | null }>)
+      .filter((u) => !!u.email && !!u.id)
+      .map((u) => ({ id: u.id, email: u.email! }))
+
     return NextResponse.json(out)
   } catch (e) {
     return NextResponse.json({ error: 'Lookup failed' }, { status: 500 })

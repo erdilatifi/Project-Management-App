@@ -15,9 +15,9 @@ export async function GET() {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    // Fetch user profile
+    // Fetch user profile from profiles table
     const { data: profile, error: profileError } = await supabase
-      .from('users')
+      .from('profiles')
       .select('*')
       .eq('id', user.id)
       .single()
@@ -85,9 +85,9 @@ export async function PATCH(request: NextRequest) {
         return errorResponse('Invalid profile data', 400)
       }
       
-      // Update user profile
+      // Update user profile in profiles table
       const { data, error } = await supabase
-        .from('users')
+        .from('profiles')
         .update(profileValidation.data)
         .eq('id', userId)
         .select()

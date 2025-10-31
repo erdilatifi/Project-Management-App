@@ -14,11 +14,11 @@ export interface UserProfile {
 }
 
 
-// Fetch user profile
+// Fetch user profile from profiles table
 export async function getUserProfile(userId: string) {
   const supabase = createClient()
   const { data, error } = await supabase
-    .from('users')
+    .from('profiles')
     .select('*')
     .eq('id', userId)
     .single()
@@ -27,11 +27,11 @@ export async function getUserProfile(userId: string) {
   return data as UserProfile
 }
 
-// Update user profile
+// Update user profile in profiles table
 export async function updateUserProfile(userId: string, updates: Partial<UserProfile>) {
   const supabase = createClient()
   const { data, error } = await supabase
-    .from('users')
+    .from('profiles')
     .update(updates)
     .eq('id', userId)
     .select()

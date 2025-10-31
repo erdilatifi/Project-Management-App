@@ -11,6 +11,10 @@ create table if not exists public.profiles (
 alter table public.profiles
   add column if not exists username text;
 
+-- 2a) Add email column if missing (replaces auth_users_public view)
+alter table public.profiles
+  add column if not exists email text;
+
 -- 3) Constraints (idempotent)
 do $$
 begin
@@ -47,4 +51,7 @@ begin
   end if;
 end
 $$ language plpgsql;
+
+-- 4a) Create index on email for faster searches (idempotent)
+create index if not exists idx_profiles_email on public.profiles(email);
 

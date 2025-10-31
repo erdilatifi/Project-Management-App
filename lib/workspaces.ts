@@ -80,23 +80,17 @@ export async function acceptInvitation(token: string): Promise<{ workspace: { id
   const row = (Array.isArray(data) ? data[0] : data) as { workspace_id: string; name: string; owner_id: string }
   if (!row) throw new Error('Invitation not found or expired')
 
-  // Best-effort: persist member's email and name to workspace_members for this workspace
-  try {
-    const workspaceId = row.workspace_id
-    const uid = user.id
-    const email = user.email ?? null
-    // Try app user profile for display name; fallback to profiles.full_name
-    let display: string | null = null
+    // Best-effort: persist member's email and name to workspace_members for this workspace
     try {
-      const { data: up } = await supabase.from('users').select('display_name').eq('id', uid).maybeSingle<any>()
-      display = (up?.display_name as string | null) ?? null
-    } catch {}
-    if (!display) {
+      const workspaceId = row.workspace_id
+      const uid = user.id
+      const email = user.email ?? null
+      // Get display name from profiles table
+      let display: string | null = null
       try {
         const { data: prof } = await supabase.from('profiles').select('full_name').eq('id', uid).maybeSingle<any>()
         display = (prof?.full_name as string | null) ?? null
       } catch {}
-    }
 
     // Try to update using likely column names; ignore if columns not present
     try {
@@ -121,9 +115,15 @@ export async function searchUsersByEmailLike(term: string): Promise<Array<{ id: 
   const supabase = createClient()
   const t = term.trim()
   if (!t) return []
-  const { data, error } = await (supabase as SupabaseClient).rpc('search_auth_users', { q: t })
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('id, email')
+    .ilike('email', `%${t}%`)
+    .limit(20)
   if (error) throw new Error(error.message)
-  return (data ?? []).filter((u: any) => !!u.email && !!u.id)
+  return ((data ?? []) as Array<{ id: string; email: string | null }>)
+    .filter((u) => !!u.email && !!u.id)
+    .map((u) => ({ id: u.id, email: u.email! }))
 }
 
 export async function createThread(workspaceId: string, title?: string): Promise<MessageThread> {
@@ -135,17 +135,57 @@ export async function createThread(workspaceId: string, title?: string): Promise
   if (authErr) throw new Error(authErr.message)
   requireUser(user)
 
+  // Check membership up-front to surface clearer errors before RLS triggers
+  const { data: membership, error: membershipErr } = await supabase
+    .from('workspace_members')
+    .select('role')
+    .eq('workspace_id', workspaceId)
+    .eq('user_id', user.id)
+    .maybeSingle<{ role: string }>()
+  if (membershipErr) {
+    console.error('[createThread] Failed to confirm membership', {
+      workspaceId,
+      userId: user.id,
+      error: membershipErr,
+    })
+    throw new Error('Unable to verify workspace membership')
+  }
+  if (!membership) {
+    console.error('[createThread] User is not a workspace member', {
+      workspaceId,
+      userId: user.id,
+    })
+    throw new Error('You must be a workspace member to start a conversation')
+  }
+
+  const payload = { workspace_id: workspaceId, title: title ?? null, created_by: user.id } as any
+
   const { data: thread, error } = await supabase
     .from('message_threads')
-    .insert({ workspace_id: workspaceId, title: title ?? null, created_by: user.id } as any)
+    .insert(payload)
     .select('*')
     .single<MessageThread>()
-  if (error) throw new Error(error.message)
+  if (error) {
+    console.error('[createThread] Insert failed', {
+      workspaceId,
+      userId: user.id,
+      payload,
+      error,
+    })
+    throw new Error(error.message)
+  }
 
   // ensure creator is a participant
-  await supabase
+  const upsertRes = await supabase
     .from('thread_participants')
     .upsert({ thread_id: thread.id, user_id: user.id, is_admin: true } as any, { onConflict: 'thread_id,user_id' })
+  if (upsertRes.error) {
+    console.error('[createThread] Failed to ensure creator participant', {
+      threadId: thread.id,
+      userId: user.id,
+      error: upsertRes.error,
+    })
+  }
 
   return thread
 }

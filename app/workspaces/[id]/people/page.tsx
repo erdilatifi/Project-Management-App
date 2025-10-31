@@ -57,61 +57,44 @@ export default function WorkspacePeoplePage() {
     
     setHasMore(count ? (pageNum * limit) < count : false)
       const ids = (members ?? []).map((m: any) => m.user_id)
-      let emailMap: Record<string, string> = {}
-      let avatarMap: Record<string, string | null> = {}
-      let profileMap: Record<string, { username: string | null; full_name: string | null; job_title: string | null }> = {}
-      let appMap: Record<string, { username: string | null; display: string | null }> = {}
+      let profileMap: Record<
+        string,
+        { email: string | null; avatar_url: string | null; username: string | null; full_name: string | null; job_title: string | null }
+      > = {}
       if (ids.length) {
-        const { data: users } = await (supabase as any).rpc('get_auth_users_by_ids', { ids })
-        const [profsRes, appUsersRes] = await Promise.all([
-          supabase
-            .from('profiles')
-            .select('id, avatar_url, username, full_name, job_title')
-            .in('id', ids),
-          supabase
-            .from('users')
-            .select('id, username, display_name')
-            .in('id', ids),
-        ])
+        const profsRes = await supabase
+          .from('profiles')
+          .select('id, email, avatar_url, username, full_name, job_title')
+          .in('id', ids)
         const profs = profsRes?.data as any[] | null
-        const appUsers = appUsersRes?.data as any[] | null
-        emailMap = Object.fromEntries((users ?? []).map((u: any) => [u.id, u.email]))
-        avatarMap = Object.fromEntries((profs ?? []).map((p: any) => [p.id, p.avatar_url ?? null]))
-        profileMap = Object.fromEntries((profs ?? []).map((p: any) => [p.id, { username: (p.username as string | null) ?? null, full_name: (p.full_name as string | null) ?? null, job_title: (p.job_title as string | null) ?? null }]))
-        appMap = Object.fromEntries((appUsers ?? []).map((u: any) => [u.id, { username: (u.username as string | null) ?? null, display: (u.display_name as string | null) ?? null }]))
-
-        // Fallback: for any IDs still missing emails, try public view
-        const missingEmailIds = ids.filter((x) => !emailMap[x])
-        if (missingEmailIds.length) {
-          try {
-            const { data: more } = await supabase
-              .from('auth_users_public')
-              .select('id, email')
-              .in('id', missingEmailIds)
-            ;(more ?? []).forEach((u: any) => {
-              if (u?.id && u?.email && !emailMap[u.id]) emailMap[u.id] = u.email
-            })
-          } catch {
-            // ignore, best-effort
-          }
-        }
+        profileMap = Object.fromEntries(
+          (profs ?? []).map((p: any) => [
+            p.id,
+            {
+              email: (p.email as string | null) ?? null,
+              avatar_url: (p.avatar_url as string | null) ?? null,
+              username: (p.username as string | null) ?? null,
+              full_name: (p.full_name as string | null) ?? null,
+              job_title: (p.job_title as string | null) ?? null,
+            },
+          ])
+        )
       }
       const newRows = (members ?? []).map((m: any) => {
           const id = m.user_id
+          const profile = profileMap[id]
           const label =
-            profileMap[id]?.username?.trim() ||
-            appMap[id]?.username?.trim() ||
-            appMap[id]?.display?.trim() ||
-            profileMap[id]?.full_name?.trim() ||
-            emailMap[id] ||
+            profile?.username?.trim() ||
+            profile?.full_name?.trim() ||
+            profile?.email ||
             'Unknown'
           return {
             workspace_id: m.workspace_id,
             user_id: id,
             role: m.role,
             email: label,
-            avatar_url: avatarMap[id] ?? null,
-            job_title: profileMap[id]?.job_title ?? null,
+            avatar_url: profile?.avatar_url ?? null,
+            job_title: profile?.job_title ?? null,
           }
         })
       

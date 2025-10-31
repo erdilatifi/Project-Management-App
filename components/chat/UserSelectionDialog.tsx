@@ -71,50 +71,20 @@ export default function UserSelectionDialog({
           return
         }
 
-        // Get user details
-        const { data: authUsers } = await (supabase as any)
-          .from('auth_users_public')
-          .select('id, email')
-          .in('id', userIds)
-
+        // Get user details from profiles table
         const { data: profiles } = await supabase
           .from('profiles')
-          .select('id, username, avatar_url')
+          .select('id, email, username, avatar_url')
           .in('id', userIds)
 
-        const { data: appUsers } = await supabase
-          .from('users')
-          .select('id, username')
-          .in('id', userIds)
+        const merged: User[] = (profiles ?? []).map((row: any) => ({
+          id: row.id,
+          email: (row.email as string | null) ?? null,
+          username: (row.username as string | null) ?? null,
+          avatar_url: (row.avatar_url as string | null) ?? null,
+        }))
 
-        // Merge user data
-        const userMap = new Map<string, User>()
-        
-        authUsers?.forEach((u: any) => {
-          userMap.set(u.id, {
-            id: u.id,
-            email: u.email,
-            username: null,
-            avatar_url: null
-          })
-        })
-
-        profiles?.forEach((p: any) => {
-          const user = userMap.get(p.id)
-          if (user) {
-            user.username = p.username
-            user.avatar_url = p.avatar_url
-          }
-        })
-
-        appUsers?.forEach((u: any) => {
-          const user = userMap.get(u.id)
-          if (user && !user.username) {
-            user.username = u.username
-          }
-        })
-
-        setUsers(Array.from(userMap.values()))
+        setUsers(merged)
       } catch (error: any) {
         toast.error(error.message || 'Failed to load users')
       } finally {
