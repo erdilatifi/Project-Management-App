@@ -2,7 +2,9 @@
 
 ![Flowfoundry Banner](public/FlowFoundry.png)
 
-A modern, full-featured project management application built with Next.js 16, Supabase, and TypeScript. Features real-time collaboration, drag-and-drop task management, and a beautiful theme-aware interface.
+A modern, **100% free and open-source** project management application built with Next.js 16, Supabase, and TypeScript. Features real-time collaboration, drag-and-drop task management, workspace chat, and a beautiful theme-aware interface.
+
+**🎉 Completely Free Forever** - No pricing tiers, no credit card required, unlimited workspaces, projects, and team members.
 
 ## ✨ Features
 
@@ -33,9 +35,10 @@ A modern, full-featured project management application built with Next.js 16, Su
   - Thread-based conversations
   - Real-time message delivery
   - Unread message counts per thread
-  - Message editing and deletion
+  - Message editing and deletion with confirmation dialogs
   - Thread title editing
   - Participant management
+  - Delete chat and leave conversation with confirmation
   - Back navigation to workspaces
   - TanStack Query for optimistic updates
 - **Notifications** - Comprehensive notification system with:
@@ -201,15 +204,16 @@ npm run dev
 - **Supabase Auth** - Enterprise-grade authentication
 - **Email/Password** - Secure credential-based login
 - **Password Recovery** - Email-based password reset flow
-- **Row Level Security (RLS)** - Database-level access control
 - **Protected Routes** - Middleware-based route protection
 - **Session Management** - Automatic session refresh and validation
+- **Confirmation Dialogs** - Safe deletion with user confirmation for chats, messages, and conversations
 
 ### Workspaces
 - **Multi-tenant Architecture** - Isolated data per workspace
-- **Role-based Access Control** - Owner, Admin, Member roles
-- **Invite System** - Email-based workspace invitations
+- **Role-based Access Control** - Owner, Admin, Member, Viewer roles
+- **Invite System** - Email-based workspace invitations with accept/decline
 - **Member Management** - Add, remove, and manage team members
+- **Unlimited Workspaces** - Create as many workspaces as you need
 - **Real-time Updates** - Live workspace data synchronization
 
 ### Projects
@@ -231,6 +235,7 @@ npm run dev
 
 ### Task Management
 - **Quick Add** - Fast task creation with inline form
+- **Multi-assignee Support** - Assign tasks to multiple team members
 - **Assignee Selection** - Searchable user dropdown
 - **Priority Levels** - P1 (High) to P5 (Low) with color coding
 - **Due Dates** - Date picker with smart categorization:
@@ -240,7 +245,7 @@ npm run dev
   - No Due Date (neutral badge)
 - **Inline Editing** - Edit tasks directly in the board
 - **Filtering** - Filter by due date category
-- **Permission Control** - Only task creator can edit/delete
+- **Permission Control** - Only workspace owners/admins can create tasks; assignees can move their tasks
 
 ### Notifications
 - **Real-time System** - Custom-built notification system with Supabase
@@ -298,9 +303,9 @@ npm run dev
 - **TypeScript** - Strict mode enabled for type safety
 - **ESLint** - Code linting with Next.js config
 - **Consistent Structure** - Organized component patterns
-- **Professional Comments** - Clear documentation for complex logic
-- **Structured Logging** - Prefixed console logs for debugging (e.g., `[component-name]`)
-- **Clean Code** - No debug endpoints or test code in production
+- **Professional Comments** - JSDoc-style documentation throughout
+- **Clean Code** - Production-ready with minimal debug logging
+- **Optimized Performance** - CSS transitions over heavy animations for smooth 60fps
 
 ### Component Organization
 - **Reusable UI** - `components/ui/` (shadcn/ui components)
