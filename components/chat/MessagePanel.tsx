@@ -10,10 +10,10 @@ import { X, Pencil, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { formatTimeAgo } from "@/lib/time";
 
-type Props = { threadId: string; workspaceId: string };
+type Props = { threadId: string; workspaceId: string; title?: string | null; isCreator?: boolean; onTitleUpdated?: (title: string | null) => void };
 type UserLite = { id: string; email: string | null };
 
-export default function MessagePanel({ threadId, workspaceId }: Props) {
+export default function MessagePanel({ threadId, workspaceId, title: titleProp, isCreator: isCreatorProp, onTitleUpdated }: Props) {
   const supabase = useMemo(() => createClient(), []);
   const [items, setItems] = useState<Message[]>([]);
   const [authors, setAuthors] = useState<Record<string, UserLite>>({});
@@ -143,8 +143,8 @@ export default function MessagePanel({ threadId, workspaceId }: Props) {
     }
     setThreadTitle(thr?.title || null);
 
-    // canManage is ONLY for the creator (not admins)
-    setCanManage(!!manage);
+    // canManage is ONLY for the creator (not admins). Allow override via prop.
+    setCanManage(isCreatorProp ?? !!manage);
 
     if (ids.length) {
       let authUsers: any[] | null = null;
@@ -210,7 +210,7 @@ export default function MessagePanel({ threadId, workspaceId }: Props) {
     } else {
       setParticipants([]);
     }
-  }, [supabase, threadId]);
+  }, [supabase, threadId, isCreatorProp]);
 
   useEffect(() => {
     loadParticipants();
@@ -232,6 +232,7 @@ export default function MessagePanel({ threadId, workspaceId }: Props) {
           const updated = payload.new as any
           if (updated.title !== undefined) {
             setThreadTitle(updated.title)
+            onTitleUpdated?.(updated.title ?? null)
           }
         }
       )
@@ -240,7 +241,7 @@ export default function MessagePanel({ threadId, workspaceId }: Props) {
     return () => {
       supabase.removeChannel(channel)
     }
-  }, [supabase, threadId])
+  }, [supabase, threadId, onTitleUpdated])
 
   // presence: single channel
   useEffect(() => {
@@ -672,18 +673,22 @@ export default function MessagePanel({ threadId, workspaceId }: Props) {
         <div className="flex items-center gap-2">
           {!titleEditing ? (
             <>
-              <h2 className="text-base font-semibold text-foreground">{threadTitle || "Untitled thread"}</h2>
-              {canManage && (
-                <button
-                  className="text-xs px-2 py-1 rounded-md border border-border bg-card hover:bg-accent font-medium transition-colors"
-                  onClick={() => {
-                    setTitleEditing(true);
-                    setTitleInput(threadTitle || "");
-                  }}
-                >
-                  Edit title
-                </button>
-              )}
+              <h2 className="text-base font-semibold text-foreground flex items-center gap-2">
+                {(titleProp ?? threadTitle) || "Untitled thread"}
+                {canManage && (
+                  <button
+                    className="inline-flex items-center justify-center h-7 w-7 rounded-md border border-border bg-card hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"
+                    title="Edit title"
+                    onClick={() => {
+                      setTitleEditing(true);
+                      setTitleInput((titleProp ?? threadTitle) || "");
+                    }}
+                    aria-label="Edit title"
+                  >
+                    <Pencil className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </h2>
             </>
           ) : (
             <div className="flex items-center gap-2">
@@ -699,7 +704,9 @@ export default function MessagePanel({ threadId, workspaceId }: Props) {
                       .update({ title: titleInput.trim() || null } as any)
                       .eq("id", threadId);
                     if (error) throw error;
-                    setThreadTitle(titleInput.trim() || "Untitled thread");
+                    const next = titleInput.trim() || null
+                    setThreadTitle(next);
+                    onTitleUpdated?.(next);
                     setTitleEditing(false);
                   } catch (e: any) {
                     toast.error(e?.message ?? "Failed to update title");

@@ -53,7 +53,7 @@ export default function WorkspaceMessagesPage() {
     getUser();
   }, [supabase]);
 
-  // Fetch thread title and check if user is creator
+  // Fetch thread title and check if user is creator/participant; redirect if unauthorized
   useEffect(() => {
     if (!activeThreadId) {
       setThreadTitle(null);
@@ -69,7 +69,22 @@ export default function WorkspaceMessagesPage() {
         .maybeSingle();
       
       setThreadTitle(data?.title || 'Untitled thread');
-      setIsCreator(currentUserId ? data?.created_by === currentUserId : false);
+      const creator = currentUserId ? data?.created_by === currentUserId : false;
+      setIsCreator(creator);
+
+      // If not creator, ensure current user is a participant; otherwise redirect
+      if (!creator && currentUserId) {
+        const { data: part } = await supabase
+          .from('thread_participants')
+          .select('user_id')
+          .eq('thread_id', activeThreadId)
+          .eq('user_id', currentUserId)
+          .maybeSingle();
+        if (!part) {
+          setThread(undefined);
+          toast.error('You do not have access to this conversation');
+        }
+      }
     };
     
     fetchThread();
@@ -97,7 +112,25 @@ export default function WorkspaceMessagesPage() {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [activeThreadId, currentUserId, supabase]);
+  }, [activeThreadId, currentUserId, supabase, setThread]);
+
+  // Redirect if current thread is deleted
+  useEffect(() => {
+    if (!activeThreadId) return;
+    const channel = supabase
+      .channel('thread-delete-watch')
+      .on(
+        'postgres_changes',
+        { event: 'DELETE', schema: 'public', table: 'message_threads', filter: `id=eq.${activeThreadId}` },
+        () => {
+          setThread(undefined);
+        }
+      )
+      .subscribe();
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [supabase, activeThreadId, setThread]);
 
   const saveTitle = async () => {
     if (!activeThreadId) return;
@@ -214,7 +247,13 @@ export default function WorkspaceMessagesPage() {
                 </div>
                 {/* Message Panel - takes remaining height */}
                 <div className="flex-1 overflow-hidden">
-                  <MessagePanel threadId={activeThreadId} workspaceId={workspaceId} />
+                  <MessagePanel
+                    threadId={activeThreadId}
+                    workspaceId={workspaceId}
+                    title={threadTitle}
+                    isCreator={isCreator}
+                    onTitleUpdated={(t) => setThreadTitle(t || 'Untitled thread')}
+                  />
                 </div>
               </>
             ) : (

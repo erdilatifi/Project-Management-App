@@ -39,23 +39,40 @@ export default function ThreadList({ workspaceId, onSelect, activeThreadId }: Pr
 
   const queryClient = useQueryClient()
 const threadsQ = useQuery({
-  queryKey: ['threads', workspaceId, page],
+  queryKey: ['threads', workspaceId, userId, page],
+  enabled: !!userId,
+  staleTime: 30000,
+  gcTime: 300000,
+  placeholderData: (prev) => prev,
   queryFn: async () => {
     const limit = 20
     const from = (page - 1) * limit
     const to = from + limit - 1
-    
-    const { data, error, count } = await supabase
+
+    // Single paginated query including creator or participant
+    const q = supabase
       .from('message_threads')
-      .select('*', { count: 'exact' })
+      .select('id, title, created_at, created_by, thread_participants!left(user_id)', { count: 'exact' })
       .eq('workspace_id', workspaceId)
+      .or(`created_by.eq.${userId},thread_participants.user_id.eq.${userId}`)
       .order('created_at', { ascending: false })
       .range(from, to)
-    
+
+    const { data, error, count } = await q
     if (error) throw new Error(error.message)
-    
+
+    // Deduplicate in case of multiple participant rows
+    const seen = new Set<string>()
+    const rows = (data ?? []) as any[]
+    const unique = rows.filter((r) => {
+      const id = r.id as string
+      if (seen.has(id)) return false
+      seen.add(id)
+      return true
+    }) as unknown as MessageThread[]
+
     setHasMore(count ? (page * limit) < count : false)
-    return (data ?? []) as MessageThread[]
+    return unique
   },
 })
 
@@ -69,7 +86,7 @@ const threadsQ = useQuery({
 
   useEffect(() => {
     threadsQ.refetch()
-  }, [workspaceId])
+  }, [workspaceId, userId, page])
 
   // Infinite scroll observer
   useEffect(() => {
@@ -100,18 +117,14 @@ const threadsQ = useQuery({
     const channel = supabase
       .channel('rt-threads')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'message_threads', filter: `workspace_id=eq.${workspaceId}` }, (payload) => {
-                queryClient.setQueryData<MessageThread[]>(['threads', workspaceId], (cur = []) => {
-          if (payload.eventType === 'INSERT') [payload.new as MessageThread, ...cur]
-          if (payload.eventType === 'UPDATE') cur.map((t) => (t.id === (payload.new as any).id ? (payload.new as MessageThread) : t))
-          if (payload.eventType === 'DELETE') return cur.filter((t) => t.id !== (payload.old as any).id)
-          return cur
-        })
+        // Re-evaluate accessible threads on any change
+        queryClient.invalidateQueries({ queryKey: ['threads', workspaceId, userId] })
       })
       .subscribe()
     return () => {
       supabase.removeChannel(channel)
     }
-  }, [supabase, workspaceId])
+  }, [supabase, workspaceId, userId, queryClient])
 
   const onNew = async () => { setNewOpen(true) }
 
@@ -131,10 +144,8 @@ const threadsQ = useQuery({
       if (error) throw error
       
       // Add selected participants
-      if (userIds.length > 0 && thread) {
+      if (thread && userIds.length > 0) {
         const threadId = thread.id
-        
-        // Add each user as participant
         for (const participantId of userIds) {
           await supabase
             .from('thread_participants')
@@ -149,8 +160,8 @@ const threadsQ = useQuery({
       return thread
     },
     onMutate: async ({ title }: { title: string; userIds: string[] }) => {
-      await queryClient.cancelQueries({ queryKey: ['threads', workspaceId] })
-      const prev = queryClient.getQueryData<MessageThread[]>(['threads', workspaceId]) || []
+      await queryClient.cancelQueries({ queryKey: ['threads', workspaceId, userId] })
+      const prev = queryClient.getQueryData<MessageThread[]>(['threads', workspaceId, userId, 1]) || []
       const optimistic: MessageThread = { 
         id: 'temp-' + Date.now().toString(), 
         workspace_id: workspaceId, 
@@ -158,26 +169,26 @@ const threadsQ = useQuery({
         created_by: userId, 
         created_at: new Date().toISOString() 
       }
-      queryClient.setQueryData(['threads', workspaceId], [optimistic, ...prev])
+      queryClient.setQueryData(['threads', workspaceId, userId, 1], [optimistic, ...prev])
       return { prev }
     },
-    onError: (_err, _vars, ctx) => { if (ctx?.prev) queryClient.setQueryData(['threads', workspaceId], ctx.prev) },
-    onSettled: () => { queryClient.invalidateQueries({ queryKey: ['threads', workspaceId] }) },
+    onError: (_err, _vars, ctx) => { if (ctx?.prev) queryClient.setQueryData(['threads', workspaceId, userId, 1], ctx.prev) },
+    onSettled: () => { queryClient.invalidateQueries({ queryKey: ['threads', workspaceId, userId] }) },
   })
 
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => { const { error } = await supabase.from('message_threads').delete().eq('id', id); if (error) throw new Error(error.message) },
     onMutate: async (id: string) => {
-      await queryClient.cancelQueries({ queryKey: ['threads', workspaceId] })
-      const prev = queryClient.getQueryData<MessageThread[]>(['threads', workspaceId]) || []
-      queryClient.setQueryData(['threads', workspaceId], prev.filter(t => t.id !== id))
+      await queryClient.cancelQueries({ queryKey: ['threads', workspaceId, userId] })
+      const prev = queryClient.getQueryData<MessageThread[]>(['threads', workspaceId, userId, 1]) || []
+      queryClient.setQueryData(['threads', workspaceId, userId, 1], prev.filter(t => t.id !== id))
       return { prev }
     },
-    onError: (_err, _vars, ctx) => { if (ctx?.prev) queryClient.setQueryData(['threads', workspaceId], ctx.prev) },
-    onSettled: () => { queryClient.invalidateQueries({ queryKey: ['threads', workspaceId] }) },
+    onError: (_err, _vars, ctx) => { if (ctx?.prev) queryClient.setQueryData(['threads', workspaceId, userId, 1], ctx.prev) },
+    onSettled: () => { queryClient.invalidateQueries({ queryKey: ['threads', workspaceId, userId] }) },
   })
 
-  const allThreads = queryClient.getQueryData<MessageThread[]>(['threads', workspaceId, page]) ?? []
+  const allThreads = threadsQ.data ?? []
   const shown = allThreads.filter((t) => (t.title ?? '').toLowerCase().includes(search.trim().toLowerCase()))
 
   // Fetch unread message counts for all threads
