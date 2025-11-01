@@ -1,3 +1,15 @@
+/**
+ * Notification Bell Component
+ * 
+ * Displays real-time notifications with:
+ * - Badge showing unread count
+ * - Dropdown list of recent notifications
+ * - Real-time updates via Supabase subscriptions
+ * - Infinite scroll for loading more notifications
+ * - Click handlers for navigation to relevant content
+ * 
+ * @component
+ */
 "use client"
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
@@ -39,56 +51,28 @@ export default function NotificationBell() {
   const scrollContainerRef = useRef<HTMLDivElement>(null)
   const loadMoreRef = useRef<HTMLLIElement | null>(null)
 
+  /**
+   * Load notifications from API
+   */
   const load = useCallback(async () => {
-    if (!user?.id) {
-      console.log('[notification-bell] No user ID, skipping load')
-      return
-    }
-    
-    console.log('[notification-bell] Loading notifications for user', user.id)
+    if (!user?.id) return
     
     try {
       const res = await fetch(`/api/notifications?limit=15`, { cache: 'no-store' })
       const json = await res.json()
       
-      console.log('[notification-bell] API response', { ok: res.ok, itemCount: json.items?.length, json })
-      
       if (!res.ok) throw new Error(json?.error || 'Failed to load notifications')
       
-      // Log each item to see what's wrong
-      console.log('[notification-bell] Raw items:', json.items)
-      json.items?.forEach((item: any, index: number) => {
-        console.log(`[notification-bell] Item ${index}:`, {
-          hasItem: !!item,
-          hasId: !!item?.id,
-          idType: typeof item?.id,
-          idValue: item?.id,
-          fullItem: item
-        })
-      })
-      
-      // Filter out invalid notifications and convert ID to string if needed
-      const validItems = (json.items as Item[]).map((item) => {
-        // Convert numeric ID to string
-        if (item && item.id && typeof item.id === 'number') {
-          return { ...item, id: String(item.id) }
-        }
-        return item
-      }).filter((item) => {
-        const isValid = item && item.id && (typeof item.id === 'string' || typeof item.id === 'number')
-        if (!isValid) {
-          console.warn('[notification-bell] Filtering out invalid item:', item)
-        }
-        return isValid
-      })
-      
-      console.log('[notification-bell] Setting items', { total: json.items?.length, valid: validItems.length })
+      // Validate and normalize notification IDs
+      const validItems = (json.items || []).map((item: any) => ({
+        ...item,
+        id: String(item.id)
+      })).filter((item: any) => item && item.id)
       
       setItems(validItems)
       setCursor(json.nextCursor)
       setHasMore(!!json.nextCursor)
     } catch (e: any) {
-      console.error('[notification-bell] Failed to load notifications', e)
       toast.error(e?.message ?? 'Failed to load notifications')
     }
   }, [user?.id])
@@ -102,13 +86,13 @@ export default function NotificationBell() {
       if (!res.ok) throw new Error(json?.error || 'Failed to load more notifications')
       
       // Filter out invalid notifications and convert ID to string if needed
-      const validItems = (json.items as Item[]).map((item) => {
+      const validItems = (json.items as Item[]).map((item: any) => {
         // Convert numeric ID to string
         if (item && item.id && typeof item.id === 'number') {
           return { ...item, id: String(item.id) }
         }
         return item
-      }).filter((item) => item && item.id && (typeof item.id === 'string' || typeof item.id === 'number'))
+      }).filter((item: any) => item && item.id && (typeof item.id === 'string' || typeof item.id === 'number'))
       
       setItems((prev) => [...prev, ...validItems])
       setCursor(json.nextCursor)
@@ -281,13 +265,20 @@ export default function NotificationBell() {
       return
     }
 
+    // Convert string ID to number for API
+    const numericId = parseInt(id, 10)
+    if (isNaN(numericId)) {
+      console.error('[mark-read] Invalid notification ID - not a number', { id })
+      return
+    }
+
     const prev = items
     setItems((cur) => cur.map((n) => (n.id === id ? { ...n, is_read: true } : n)))
     try {
       const res = await fetch('/api/notifications/mark-read', { 
         method: 'POST', 
         headers: { 'Content-Type': 'application/json' }, 
-        body: JSON.stringify({ ids: [id] }) 
+        body: JSON.stringify({ ids: [numericId] }) 
       })
       const json = await res.json()
       if (!res.ok) {

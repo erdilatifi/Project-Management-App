@@ -175,16 +175,18 @@ export async function createThread(workspaceId: string, title?: string): Promise
     throw new Error(error.message)
   }
 
-  // ensure creator is a participant
-  const upsertRes = await supabase
-    .from('thread_participants')
-    .upsert({ thread_id: thread.id, user_id: user.id, is_admin: true } as any, { onConflict: 'thread_id,user_id' })
-  if (upsertRes.error) {
-    console.error('[createThread] Failed to ensure creator participant', {
+  const participantsParam = [{ user_id: user.id, is_admin: true }]
+  const { error: participantError } = await supabase.rpc('add_thread_participants', {
+    thread_id_param: thread.id,
+    participants_param: participantsParam,
+  })
+  if (participantError) {
+    console.error('[createThread] Failed to seed participants', {
       threadId: thread.id,
       userId: user.id,
-      error: upsertRes.error,
+      error: participantError,
     })
+    throw new Error(participantError.message)
   }
 
   return thread
@@ -209,13 +211,18 @@ export async function sendMessage(threadId: string, workspaceId: string, body: s
   if (error) throw new Error(error.message)
 
   // Determine recipients: participants if present, else all workspace members
-  const { data: parts } = await supabase
-    .from('thread_participants')
-    .select('user_id')
-    .eq('thread_id', threadId)
+  const {
+    data: participantRows,
+    error: participantError,
+  } = await supabase.rpc('get_thread_participants', {
+    thread_id_param: threadId,
+  })
+  if (participantError && participantError.message !== 'Not allowed') {
+    throw new Error(participantError.message)
+  }
   let recipients: string[] = []
-  if (parts && parts.length > 0) {
-    recipients = parts.map((p: any) => p.user_id as string)
+  if (participantRows && participantRows.length > 0) {
+    recipients = (participantRows as any[]).map((p) => p.user_id as string)
   } else {
     const { data: members, error: memErr } = await supabase
       .from('workspace_members')

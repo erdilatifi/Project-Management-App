@@ -49,61 +49,24 @@ const threadsQ = useQuery({
   queryFn: async () => {
     const limit = 20
 
-    // Find threads where current user is creator or a participant
-    const participantIdsRes = await supabase
-      .from('thread_participants')
-      .select('thread_id')
-      .eq('user_id', userId)
-    if (participantIdsRes.error) {
-      console.error('[thread-list] Failed to load participant thread ids', {
-        workspaceId,
-        userId,
-        error: participantIdsRes.error,
-        message: participantIdsRes.error?.message,
-        details: participantIdsRes.error?.details,
-      })
-      throw new Error(participantIdsRes.error.message)
-    }
-    console.log('[thread-list] Loaded participant thread ids', {
-      workspaceId,
-      userId,
-      count: participantIdsRes.data?.length ?? 0,
-      threadIds: participantIdsRes.data?.map((row: any) => row.thread_id),
+    const { data, error } = await supabase.rpc('list_accessible_threads', {
+      workspace_id_param: workspaceId,
+      limit_param: limit,
+      cursor_param: cursor,
     })
-    const ids = (participantIdsRes.data ?? []).map((r: any) => r.thread_id as string)
-
-    // Build OR filter: created_by = me OR id IN (my participant threads)
-    let orFilter = `created_by.eq.${userId}`
-    if (ids.length > 0) {
-      const inList = ids.map((id) => id.replaceAll(',', '')).join(',')
-      orFilter += `,id.in.(${inList})`
-    }
-
-    let q = supabase
-      .from('message_threads')
-      .select('id, title, created_at, created_by')
-      .eq('workspace_id', workspaceId)
-      .or(orFilter)
-      .order('created_at', { ascending: false })
-      .limit(limit)
-
-    if (cursor) {
-      q = q.lt('created_at', cursor)
-    }
-
-    const { data, error } = await q
     if (error) {
       console.error('[thread-list] Failed to load threads', {
         workspaceId,
         userId,
-        filter: orFilter,
         cursor,
         error,
+        message: error.message,
+        details: error.details,
       })
       throw new Error(error.message)
     }
 
-    const rows = (data ?? []) as unknown as MessageThread[]
+    const rows = (data ?? []) as MessageThread[]
     console.log('[thread-list] Loaded threads', {
       workspaceId,
       userId,
@@ -192,34 +155,21 @@ const threadsQ = useQuery({
 
       const threadId: string = (thread as MessageThread).id
 
-      // Ensure the creator is always a participant so last_read_at updates succeed
-      if (userId) {
-        const { error: creatorError } = await supabase
-          .from('thread_participants')
-          .upsert(
-            {
-              thread_id: threadId,
-              user_id: userId,
-              is_admin: true,
-            },
-            { onConflict: 'thread_id,user_id' }
-          )
+      const participantsParam = [
+        ...(userId ? [{ user_id: userId, is_admin: true }] : []),
+        ...userIds
+          .filter((participantId) => participantId && participantId !== userId)
+          .map((participantId) => ({
+            user_id: participantId,
+            is_admin: false,
+          })),
+      ]
 
-        if (creatorError) throw creatorError
-      }
-
-      const participantPayload = userIds
-        .filter((participantId) => participantId && participantId !== userId)
-        .map((participantId) => ({
-          thread_id: threadId,
-          user_id: participantId,
-          is_admin: false,
-        }))
-
-      if (participantPayload.length) {
-        const { error: participantError } = await supabase
-          .from('thread_participants')
-          .upsert(participantPayload, { onConflict: 'thread_id,user_id' })
+      if (participantsParam.length) {
+        const { error: participantError } = await supabase.rpc('add_thread_participants', {
+          thread_id_param: threadId,
+          participants_param: participantsParam,
+        })
 
         if (participantError) throw participantError
       }
@@ -267,12 +217,13 @@ const threadsQ = useQuery({
       
       try {
         // Get last read timestamps for all threads
-        const { data: readData } = await supabase
-          .from('thread_participants')
-          .select('thread_id, last_read_at')
-          .eq('user_id', userId)
-          .in('thread_id', threadIds)
-        
+        const { data: readData, error: readError } = await supabase.rpc('get_thread_reads', {
+          thread_ids_param: threadIds.length ? threadIds : null,
+        })
+        if (readError) {
+          throw readError
+        }
+
         const lastReadMap: Record<string, string | null> = {}
         readData?.forEach((r: any) => {
           lastReadMap[r.thread_id] = r.last_read_at

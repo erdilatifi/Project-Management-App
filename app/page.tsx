@@ -1,4 +1,16 @@
-
+/**
+ * Landing Page Component
+ * 
+ * Main marketing page featuring:
+ * - Hero section with call-to-action
+ * - Interactive Kanban board demo
+ * - Feature showcase with animations
+ * - Customer testimonials
+ * - Comparison table
+ * - FAQ section with infinite scroll
+ * 
+ * @component
+ */
 'use client';
 
 import { useState, FormEvent, ReactNode } from 'react';
@@ -199,9 +211,21 @@ function ComparisonRow({ feature, us, them }: { feature: string; us: boolean; th
   );
 }
 
+/**
+ * Interactive Kanban Board Demo
+ * 
+ * Lightweight drag-and-drop demo without animations for optimal performance.
+ * Showcases task management capabilities with smooth CSS transitions.
+ */
 function InteractiveDashboard() {
   const [draggedCard, setDraggedCard] = useState<number | null>(null);
-  const [columns, setColumns] = useState({ todo: [0, 1], inProgress: [2, 3, 4], done: [5, 6] });
+  const [columns, setColumns] = useState({ 
+    todo: [0, 1], 
+    inProgress: [2, 3, 4], 
+    done: [5, 6] 
+  });
+  
+  // Sample task data for demo purposes
   const taskData = [
     { title: 'Design new landing page', priority: 'high', assignees: 2 },
     { title: 'Update API documentation', priority: 'medium', assignees: 1 },
@@ -211,50 +235,85 @@ function InteractiveDashboard() {
     { title: 'Write unit tests', priority: 'low', assignees: 1 },
     { title: 'Deploy to production', priority: 'medium', assignees: 2 }
   ];
-  const priorityColors: Record<string, string> = { high: 'from-red-500/30 to-red-500/10', medium: 'from-yellow-500/30 to-yellow-500/10', low: 'from-green-500/30 to-green-500/10' };
+  
+  const priorityColors: Record<string, string> = { 
+    high: 'from-red-500/30 to-red-500/10', 
+    medium: 'from-yellow-500/30 to-yellow-500/10', 
+    low: 'from-green-500/30 to-green-500/10' 
+  };
+  
   const handleDragStart = (cardId: number) => setDraggedCard(cardId);
   const handleDragOver = (e: React.DragEvent) => e.preventDefault();
+  
   const handleDrop = (columnKey: 'todo' | 'inProgress' | 'done') => {
     if (draggedCard === null) return;
+    
     setColumns(prev => {
       const next = { ...prev };
+      // Remove card from all columns
       Object.keys(next).forEach(key => {
         next[key as keyof typeof next] = next[key as keyof typeof next].filter(id => id !== draggedCard);
       });
+      // Add to target column
       next[columnKey] = [...next[columnKey], draggedCard];
       return next;
     });
     setDraggedCard(null);
   };
+  
   const columnNames = { todo: 'To Do', inProgress: 'In Progress', done: 'Done' };
+  
   return (
-    <motion.div className="grid flex-1 grid-cols-3 gap-3" variants={elevate}>
+    <div className="grid flex-1 grid-cols-3 gap-3">
       {(Object.keys(columns) as Array<keyof typeof columns>).map((colKey) => (
-        <div key={colKey} className="space-y-2 rounded-xl border border-border/50 bg-muted/20 p-3 backdrop-blur-sm transition-all" onDragOver={handleDragOver} onDrop={() => handleDrop(colKey)}>
+        <div 
+          key={colKey} 
+          className="space-y-2 rounded-xl border border-border/50 bg-muted/20 p-3 backdrop-blur-sm transition-all" 
+          onDragOver={handleDragOver} 
+          onDrop={() => handleDrop(colKey)}
+        >
           <div className="mb-3 flex items-center justify-between">
-            <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">{columnNames[colKey]}</span>
+            <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+              {columnNames[colKey]}
+            </span>
             <span className="text-xs text-muted-foreground/60">{columns[colKey].length}</span>
           </div>
           {columns[colKey].map((cardId) => {
             const task = taskData[cardId];
             return (
-              <motion.div key={cardId} draggable onDragStart={() => handleDragStart(cardId)} className="group cursor-move rounded-lg border border-border/50 bg-card p-2.5 shadow-sm transition-all hover:border-primary/30 hover:shadow-md" style={{ opacity: draggedCard === cardId ? 0.5 : 1 }} whileHover={{ y: -2 }} whileTap={{ scale: 0.98 }}>
+              <div 
+                key={cardId} 
+                draggable 
+                onDragStart={() => handleDragStart(cardId)} 
+                className="group cursor-move rounded-lg border border-border/50 bg-card p-2.5 shadow-sm transition-all duration-200 hover:border-primary/30 hover:shadow-md hover:-translate-y-0.5 active:scale-95" 
+                style={{ 
+                  opacity: draggedCard === cardId ? 0.5 : 1,
+                  transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)'
+                }}
+              >
                 <div className={`mb-2 h-1 w-full rounded bg-gradient-to-r ${priorityColors[task.priority]}`} />
-                <div className="mb-1.5 text-[10px] font-medium text-foreground/90 leading-tight">{task.title}</div>
+                <div className="mb-1.5 text-[10px] font-medium text-foreground/90 leading-tight">
+                  {task.title}
+                </div>
                 <div className="flex items-center justify-between mt-2">
                   <div className="flex -space-x-1">
                     {[...Array(task.assignees)].map((_, i) => (
-                      <div key={i} className="h-3 w-3 rounded-full bg-gradient-to-br from-primary/60 to-primary/40 ring-1 ring-card" />
+                      <div 
+                        key={i} 
+                        className="h-3 w-3 rounded-full bg-gradient-to-br from-primary/60 to-primary/40 ring-1 ring-card" 
+                      />
                     ))}
                   </div>
-                  <div className="text-[8px] text-muted-foreground/60 uppercase tracking-wider">{task.priority}</div>
+                  <div className="text-[8px] text-muted-foreground/60 uppercase tracking-wider">
+                    {task.priority}
+                  </div>
                 </div>
-              </motion.div>
+              </div>
             );
           })}
         </div>
       ))}
-    </motion.div>
+    </div>
   );
 }
 
@@ -298,7 +357,7 @@ export default function Page() {
               </div>
               <div className="flex items-center gap-2">
                 <CheckCircle2 className="h-4 w-4 text-primary" />
-                <span>No credit card</span>
+                <span>Unlimited workspaces</span>
               </div>
               <div className="flex items-center gap-2">
                 <CheckCircle2 className="h-4 w-4 text-primary" />
@@ -307,7 +366,7 @@ export default function Page() {
             </motion.div>
           </motion.div>
 
-          <motion.div variants={zoomIn} initial="initial" whileInView="whileInView" className="mt-20">
+          <motion.div variants={fadeOnly} initial="initial" whileInView="whileInView" className="mt-20">
             <div className="relative mx-auto max-w-6xl">
               <div className="absolute -inset-4 bg-gradient-to-r from-primary/30 via-primary/20 to-primary/30 blur-3xl" />
               <div className="relative overflow-hidden rounded-3xl border-2 border-primary/20 bg-gradient-to-br from-card via-card/95 to-card/90 shadow-2xl ring-1 ring-primary/10">
@@ -491,14 +550,14 @@ export default function Page() {
                   <div className="text-center text-sm font-semibold text-primary">Flowfoundry</div>
                   <div className="text-center text-sm font-semibold text-muted-foreground">Others</div>
                 </div>
-                <ComparisonRow feature="Setup time" us={true} them={false} />
+                <ComparisonRow feature="Quick setup (5 min)" us={true} them={false} />
                 <ComparisonRow feature="Real-time collaboration" us={true} them={false} />
-                <ComparisonRow feature="Free forever plan" us={true} them={false} />
-                <ComparisonRow feature="No learning curve" us={true} them={false} />
+                <ComparisonRow feature="100% free forever" us={true} them={false} />
+                <ComparisonRow feature="Unlimited workspaces" us={true} them={false} />
                 <ComparisonRow feature="Beautiful UI" us={true} them={false} />
                 <ComparisonRow feature="Mobile responsive" us={true} them={true} />
                 <ComparisonRow feature="Dark mode" us={true} them={false} />
-                <ComparisonRow feature="API access" us={true} them={true} />
+                <ComparisonRow feature="Built-in messaging" us={true} them={false} />
               </CardContent>
             </Card>
           </motion.div>
@@ -516,32 +575,32 @@ export default function Page() {
         </Container>
       </Section>
 
-      <Section className="w-full bg-linear-to-br from-primary/5 via-background to-background border-y" id="pricing">
+      <Section className="w-full bg-linear-to-br from-primary/5 via-background to-background border-y" id="get-started">
         <Container>
           <motion.div className="mx-auto max-w-4xl text-center" initial="initial" whileInView="whileInView" variants={fadeScale}>
-            <Badge className="mb-6 shadow-lg">Limited Time Offer</Badge>
-            <h2 className="text-4xl font-bold tracking-tight sm:text-5xl mb-4">Start shipping faster today</h2>
-            <p className="text-lg text-muted-foreground mb-8 max-w-2xl mx-auto">Join 10,000+ teams who've transformed their workflow. Free forever for small teams, with premium features available as you grow.</p>
+            <Badge className="mb-6 shadow-lg">100% Free Forever</Badge>
+            <h2 className="text-4xl font-bold tracking-tight sm:text-5xl mb-4">Start managing projects today</h2>
+            <p className="text-lg text-muted-foreground mb-8 max-w-2xl mx-auto">Join thousands of teams using Flowfoundry. Completely free with unlimited workspaces, projects, and team members.</p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center mb-8">
               <Button asChild size="lg" className="h-14 px-10 text-lg shadow-xl shadow-primary/25">
-                <Link href="/workspaces">Start free trial</Link>
+                <Link href="/workspaces">Get Started Free</Link>
               </Button>
               <Button asChild variant="outline" size="lg" className="h-14 px-10 text-lg border-2">
-                <Link href="#features">View pricing</Link>
+                <Link href="#features">Explore Features</Link>
               </Button>
             </div>
             <div className="flex flex-wrap items-center justify-center gap-6 text-sm text-muted-foreground">
               <div className="flex items-center gap-2">
                 <CheckCircle2 className="h-4 w-4 text-primary" />
-                <span>14-day free trial</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <CheckCircle2 className="h-4 w-4 text-primary" />
-                <span>Cancel anytime</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <CheckCircle2 className="h-4 w-4 text-primary" />
                 <span>No credit card required</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <CheckCircle2 className="h-4 w-4 text-primary" />
+                <span>Unlimited everything</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <CheckCircle2 className="h-4 w-4 text-primary" />
+                <span>Always free</span>
               </div>
             </div>
           </motion.div>
@@ -724,9 +783,9 @@ export default function Page() {
                 <ul className="space-y-3">
                   {[
                     { label: 'Features', href: '#features' },
-                    { label: 'Pricing', href: '#pricing' },
+                    { label: 'Get Started', href: '#get-started' },
                     { label: 'FAQ', href: '#faq' },
-                    { label: 'Changelog', href: '#' }
+                    { label: 'Testimonials', href: '#testimonials' }
                   ].map((link) => (
                     <li key={link.label}>
                       <Link href={link.href} className="text-sm text-muted-foreground transition-colors hover:text-foreground">{link.label}</Link>

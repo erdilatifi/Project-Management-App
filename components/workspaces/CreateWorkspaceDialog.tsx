@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -64,7 +64,7 @@ export default function CreateWorkspaceDialog({ onCreated }: Props) {
         </div>
         <DialogFooter>
           <Button onClick={submit} disabled={submitting || !name.trim()} variant="outline" >
-            {submitting ? "Creatingâ€¦" : "Create"}
+            {submitting ? "Creating..." : "Create"}
           </Button>
         </DialogFooter>
       </DialogContent>

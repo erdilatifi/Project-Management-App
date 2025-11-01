@@ -204,11 +204,11 @@ export const notificationQuerySchema = z.object({
 })
 
 export const markNotificationsReadSchema = z.object({
-  ids: z.array(uuidSchema).min(1, 'At least one notification ID is required').max(100),
+  ids: z.array(z.number().int().positive()).min(1, 'At least one notification ID is required').max(100),
 })
 
 export const markSingleNotificationReadSchema = z.object({
-  id: uuidSchema,
+  id: z.number().int().positive(),
 })
 
 // ============================================================================

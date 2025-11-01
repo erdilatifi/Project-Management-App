@@ -1,5 +1,7 @@
 # Flowfoundry - Project Management Application
 
+![Flowfoundry Banner](./public/FUNFOUNDRY.jpg)
+
 A modern, full-featured project management application built with Next.js 16, Supabase, and TypeScript. Features real-time collaboration, drag-and-drop task management, and a beautiful theme-aware interface.
 
 ## ✨ Features

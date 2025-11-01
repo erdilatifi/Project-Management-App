@@ -6,9 +6,19 @@ import { createClient } from "@/utils/supabase/client";
 import type { Message } from "@/types/workspaces";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { X, Pencil, Trash2 } from "lucide-react";
+import { X, Pencil, Trash2, MoreVertical, LogOut } from "lucide-react";
 import { toast } from "sonner";
 import { formatTimeAgo } from "@/lib/time";
+import { ConfirmationDialog } from "@/components/ui/confirmation-dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  DropdownMenuSeparator,
+} from "@/components/ui/dropdown-menu";
+import { Button } from "@/components/ui/button";
+import { useRouter } from "next/navigation";
 
 type Props = { threadId: string; workspaceId: string; title?: string | null; isCreator?: boolean; onTitleUpdated?: (title: string | null) => void };
 type UserLite = { id: string; email: string | null };
@@ -17,10 +27,17 @@ type UserMeta = { label: string | null; email: string | null; avatar_url: string
 export default function MessagePanel({ threadId, workspaceId, title: titleProp, isCreator: isCreatorProp, onTitleUpdated }: Props) {
   const supabase = useMemo(() => createClient(), []);
   const queryClient = useQueryClient();
+  const router = useRouter();
   const [authors, setAuthors] = useState<Record<string, UserLite>>({});
   const [text, setText] = useState("");
   const [userId, setUserId] = useState<string | null>(null);
   const listRef = useRef<HTMLDivElement | null>(null);
+  
+  // Dialog states
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [leaveDialogOpen, setLeaveDialogOpen] = useState(false);
+  const [deleteMessageDialogOpen, setDeleteMessageDialogOpen] = useState(false);
+  const [messageToDelete, setMessageToDelete] = useState<string | null>(null);
 
   const [participants, setParticipants] = useState<
     Array<{ id: string; email: string | null; avatar_url: string | null; is_admin: boolean }>
@@ -198,25 +215,28 @@ export default function MessagePanel({ threadId, workspaceId, title: titleProp, 
 
   // participants + permissions
   const loadParticipants = useCallback(async () => {
-    const { data: tp, error } = await supabase
-      .from("thread_participants")
-      .select("user_id, is_admin")
-      .eq("thread_id", threadId);
+    const { data: tp, error } = await supabase.rpc("get_thread_participants", {
+      thread_id_param: threadId,
+    });
     if (error) {
       console.error("[message-panel] Failed to load participants", {
         threadId,
         error,
       });
+      setParticipants([]);
       return;
     }
 
+    const participantsRows = Array.isArray(tp) ? tp : [];
+
     console.log("[message-panel] Loaded participants", {
       threadId,
-      count: tp?.length ?? 0,
-      participants: tp,
+      count: participantsRows.length,
     });
 
-    const ids = Array.from(new Set((tp ?? []).map((r: any) => r.user_id as string)));
+    const ids = Array.from(
+      new Set(participantsRows.map((r: any) => String(r.user_id)))
+    );
 
     let manage = false;
     const { data: u } = await supabase.auth.getUser();
@@ -247,7 +267,7 @@ export default function MessagePanel({ threadId, workspaceId, title: titleProp, 
     if (ids.length) {
       const meta = await fetchUserMeta(ids);
       const adminMap: Record<string, boolean> = Object.fromEntries(
-        ((tp ?? []) as any[]).map((x) => [String(x.user_id), !!x.is_admin])
+        participantsRows.map((x: any) => [String(x.user_id), !!x.is_admin])
       );
       setParticipants(
         ids.map((id) => ({
@@ -274,15 +294,19 @@ export default function MessagePanel({ threadId, workspaceId, title: titleProp, 
       try {
         console.log('[message-panel] Marking thread as read', { threadId, userId })
         
-        // Update last_read_at timestamp in thread_participants
-        const { error } = await supabase
-          .from('thread_participants')
-          .update({ last_read_at: new Date().toISOString() })
-          .eq('thread_id', threadId)
-          .eq('user_id', userId)
+        const { error } = await supabase.rpc('mark_thread_read', {
+          thread_id_param: threadId,
+        })
         
         if (error) {
-          console.error('[message-panel] Failed to mark thread as read', error)
+          if (error.message?.toLowerCase().includes('not allowed')) {
+            console.debug('[message-panel] Skipped marking thread as read (not allowed)', {
+              threadId,
+              userId,
+            })
+          } else {
+            console.error('[message-panel] Failed to mark thread as read', error)
+          }
         } else {
           console.log('[message-panel] Thread marked as read successfully')
         }
@@ -769,9 +793,52 @@ export default function MessagePanel({ threadId, workspaceId, title: titleProp, 
     },
   });
 
-  const deleteMessage = async (id: string) => {
-    if (!confirm("Delete this message?")) return;
-    deleteMessageMutation.mutate(id);
+  const deleteMessage = (id: string) => {
+    setMessageToDelete(id);
+    setDeleteMessageDialogOpen(true);
+  };
+
+  const confirmDeleteMessage = async () => {
+    if (!messageToDelete) return;
+    deleteMessageMutation.mutate(messageToDelete);
+    setMessageToDelete(null);
+  };
+
+  // Delete thread handler
+  const handleDeleteThread = async () => {
+    try {
+      const { error } = await supabase.from("message_threads").delete().eq("id", threadId);
+      if (error) throw new Error(error.message);
+      
+      toast.success("Conversation deleted");
+      await queryClient.invalidateQueries({ queryKey: ["threads", workspaceId] });
+      router.push(`/workspaces/${workspaceId}/messages`);
+    } catch (e: any) {
+      toast.error(e?.message ?? "Failed to delete conversation");
+      throw e;
+    }
+  };
+
+  // Leave thread handler
+  const handleLeaveThread = async () => {
+    if (!userId) return;
+    
+    try {
+      const { error } = await supabase
+        .from("thread_participants")
+        .delete()
+        .eq("thread_id", threadId)
+        .eq("user_id", userId);
+      
+      if (error) throw new Error(error.message);
+      
+      toast.success("Left conversation");
+      await queryClient.invalidateQueries({ queryKey: ["threads", workspaceId] });
+      router.push(`/workspaces/${workspaceId}/messages`);
+    } catch (e: any) {
+      toast.error(e?.message ?? "Failed to leave conversation");
+      throw e;
+    }
   };
 
   return (
@@ -809,15 +876,34 @@ export default function MessagePanel({ threadId, workspaceId, title: titleProp, 
           )}
         </div>
 
-        {/* Leave button - visible to all participants and owner */}
+        {/* Thread actions menu */}
         {userId && (participants.some((p) => p.id === userId) || creatorId === userId) && (
-          <button
-            className="text-xs px-3 py-2 rounded-lg border border-border bg-card hover:bg-red-50 dark:hover:bg-red-950 hover:text-red-600 hover:border-red-300 font-medium transition-colors whitespace-nowrap"
-            onClick={() => removeParticipant(userId)}
-            title={creatorId === userId ? "Leave (will delete thread)" : "Leave conversation"}
-          >
-            {creatorId === userId ? "Leave & Delete" : "Leave"}
-          </button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="icon" className="h-8 w-8">
+                <MoreVertical className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              {creatorId === userId ? (
+                <DropdownMenuItem
+                  className="text-destructive focus:text-destructive cursor-pointer"
+                  onClick={() => setDeleteDialogOpen(true)}
+                >
+                  <Trash2 className="mr-2 h-4 w-4" />
+                  Delete Conversation
+                </DropdownMenuItem>
+              ) : (
+                <DropdownMenuItem
+                  className="text-destructive focus:text-destructive cursor-pointer"
+                  onClick={() => setLeaveDialogOpen(true)}
+                >
+                  <LogOut className="mr-2 h-4 w-4" />
+                  Leave Conversation
+                </DropdownMenuItem>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
         )}
       </div>
 
@@ -986,6 +1072,43 @@ export default function MessagePanel({ threadId, workspaceId, title: titleProp, 
           className="h-11 rounded-xl border-border bg-background focus-visible:ring-2 focus-visible:ring-ring"
         />
       </div>
+
+      {/* Confirmation Dialogs */}
+      <ConfirmationDialog
+        open={deleteDialogOpen}
+        onOpenChange={setDeleteDialogOpen}
+        title="Delete Conversation"
+        description="Are you sure you want to delete this conversation? This action cannot be undone and all messages will be permanently deleted."
+        confirmText="Delete"
+        cancelText="Cancel"
+        variant="destructive"
+        onConfirm={handleDeleteThread}
+      />
+
+      <ConfirmationDialog
+        open={leaveDialogOpen}
+        onOpenChange={setLeaveDialogOpen}
+        title="Leave Conversation"
+        description="Are you sure you want to leave this conversation? You will no longer receive messages or be able to view this chat."
+        confirmText="Leave"
+        cancelText="Cancel"
+        variant="destructive"
+        onConfirm={handleLeaveThread}
+      />
+
+      <ConfirmationDialog
+        open={deleteMessageDialogOpen}
+        onOpenChange={(open) => {
+          setDeleteMessageDialogOpen(open);
+          if (!open) setMessageToDelete(null);
+        }}
+        title="Delete Message"
+        description="Are you sure you want to delete this message? This action cannot be undone."
+        confirmText="Delete"
+        cancelText="Cancel"
+        variant="destructive"
+        onConfirm={confirmDeleteMessage}
+      />
     </div>
   );
 }

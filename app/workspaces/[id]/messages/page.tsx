@@ -74,15 +74,27 @@ export default function WorkspaceMessagesPage() {
       const creator = currentUserId ? data?.created_by === currentUserId : false;
       setIsCreator(creator);
 
-      // If not creator, ensure current user is a participant; otherwise redirect
+      // If not creator, ensure current user is a participant or admin; otherwise redirect
       if (!creator && currentUserId) {
-        const { data: part } = await supabase
-          .from('thread_participants')
-          .select('user_id')
-          .eq('thread_id', activeThreadId)
-          .eq('user_id', currentUserId)
-          .maybeSingle();
-        if (!part) {
+        const { data: participants, error: participantsError } = await supabase.rpc('get_thread_participants', {
+          thread_id_param: activeThreadId,
+        });
+
+        if (participantsError) {
+          if (participantsError.message?.toLowerCase().includes('not allowed')) {
+            setThread(undefined);
+            toast.error('You do not have access to this conversation');
+            return;
+          }
+          toast.error(participantsError.message || 'Failed to load participants');
+          return;
+        }
+
+        const isParticipant = Array.isArray(participants)
+          ? participants.some((p: any) => String(p.user_id) === currentUserId)
+          : false;
+
+        if (!isParticipant) {
           setThread(undefined);
           toast.error('You do not have access to this conversation');
         }

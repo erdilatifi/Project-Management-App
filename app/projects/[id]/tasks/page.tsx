@@ -357,9 +357,7 @@ export default function ProjectTasksBoardPage() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      console.log('Loading tasks for project:', projectId, 'userId:', userId);
-      
-      // Load ALL tasks in the project (project board shows everything)
+      // Load all tasks in the project
       const { data, error } = await supabase
         .from("tasks")
         .select(
@@ -368,13 +366,8 @@ export default function ProjectTasksBoardPage() {
         .eq("project_id", projectId)
         .order("created_at", { ascending: false });
 
-      if (error) {
-        console.error('Error loading tasks:', error);
-        throw error;
-      }
-      console.log('Loaded tasks:', data?.length, data);
-      console.log('Current user ID:', userId);
-      console.log('Sample task:', data?.[0]);
+      if (error) throw error;
+      
       setItems(sortTasks((data ?? []) as TaskRow[]));
     } catch (e: unknown) {
       toast.error(
@@ -594,7 +587,6 @@ export default function ProjectTasksBoardPage() {
     if (!t) return;
     
     const assignees = Array.isArray(t.assignee_ids) ? t.assignee_ids : [];
-    console.log('Drag start - task:', t.id, 'assignees:', assignees, 'userId:', userId);
     
     // Allow drag if user is one of the assignees, task is unassigned, or user is creator
     if (assignees.length === 0 || assignees.includes(userId || "") || t.created_by === userId) {
@@ -708,7 +700,6 @@ export default function ProjectTasksBoardPage() {
               projectId={projectId}
               workspaceId={workspaceId}
               onTaskCreated={async (task) => {
-                console.log('Task created, received:', task);
                 // Optimistically add the task immediately
                 if (task) {
                   setItems((cur) => sortTasks([...cur, task as TaskRow]));
