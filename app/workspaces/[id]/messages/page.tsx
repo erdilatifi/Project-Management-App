@@ -137,14 +137,15 @@ export default function WorkspaceMessagesPage() {
         'postgres_changes',
         { event: 'DELETE', schema: 'public', table: 'message_threads', filter: `id=eq.${activeThreadId}` },
         () => {
-          setThread(undefined);
+          toast.info("Conversation has been deleted");
+          router.push('/workspaces');
         }
       )
       .subscribe();
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [supabase, activeThreadId, setThread]);
+  }, [supabase, activeThreadId, router]);
 
   // Optimistic title update for mobile header
   const saveTitleMutation = useMutation({

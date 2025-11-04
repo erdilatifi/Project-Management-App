@@ -83,16 +83,17 @@ export default function WorkspacePeoplePage() {
       const newRows = (members ?? []).map((m: any) => {
           const id = m.user_id
           const profile = profileMap[id]
-          const label =
-            profile?.username?.trim() ||
-            profile?.full_name?.trim() ||
-            profile?.email ||
-            'Unknown'
+          const fullName = profile?.full_name ? profile.full_name.trim() : null
+          const username = profile?.username ? profile.username.trim() : null
+          const email = profile?.email ?? null
+          const nameCandidate = fullName || username || null
+          const displayName = nameCandidate || (email ? email.split('@')[0] : 'Unknown')
           return {
             workspace_id: m.workspace_id,
             user_id: id,
             role: m.role,
-            email: label,
+            name: displayName,
+            email,
             avatar_url: profile?.avatar_url ?? null,
             job_title: profile?.job_title ?? null,
           }
@@ -204,11 +205,13 @@ export default function WorkspacePeoplePage() {
   const filteredRows = useMemo(() => {
     if (!searchQuery.trim()) return rows
     const query = searchQuery.toLowerCase()
-    return rows.filter((m) => 
-      m.email?.toLowerCase().includes(query) ||
-      m.job_title?.toLowerCase().includes(query) ||
-      m.role?.toLowerCase().includes(query)
-    )
+    return rows.filter((m) => {
+      const nameMatch = m.name ? m.name.toLowerCase().includes(query) : false
+      const emailMatch = m.email ? m.email.toLowerCase().includes(query) : false
+      const jobMatch = m.job_title ? m.job_title.toLowerCase().includes(query) : false
+      const roleMatch = m.role ? m.role.toLowerCase().includes(query) : false
+      return nameMatch || emailMatch || jobMatch || roleMatch
+    })
   }, [rows, searchQuery])
 
   // Keyboard shortcut for search
@@ -307,12 +310,14 @@ export default function WorkspacePeoplePage() {
                     <div className="flex items-center gap-3 min-w-0 md:col-span-1">
                       <Avatar className="h-10 w-10 md:h-8 md:w-8">
                         {m.avatar_url ? (
-                          <AvatarImage src={m.avatar_url} alt={m.email ?? 'Avatar'} />
+                          <AvatarImage src={m.avatar_url} alt={m.name ?? 'Avatar'} />
                         ) : null}
-                        <AvatarFallback className="text-xs font-medium">{m.email?.[0]?.toUpperCase() ?? 'U'}</AvatarFallback>
+                        <AvatarFallback className="text-xs font-medium">
+                          {(m.name?.[0] ?? m.email?.[0] ?? 'U').toUpperCase()}
+                        </AvatarFallback>
                       </Avatar>
                       <div className="flex-1 min-w-0">
-                        <span className="block truncate font-medium text-foreground">{m.email}</span>
+                        <span className="block truncate font-medium text-foreground">{m.name}</span>
                         <span className="md:hidden block text-xs text-muted-foreground mt-0.5">{m.job_title || 'No Position'}</span>
                       </div>
                     </div>

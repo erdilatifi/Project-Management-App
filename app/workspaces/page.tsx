@@ -246,9 +246,7 @@ export default function WorkspacesPage() {
 
                       {w.description ? (
                         <p className="text-sm text-muted-foreground leading-6 line-clamp-3">{w.description}</p>
-                      ) : (
-                        <p className="text-sm text-muted-foreground italic">No description</p>
-                      )}
+                      ) : null}
                     </div>
 
                     <Separator />

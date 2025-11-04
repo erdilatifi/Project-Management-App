@@ -86,7 +86,7 @@ const Navbar = () => {
   }, [user?.id]);
 
   // Subscribe to real-time profile and user updates
-  useEffect(() => {
+useEffect(() => {
   if (!user?.id) return;
 
   const profChannel = supabase
@@ -121,6 +121,44 @@ const Navbar = () => {
   };
 }, [user?.id, supabase]);
 
+  useEffect(() => {
+    if (typeof window === 'undefined' || !user?.id) return;
+
+    const onProfileUpdated = (event: Event) => {
+      const detail = (event as CustomEvent<Partial<ProfileRow>>).detail ?? {};
+      setProfile((prev) => {
+        const next: ProfileRow = {
+          username: detail.username ?? prev?.username ?? null,
+          full_name: detail.full_name ?? prev?.full_name ?? null,
+          avatar_url:
+            detail.avatar_url !== undefined
+              ? detail.avatar_url
+              : prev?.avatar_url ?? null,
+        };
+
+        if (
+          prev &&
+          next.username === prev.username &&
+          next.full_name === prev.full_name &&
+          next.avatar_url === prev.avatar_url
+        ) {
+          return prev;
+        }
+
+        return next;
+      });
+
+      if (detail.avatar_url !== undefined) {
+        setAvatarSalt(Date.now());
+      }
+
+      setProfileLoading(false);
+    };
+
+    window.addEventListener('profile-updated', onProfileUpdated as EventListener);
+    return () => window.removeEventListener('profile-updated', onProfileUpdated as EventListener);
+  }, [user?.id]);
+
 
   // Handle user sign out and redirect to login
   const handleSignOut = async () => {
@@ -150,14 +188,14 @@ const Navbar = () => {
     { name: 'Profile', path: '/profile' },
   ];
 
-  // Determine display name with fallback priority: username > full_name > email
+  // Determine display name with fallback priority: full_name > username > email
   const displayName = useMemo(
     () =>
-      profile?.username?.trim() ||
       profile?.full_name?.trim() ||
+      profile?.username?.trim() ||
       user?.email?.split('@')[0] ||
       '',
-    [profile?.username, profile?.full_name, user?.email]
+    [profile?.full_name, profile?.username, user?.email]
   );
 
   // Navigation item with animated underline on hover and active state

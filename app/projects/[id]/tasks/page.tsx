@@ -33,6 +33,7 @@ import { useRouter } from "next/navigation";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { TaskAssignees } from "@/components/tasks/TaskAssignees";
 import { CreateTaskDialog } from "@/components/tasks/CreateTaskDialog";
+import { getUserDisplayName } from "@/utils/userDisplay";
 
 import {
   DndContext,
@@ -48,6 +49,31 @@ import {
 
 
 type Candidate = { id: string; label: string };
+
+const PLACEHOLDER_LABELS = new Set([
+  "unknown",
+  "unknown user",
+  "unknown-user",
+  "unknown_user",
+  "no email",
+  "no-email",
+  "no_email",
+]);
+
+const normalize = (value?: string | null) => {
+  if (typeof value !== "string") return null;
+  const trimmed = value.trim();
+  if (!trimmed.length) return null;
+  if (PLACEHOLDER_LABELS.has(trimmed.toLowerCase())) return null;
+  return trimmed;
+};
+
+const emailToHandle = (email?: string | null) => {
+  const cleaned = normalize(email);
+  if (!cleaned) return null;
+  const [handle] = cleaned.split("@");
+  return normalize(handle);
+};
 
 type SearchBarProps = {
   candidates: Candidate[];
@@ -73,7 +99,7 @@ function AssigneeSearchBar({
   const boxRef = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
 
-  // Reflect external value into the input
+  // Keep the input in sync with the upstream value.
   useEffect(() => {
     if (value === null) {
       setQ(allowUnassigned ? "Unassigned" : "");
@@ -288,6 +314,21 @@ const COLUMNS: Array<{ id: Status; label: string }> = [
   { id: "done", label: "Done" },
 ];
 
+const getAssigneeIds = (task: TaskRow) => {
+  const ids = new Set<string>();
+  if (Array.isArray(task.assignee_ids)) {
+    task.assignee_ids.forEach((id) => {
+      if (typeof id === "string" && id.trim().length) {
+        ids.add(id);
+      }
+    });
+  }
+  if (typeof task.assignee_id === "string" && task.assignee_id.trim().length) {
+    ids.add(task.assignee_id);
+  }
+  return Array.from(ids);
+};
+
 const statusTint: Record<Status, string> = {
   todo: "from-white to-blue-50/50",
   in_progress: "from-white to-amber-50/50",
@@ -325,23 +366,24 @@ export default function ProjectTasksBoardPage() {
   const [userId, setUserId] = useState<string | null>(null);
   const [activeId, setActiveId] = useState<UniqueIdentifier | null>(null);
   const [workspaceId, setWorkspaceId] = useState<string | null>(null);
-  const [members, setMembers] = useState<Array<{ id: string; email: string }>>([]);
+  const [members, setMembers] = useState<Array<{ id: string; label: string; email?: string | null }>>([]);
+  const [assigneeProfiles, setAssigneeProfiles] = useState<Record<string, { id: string; label: string }>>({});
   const [canCreate, setCanCreate] = useState<boolean>(false);
   const [dueFilter, setDueFilter] = useState<DueFilter>("all");
 
-  // Task editing state
+  // Task editing state.
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editTitle, setEditTitle] = useState<string>("");
   const [editDescription, setEditDescription] = useState<string>("");
   const [editDue, setEditDue] = useState<string>("");
   const [savingEdit, setSavingEdit] = useState(false);
 
-  // Delete confirmation dialog
+  // Delete confirmation dialog state.
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
 
-  // Drag and drop sensors
+  // Drag-and-drop sensors.
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } })
   );
@@ -354,10 +396,81 @@ export default function ProjectTasksBoardPage() {
           new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
       );
 
+  const ensureAssigneeProfiles = useCallback(
+    async (ids: string[]) => {
+      const unique = Array.from(new Set(ids.filter((id) => !!id)));
+      const missing = unique.filter((id) => !assigneeProfiles[id]);
+      if (!missing.length) return;
+
+      const resolved: Record<string, { id: string; label: string }> = {};
+      const memberMap = new Map(members.map((m) => [m.id, m.label]));
+
+      missing.forEach((id) => {
+        const label = memberMap.get(id);
+        if (label) {
+          resolved[id] = { id, label };
+        }
+      });
+
+      let remaining = missing.filter((id) => !resolved[id]);
+
+      if (remaining.length) {
+        try {
+          const { data: profiles } = await supabase
+            .from("profiles")
+            .select("id, username, full_name, email")
+            .in("id", remaining);
+
+          (profiles ?? []).forEach((profile: any) => {
+            const label = getUserDisplayName({
+              id: profile.id,
+              full_name: profile.full_name,
+              username: profile.username,
+              email: profile.email,
+            });
+            if (label) {
+              resolved[profile.id] = { id: profile.id, label };
+            }
+          });
+        } catch (error) {
+          console.error("Failed to load profile names:", error);
+        }
+      }
+
+      remaining = remaining.filter((id) => !resolved[id]);
+
+      if (remaining.length) {
+        try {
+          const query = encodeURIComponent(remaining.join(","));
+          const resp = await fetch(`/api/users/by-ids?ids=${query}`, { cache: "no-store" });
+          if (resp.ok) {
+            const data: Array<{ id: string; email: string }> = await resp.json();
+            data.forEach((entry) => {
+              const label = getUserDisplayName({ id: entry.id, email: entry.email });
+              resolved[entry.id] = { id: entry.id, label };
+            });
+          }
+        } catch (error) {
+          console.error("Fallback user lookup failed:", error);
+        }
+      }
+
+      remaining = remaining.filter((id) => !resolved[id]);
+      remaining.forEach((id) => {
+        resolved[id] = { id, label: id.slice(0, 8) };
+      });
+
+      if (Object.keys(resolved).length) {
+        setAssigneeProfiles((prev) => ({ ...prev, ...resolved }));
+      }
+    },
+    [assigneeProfiles, members, supabase]
+  );
+
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      // Load all tasks in the project
+      // Load every task in the current project.
       const { data, error } = await supabase
         .from("tasks")
         .select(
@@ -378,7 +491,7 @@ export default function ProjectTasksBoardPage() {
     }
   }, [projectId, supabase, userId]);
 
-  // Initialize workspace and members
+  // Initialize workspace context and member roster.
   useEffect(() => {
     const init = async () => {
       let currentUserId: string | null = null;
@@ -389,7 +502,7 @@ export default function ProjectTasksBoardPage() {
       } catch {}
       await load();
 
-      // load project workspace and its members for assignee picker + role
+      // Retrieve workspace membership details for permissions and the assignee picker.
       try {
         const { data: proj } = await supabase
           .from("projects")
@@ -407,31 +520,41 @@ export default function ProjectTasksBoardPage() {
 
           const ids = (wms ?? []).map((r: any) => r.user_id as string);
           if (ids.length) {
-            // Determine if current user is admin or owner (no await inside .find)
+            // Determine whether the current user is an admin or owner (no await inside .find).
             const me = (wms ?? []).find(
               (r: any) => String(r.user_id) === String(currentUserId)
             );
             setCanCreate(me?.role === "admin" || me?.role === "owner");
 
             try {
-              // Prefer any saved label on workspace_members; fallback to app profiles
+              // Prefer any saved label on workspace_members; fall back to profile data.
               const wmLabelMap: Record<string, string | null> = Object.fromEntries(
                 (wms ?? []).map((r: any) => {
                   const uid = String(r.user_id);
-                  const primary = (r.member_name as string | null) || (r.name as string | null) || (r.display_name as string | null);
-                  const fallback = (r.member_email as string | null) || (r.email as string | null) || null;
-                  const label = (primary && String(primary).trim()) || (fallback && String(fallback).trim()) || null;
+                  const primary =
+                    normalize(r.member_name as string | null) ||
+                    normalize(r.name as string | null) ||
+                    normalize(r.display_name as string | null);
+                  const fallbackEmail =
+                    (r.member_email as string | null) ||
+                    (r.email as string | null) ||
+                    null;
+                  const fallback = emailToHandle(fallbackEmail);
+                  const label = primary ?? fallback ?? null;
                   return [uid, label];
                 })
               );
+              const wmById: Record<string, any> = Object.fromEntries(
+                (wms ?? []).map((r: any) => [String(r.user_id), r])
+              );
 
-              // Fetch profiles for additional user data
-              let profilesMap: Record<string, { username: string | null; full_name: string | null }> = {};
+              // Fetch profile data for additional user metadata.
+              let profilesMap: Record<string, { username: string | null; full_name: string | null; email: string | null }> = {};
               try {
                 if (ids.length) {
                   const { data: profs } = await supabase
                     .from("profiles")
-                    .select("id, username, full_name")
+                    .select("id, username, full_name, email")
                     .in("id", ids);
                   profilesMap = Object.fromEntries(
                     (profs ?? []).map((p: any) => [
@@ -439,6 +562,7 @@ export default function ProjectTasksBoardPage() {
                       {
                         username: (p.username as string | null) ?? null,
                         full_name: (p.full_name as string | null) ?? null,
+                        email: (p.email as string | null) ?? null,
                       },
                     ])
                   );
@@ -447,14 +571,21 @@ export default function ProjectTasksBoardPage() {
 
               setMembers(
                 ids.map((id) => {
-                  const label =
-                    // Prefer workspace member data first
-                    (wmLabelMap[id]?.trim()) ||
-                    // Then profiles data
-                    (profilesMap[id]?.username?.trim()) ||
-                    (profilesMap[id]?.full_name?.trim()) ||
-                    "User";
-                  return { id, email: label };
+                  const wmRecord = wmById[id];
+                  const wmEmail =
+                    (wmRecord?.member_email as string | null)?.trim() ||
+                    (wmRecord?.email as string | null)?.trim() ||
+                    null;
+                  const profileEmail = profilesMap[id]?.email ?? null;
+                  const handle = emailToHandle(wmEmail) || emailToHandle(profileEmail);
+                  const display =
+                    normalize(wmLabelMap[id]) ||
+                    normalize(profilesMap[id]?.full_name) ||
+                    normalize(profilesMap[id]?.username) ||
+                    handle ||
+                    id.slice(0, 8);
+
+                  return { id, label: display, email: wmEmail ?? profileEmail };
                 })
               );
             } catch {
@@ -469,7 +600,7 @@ export default function ProjectTasksBoardPage() {
     init();
   }, [supabase, load, projectId]);
 
-  // Real-time task updates
+  // Listen for real-time task updates.
   useEffect(() => {
     if (!projectId) return;
     const channel = supabase
@@ -477,10 +608,25 @@ export default function ProjectTasksBoardPage() {
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "tasks", filter: `project_id=eq.${projectId}` },
-        (payload) => {
+        async (payload) => {
           const type = payload.eventType;
           const row = type === "DELETE" ? (payload.old as TaskRow) : (payload.new as TaskRow);
           if (!row) return;
+          
+          // For INSERT or UPDATE events, fetch profile data for new assignees before mutating local state.
+          if (type === "INSERT" || type === "UPDATE") {
+            const assigneeIds = new Set<string>();
+            if (row.assignee_id) assigneeIds.add(row.assignee_id);
+            if (Array.isArray(row.assignee_ids)) {
+              row.assignee_ids.forEach(id => assigneeIds.add(id));
+            }
+            
+            if (assigneeIds.size > 0) {
+              await ensureAssigneeProfiles(Array.from(assigneeIds));
+            }
+          }
+          
+          // Update the task list after profile data is ready.
           setItems((cur) => {
             if (type === "INSERT") {
               const exists = cur.some((t) => t.id === row.id);
@@ -501,10 +647,31 @@ export default function ProjectTasksBoardPage() {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [supabase, projectId]);
+  }, [supabase, projectId, ensureAssigneeProfiles]);
 
+  // Fetch profile data for every assignee referenced by the current task list.
+  useEffect(() => {
+    const fetchAssigneeProfiles = async () => {
+      if (items.length === 0) return;
+      
+      // Collect all unique assignee identifiers from the tasks.
+      const assigneeIds = new Set<string>();
+      items.forEach(task => {
+        if (task.assignee_id) assigneeIds.add(task.assignee_id);
+        if (Array.isArray(task.assignee_ids)) {
+          task.assignee_ids.forEach(id => assigneeIds.add(id));
+        }
+      });
+      
+      if (assigneeIds.size === 0) return;
+      
+      await ensureAssigneeProfiles(Array.from(assigneeIds));
+    };
+    
+    fetchAssigneeProfiles();
+  }, [items, ensureAssigneeProfiles]);
 
-  // Task update helper
+  // Task update helper.
   const updateTask = async (id: string, patch: Partial<TaskRow>) => {
     try {
       const prev = items.find((t) => t.id === id) || null;
@@ -518,7 +685,7 @@ export default function ProjectTasksBoardPage() {
         .single<TaskRow>();
       if (error) throw error;
       setItems((cur) => cur.map((t) => (t.id === id ? data : t)));
-      // Notify on status change (fanout)
+      // Notify on status change (fanout).
       if (prev && typeof patch.status !== "undefined" && prev.status !== data.status) {
         const actor = (await supabase.auth.getUser()).data.user?.id ?? "system";
         const recipients = new Set<string>();
@@ -553,12 +720,12 @@ export default function ProjectTasksBoardPage() {
         toast.error("Only the creator can delete this task.");
         return;
       }
-      // optimistic remove
+      // Optimistically remove the task until the server confirms the deletion.
       const prev = items;
       setItems((cur) => cur.filter((t) => t.id !== id));
       const { error } = await supabase.from("tasks").delete().eq("id", id);
       if (error) {
-        setItems(prev); // revert
+        setItems(prev); // Revert if the deletion fails.
         throw error;
       }
       toast.success("Task deleted");
@@ -580,17 +747,20 @@ export default function ProjectTasksBoardPage() {
     }
   };
 
-  // Drag and drop handlers
+  // Drag-and-drop handlers.
   const onDragStart = (evt: DragStartEvent) => {
     const draggedId = evt.active.id as string;
     const t = items.find((x) => x.id === draggedId);
     if (!t) return;
     
-    const assignees = Array.isArray(t.assignee_ids) ? t.assignee_ids : [];
-    
-    // Allow drag if user is one of the assignees, task is unassigned, or user is creator
-    if (assignees.length === 0 || assignees.includes(userId || "") || t.created_by === userId) {
+    const assignees = getAssigneeIds(t);
+    const selfId = userId ?? null;
+    const isAssignee = !!selfId && assignees.includes(selfId);
+
+    if (isAssignee) {
       setActiveId(evt.active.id);
+    } else if (selfId) {
+      toast.error("You can only move tasks assigned to you.");
     }
   };
 
@@ -603,23 +773,28 @@ export default function ProjectTasksBoardPage() {
     const prev = items.find((t) => t.id === draggedId);
     if (!prev) return;
     
-    const assignees = Array.isArray(prev.assignee_ids) ? prev.assignee_ids : [];
-    // Allow move if user is one of the assignees, task is unassigned, or user is creator
-    if (!(assignees.length === 0 || assignees.includes(userId || "") || prev.created_by === userId)) return;
+    const assignees = getAssigneeIds(prev);
+    const selfId = userId ?? null;
+    const isAssignee = !!selfId && assignees.includes(selfId);
 
-    // Parse column ID from droppable
+    if (!isAssignee) {
+      if (selfId) toast.error("Only assigned users can move this task.");
+      return;
+    }
+
+    // Parse the column identifier from the droppable target.
     const [, target] = overId.split(":");
     if (!target || !["todo", "in_progress", "done"].includes(target)) return;
 
     const nextStatus = target as Status;
     if (prev.status === nextStatus) return;
 
-    // Optimistic UI update
+    // Optimistically update UI to reflect the new status.
     setItems((cur) => cur.map((t) => (t.id === draggedId ? { ...t, status: nextStatus } : t)));
     try {
       await updateTask(draggedId, { status: nextStatus });
     } catch {
-      // revert on failure
+      // Revert on failure.
       setItems((cur) => cur.map((t) => (t.id === draggedId ? { ...t, status: prev.status } : t)));
     }
   };
@@ -635,7 +810,7 @@ export default function ProjectTasksBoardPage() {
     setEditDue(t.due_at ? new Date(t.due_at).toISOString().slice(0, 10) : "");
   };
 
-  // Make save optimistic for instant feedback (includes due date)
+  // Apply optimistic updates so edits feel instantaneous.
   const saveEdit = async (id: string) => {
     setSavingEdit(true);
     const prev = items.find((t) => t.id === id);
@@ -651,14 +826,14 @@ export default function ProjectTasksBoardPage() {
       due_at: editDue ? new Date(editDue).toISOString() : null,
     };
 
-    // optimistic
+    // Optimistically apply the changes before persisting.
     setItems((cur) => cur.map((t) => (t.id === id ? { ...t, ...patch } : t)));
 
     try {
       await updateTask(id, patch);
       setEditingId(null);
     } catch {
-      // revert on failure
+      // Revert on failure.
       if (prev) {
         setItems((cur) => cur.map((t) => (t.id === id ? prev : t)));
       }
@@ -672,7 +847,7 @@ export default function ProjectTasksBoardPage() {
     setDeleteOpen(true);
   };
 
-  // Filter tasks by due date category
+  // Filter tasks by due-date category.
   const filteredItems = useMemo(() => {
     if (dueFilter === "all") return items;
     return items.filter((t) => dueCategory(t.due_at) === dueFilter);
@@ -700,11 +875,28 @@ export default function ProjectTasksBoardPage() {
               projectId={projectId}
               workspaceId={workspaceId}
               onTaskCreated={async (task) => {
-                // Optimistically add the task immediately
+                // Fetch assignee profiles immediately for the new task.
                 if (task) {
-                  setItems((cur) => sortTasks([...cur, task as TaskRow]));
+                  const taskRow = task as TaskRow;
+                  const assigneeIds = new Set<string>();
+                  if (taskRow.assignee_id) assigneeIds.add(taskRow.assignee_id);
+                  if (Array.isArray(taskRow.assignee_ids)) {
+                    taskRow.assignee_ids.forEach(id => assigneeIds.add(id));
+                  }
+                  
+                  console.log('[onTaskCreated] Task created with assignees:', {
+                    taskId: taskRow.id,
+                    assigneeIds: Array.from(assigneeIds),
+                  });
+                  
+                  if (assigneeIds.size > 0) {
+                    await ensureAssigneeProfiles(Array.from(assigneeIds));
+                  }
+                  
+                  // Optimistically add the task after profile enrichment.
+                  setItems((cur) => sortTasks([...cur, taskRow]));
                 }
-                // Reload to ensure consistency
+                // Reload to ensure the client state matches the database.
                 await load();
               }}
             />
@@ -777,7 +969,7 @@ export default function ProjectTasksBoardPage() {
                       toast.error("Only the creator can change priority.");
                       return;
                     }
-                    // optimistic priority
+                    // Optimistically update priority before persisting.
                     setItems((cur) => cur.map((t) => (t.id === id ? { ...t, priority: value } : t)));
                     try {
                       await updateTask(id, { priority: value });
@@ -788,6 +980,7 @@ export default function ProjectTasksBoardPage() {
                     }
                   }}
                   members={members}
+                  assigneeProfiles={assigneeProfiles}
                   currentUserId={userId}
                   todayStr={todayStr}
                 />
@@ -842,7 +1035,8 @@ interface ColumnProps {
   setEditDue: (v: string) => void;
   onSaveEdit: (id: string) => void;
   savingEdit: boolean;
-  members: Array<{ id: string; email: string }>;
+  members: Array<{ id: string; label: string; email?: string | null }>;
+  assigneeProfiles: Record<string, { id: string; label: string }>;
   currentUserId: string | null;
   todayStr: string;
 }
@@ -896,7 +1090,8 @@ function Column(props: ColumnProps) {
                 onSave={() => props.onSaveEdit(t.id)}
                 saving={props.savingEdit}
                 members={props.members}
-                assignees={Array.isArray(t.assignee_ids) ? t.assignee_ids : []}
+                assigneeProfiles={props.assigneeProfiles}
+                assignees={getAssigneeIds(t)}
                 currentUserId={props.currentUserId}
                 todayStr={props.todayStr}
               />
@@ -922,15 +1117,21 @@ interface TaskCardProps {
   setEditDue: (v: string) => void;
   onSave: () => void;
   saving: boolean;
-  members: Array<{ id: string; email: string }>;
+  members: Array<{ id: string; label: string; email?: string | null }>;
+  assigneeProfiles: Record<string, { id: string; label: string }>;
   assignees: string[];
   currentUserId: string | null;
   todayStr: string;
 }
 
 function TaskCard(props: TaskCardProps) {
+  const isCreator = !!props.currentUserId && props.currentUserId === props.task.created_by;
+  const isAssignee = !!props.currentUserId && props.assignees.includes(props.currentUserId);
+  const canDrag = !!props.currentUserId && isAssignee;
+
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: props.task.id,
+    disabled: !canDrag,
   });
 
   const style: CSSProperties | undefined = transform
@@ -956,8 +1157,6 @@ function TaskCard(props: TaskCardProps) {
     <div
       ref={setNodeRef}
       style={style as CSSProperties}
-      {...listeners}
-      {...attributes}
       className={`rounded-xl border border-border bg-card hover:bg-accent transition-colors p-3 shadow-sm hover:shadow-md focus-visible:ring-2 focus-visible:ring-ring outline-none ${
         isDragging ? "opacity-70" : ""
       }`}
@@ -966,7 +1165,13 @@ function TaskCard(props: TaskCardProps) {
         <>
           <div className="flex items-start justify-between gap-3">
             <div className="flex items-start gap-2">
-              <span className="mt-0.5 inline-flex h-5 w-5 items-center justify-center rounded-md border border-border bg-card text-muted-foreground cursor-grab active:cursor-grabbing">
+              <span
+                className={`mt-0.5 inline-flex h-5 w-5 items-center justify-center rounded-md border border-border bg-card text-muted-foreground ${
+                  canDrag ? "cursor-grab active:cursor-grabbing" : "cursor-not-allowed opacity-50"
+                }`}
+                {...(canDrag ? attributes : {})}
+                {...(canDrag ? listeners : {})}
+              >
                 <GripVertical className="h-3.5 w-3.5" />
               </span>
               <div>
@@ -983,9 +1188,22 @@ function TaskCard(props: TaskCardProps) {
                 <div className="mt-2">
                   <TaskAssignees
                     assignees={props.assignees
-                      .map(id => props.members.find(m => m.id === id))
-                      .filter(Boolean)
-                      .map(m => ({ id: m!.id, label: m!.email }))}
+                      .map(id => {
+                        // Prefer member metadata and fall back to cached assignee profiles.
+                        const member = props.members.find(m => m.id === id);
+                        if (member) return { id: member.id, label: member.label };
+                        const profile = props.assigneeProfiles[id];
+                        if (profile) return { id: profile.id, label: profile.label };
+                        // Provide a temporary label while profile data is loading.
+                        console.warn(`[TaskCard] No profile found for assignee ${id}`, {
+                          taskId: props.task.id,
+                          assignees: props.assignees,
+                          membersCount: props.members.length,
+                          profilesCount: Object.keys(props.assigneeProfiles).length,
+                        });
+                        return { id, label: `User ${id.slice(0, 4)}` };
+                      })
+                      .map(m => ({ id: m!.id, label: m!.label }))}
                     maxDisplay={3}
                     size="sm"
                   />

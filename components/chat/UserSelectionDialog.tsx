@@ -9,12 +9,15 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Search, Loader2, Users } from 'lucide-react'
 import { toast } from 'sonner'
+import { getUserDisplayName } from '@/utils/userDisplay'
 
 type User = {
   id: string
   email: string | null
   username: string | null
+  full_name: string | null
   avatar_url: string | null
+  display_name: string
 }
 
 type Props = {
@@ -74,15 +77,26 @@ export default function UserSelectionDialog({
         // Get user details from profiles table
         const { data: profiles } = await supabase
           .from('profiles')
-          .select('id, email, username, avatar_url')
+          .select('id, email, username, full_name, avatar_url')
           .in('id', userIds)
 
-        const merged: User[] = (profiles ?? []).map((row: any) => ({
-          id: row.id,
-          email: (row.email as string | null) ?? null,
-          username: (row.username as string | null) ?? null,
-          avatar_url: (row.avatar_url as string | null) ?? null,
-        }))
+        const merged: User[] = (profiles ?? []).map((row: any) => {
+          const displayName = getUserDisplayName({
+            full_name: row.full_name,
+            username: row.username,
+            email: row.email,
+            id: row.id,
+          });
+          
+          return {
+            id: row.id,
+            email: (row.email as string | null) ?? null,
+            username: (row.username as string | null) ?? null,
+            full_name: (row.full_name as string | null) ?? null,
+            avatar_url: (row.avatar_url as string | null) ?? null,
+            display_name: displayName,
+          };
+        })
 
         setUsers(merged)
       } catch (error: any) {
@@ -101,6 +115,7 @@ export default function UserSelectionDialog({
     
     const query = search.toLowerCase()
     return users.filter(u => 
+      u.display_name.toLowerCase().includes(query) ||
       u.email?.toLowerCase().includes(query) ||
       u.username?.toLowerCase().includes(query)
     )
@@ -177,21 +192,16 @@ export default function UserSelectionDialog({
                   />
                   <Avatar className="h-8 w-8 flex-shrink-0">
                     {user.avatar_url && (
-                      <AvatarImage src={user.avatar_url} alt={user.username || user.email || 'User'} />
+                      <AvatarImage src={user.avatar_url} alt={user.display_name} />
                     )}
                     <AvatarFallback className="text-xs">
-                      {(user.username?.[0] || user.email?.[0] || '?').toUpperCase()}
+                      {user.display_name[0]?.toUpperCase() || '?'}
                     </AvatarFallback>
                   </Avatar>
                   <div className="flex-1 min-w-0">
                     <div className="text-sm font-medium truncate">
-                      {user.username || user.email || 'Unknown User'}
+                      {user.display_name}
                     </div>
-                    {user.username && user.email && (
-                      <div className="text-xs text-muted-foreground truncate">
-                        {user.email}
-                      </div>
-                    )}
                   </div>
                 </div>
               ))}

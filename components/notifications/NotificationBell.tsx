@@ -23,7 +23,7 @@ import { subscribeToNotifications } from '@/lib/notifications/subscribe'
 import { useRouter } from 'next/navigation'
 
 type Item = {
-  id: string | number
+  id: string
   type: string
   title: string | null
   body: string | null
@@ -64,10 +64,16 @@ export default function NotificationBell() {
       if (!res.ok) throw new Error(json?.error || 'Failed to load notifications')
       
       // Validate and normalize notification IDs
-      const validItems = (json.items || []).map((item: any) => ({
-        ...item,
-        id: String(item.id)
-      })).filter((item: any) => item && item.id)
+      const validItems: Item[] = (json.items || [])
+        .map((item: any) => ({
+          ...item,
+          id: String(item?.id ?? '').trim(),
+        }))
+        .filter((item: any) => item && typeof item.id === 'string' && item.id.length > 0)
+        .map((item: any) => ({
+          ...item,
+          id: item.id,
+        }))
       
       setItems(validItems)
       setCursor(json.nextCursor)
@@ -86,13 +92,10 @@ export default function NotificationBell() {
       if (!res.ok) throw new Error(json?.error || 'Failed to load more notifications')
       
       // Filter out invalid notifications and convert ID to string if needed
-      const validItems = (json.items as Item[]).map((item: any) => {
-        // Convert numeric ID to string
-        if (item && item.id && typeof item.id === 'number') {
-          return { ...item, id: String(item.id) }
-        }
-        return item
-      }).filter((item: any) => item && item.id && (typeof item.id === 'string' || typeof item.id === 'number'))
+      const validItems: Item[] = (json.items as Item[]).map((item: any) => ({
+        ...item,
+        id: String(item?.id ?? '').trim(),
+      })).filter((item: any) => item && typeof item.id === 'string' && item.id.length > 0)
       
       setItems((prev) => [...prev, ...validItems])
       setCursor(json.nextCursor)
@@ -180,40 +183,50 @@ export default function NotificationBell() {
     console.log('[notification-bell] Setting up real-time subscription for user', user.id)
     
     const unsubscribe = subscribeToNotifications(supabase as any, user.id, (p) => {
-      // Validate incoming notification
-      if (!p || !p.id || typeof p.id !== 'string') {
+      if (!p) {
+        console.error('[real-time-notification] Payload missing', p)
+        return
+      }
+
+      const id = String((p as any).id ?? '').trim()
+      if (!id) {
         console.error('[real-time-notification] Invalid notification received', p)
         return
       }
-      
-      console.log('[notification-bell] Received real-time notification', p)
-      
+
+      const createdAt =
+        typeof p.created_at === 'string' && p.created_at
+          ? p.created_at
+          : new Date().toISOString()
+
+      const normalized: Item = {
+        id,
+        type: (p.type ?? 'message_new') as string,
+        title: p.title ?? null,
+        body: p.body ?? null,
+        created_at: createdAt,
+        is_read: false,
+        workspace_id: p.workspace_id ?? null,
+        ref_id: p.ref_id ?? null,
+        thread_id: p.thread_id ?? null,
+        message_id: p.message_id ?? null,
+        task_id: p.task_id ?? null,
+        project_id: p.project_id ?? null,
+      }
+
+      console.log('[notification-bell] Received real-time notification', normalized)
+
       setItems((prev) => {
-        // Check if notification already exists
-        if (prev.some((item) => item.id === p.id)) {
-          console.log('[notification-bell] Notification already exists, skipping', p.id)
+        if (prev.some((item) => item.id === normalized.id)) {
+          console.log('[notification-bell] Notification already exists, skipping', normalized.id)
           return prev
         }
-        
-        console.log('[notification-bell] Adding new notification to list', p.id)
-        
-        return ([
-          { 
-            id: p.id, 
-            type: (p.type ?? 'message_new') as string, 
-            title: p.title ?? null, 
-            body: p.body ?? null, 
-            created_at: p.created_at, 
-            is_read: false,
-            workspace_id: p.workspace_id ?? null,
-            ref_id: p.ref_id ?? null,
-            thread_id: p.thread_id ?? null,
-            message_id: p.message_id ?? null,
-            task_id: p.task_id ?? null,
-            project_id: p.project_id ?? null,
-          },
-          ...prev,
-        ]).slice(0, 15)
+
+        const updated = [normalized, ...prev]
+          .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+          .slice(0, 15)
+
+        return updated
       })
     })
     
@@ -339,8 +352,14 @@ export default function NotificationBell() {
           const taskProjectId = n.project_id
           const taskId = n.task_id || n.ref_id
           
-          if (taskWorkspaceId && taskProjectId && taskId) {
-            router.push(`/workspaces/${taskWorkspaceId}/projects/${taskProjectId}?task=${taskId}`)
+          if (taskProjectId && taskId) {
+            const params = new URLSearchParams()
+            params.set('task', taskId)
+            router.push(`/projects/${taskProjectId}/tasks?${params.toString()}`)
+          } else if (taskProjectId) {
+            router.push(`/projects/${taskProjectId}/tasks`)
+          } else if (taskWorkspaceId) {
+            router.push(`/workspaces/${taskWorkspaceId}`)
           } else {
             router.push(`/projects`)
           }

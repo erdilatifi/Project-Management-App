@@ -49,7 +49,8 @@ export type Member = {
   workspace_id: string
   user_id: string
   role: MemberRole
-  email?: string
+  name?: string | null
+  email?: string | null
   avatar_url?: string | null
   job_title?: string | null
   created_at?: string

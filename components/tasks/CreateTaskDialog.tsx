@@ -19,11 +19,38 @@ import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { toast } from "sonner";
 import { Plus, X, Calendar, Flag, Users as UsersIcon } from "lucide-react";
+import { getUserDisplayName } from "@/utils/userDisplay";
 
 type User = {
   id: string;
-  email: string;
-  name?: string;
+  email: string | null;
+  name?: string | null;
+  handle?: string | null;
+};
+
+const PLACEHOLDER_LABELS = new Set([
+  "unknown",
+  "unknown user",
+  "unknown-user",
+  "unknown_user",
+  "no email",
+  "no-email",
+  "no_email",
+]);
+
+const normalize = (value?: string | null) => {
+  if (typeof value !== "string") return null;
+  const trimmed = value.trim();
+  if (!trimmed.length) return null;
+  if (PLACEHOLDER_LABELS.has(trimmed.toLowerCase())) return null;
+  return trimmed;
+};
+
+const emailToHandle = (email?: string | null) => {
+  const cleaned = normalize(email);
+  if (!cleaned) return null;
+  const [handle] = cleaned.split("@");
+  return normalize(handle);
 };
 
 type CreateTaskDialogProps = {
@@ -84,20 +111,26 @@ export function CreateTaskDialog({
         const wmLabelMap: Record<string, string | null> = Object.fromEntries(
           wms.map((r: any) => {
             const uid = String(r.user_id);
-            const primary = (r.member_name as string | null) || (r.name as string | null) || (r.display_name as string | null);
-            const fallback = (r.member_email as string | null) || (r.email as string | null) || null;
-            const label = (primary && String(primary).trim()) || (fallback && String(fallback).trim()) || null;
+            const primary =
+              normalize(r.member_name as string | null) ||
+              normalize(r.name as string | null) ||
+              normalize(r.display_name as string | null);
+            const fallbackEmail =
+              (r.member_email as string | null) ||
+              (r.email as string | null) ||
+              null;
+            const fallback = emailToHandle(fallbackEmail);
+            const label = primary ?? fallback ?? null;
             return [uid, label];
           })
         );
-        
         // Fetch profile data
-        let profilesMap: Record<string, { username: string | null; full_name: string | null }> = {};
+        let profilesMap: Record<string, { username: string | null; full_name: string | null; email: string | null }> = {};
         try {
           if (ids.length) {
             const { data: profs } = await supabase
               .from("profiles")
-              .select("id, username, full_name")
+              .select("id, username, full_name, email")
               .in("id", ids);
             profilesMap = Object.fromEntries(
               (profs ?? []).map((p: any) => [
@@ -105,6 +138,7 @@ export function CreateTaskDialog({
                 {
                   username: (p.username as string | null) ?? null,
                   full_name: (p.full_name as string | null) ?? null,
+                  email: (p.email as string | null) ?? null,
                 },
               ])
             );
@@ -113,22 +147,28 @@ export function CreateTaskDialog({
         
         const userList: User[] = wms.map((wm: any) => {
           const id = String(wm.user_id);
-          
-          // Get name with fallback chain (workspace_members first, then profiles)
-          const name =
-            (wm.member_name as string | null)?.trim() ||
-            (profilesMap[id]?.username?.trim()) ||
-            (profilesMap[id]?.full_name?.trim()) ||
+          const wmEmail =
             (wm.member_email as string | null)?.trim() ||
-            "Unknown User";
+            (wm.email as string | null)?.trim() ||
+            null;
+          const profileEmail = profilesMap[id]?.email ?? null;
           
-          // Get email from workspace_members
-          const email = (wm.member_email as string | null)?.trim() || "no-email@example.com";
+          // Use getUserDisplayName for consistent display logic
+          const display = getUserDisplayName({
+            full_name: profilesMap[id]?.full_name,
+            username: profilesMap[id]?.username,
+            email: wmEmail || profileEmail,
+            display_name: normalize(wmLabelMap[id]),
+            id,
+          });
           
+          const handle = emailToHandle(wmEmail) || emailToHandle(profileEmail);
+
           return {
             id,
-            email,
-            name,
+            email: wmEmail ?? profileEmail,
+            name: display,
+            handle,
           };
         });
         
@@ -160,11 +200,11 @@ export function CreateTaskDialog({
   const filteredUsers = useMemo(() => {
     if (!searchQuery.trim()) return users;
     const query = searchQuery.toLowerCase();
-    return users.filter(
-      (u) =>
-        u.email.toLowerCase().includes(query) ||
-        u.name?.toLowerCase().includes(query)
-    );
+    return users.filter((u) => {
+      const nameMatch = u.name ? u.name.toLowerCase().includes(query) : false;
+      const handleMatch = u.handle ? u.handle.toLowerCase().includes(query) : false;
+      return nameMatch || handleMatch;
+    });
   }, [users, searchQuery]);
 
   const availableUsers = useMemo(() => {
@@ -415,17 +455,19 @@ export function CreateTaskDialog({
               {selectedAssignees.length > 0 && (
                 <div className="flex flex-wrap gap-2 mb-2">
                   {selectedAssignees.map((user) => (
-                    <Badge
+                      <Badge
                       key={user.id}
                       variant="secondary"
                       className="pl-2 pr-1 py-1 rounded-lg flex items-center gap-2"
                     >
                       <Avatar className="h-5 w-5">
                         <AvatarFallback className="text-xs">
-                          {user.name?.[0]?.toUpperCase() || user.email[0].toUpperCase()}
+                          {(user.name?.[0] ?? user.handle?.[0] ?? user.id[0] ?? "?").toUpperCase()}
                         </AvatarFallback>
                       </Avatar>
-                      <span className="text-xs">{user.name || user.email}</span>
+                      <span className="text-xs">
+                        {user.name ?? user.handle ?? user.id.slice(0, 8)}
+                      </span>
                       <button
                         type="button"
                         onClick={() => removeAssignee(user.id)}
@@ -464,12 +506,13 @@ export function CreateTaskDialog({
                       >
                         <Avatar className="h-6 w-6">
                           <AvatarFallback className="text-xs">
-                            {user.name?.[0]?.toUpperCase() || user.email[0].toUpperCase()}
+                            {(user.name?.[0] ?? user.handle?.[0] ?? user.id[0] ?? "?").toUpperCase()}
                           </AvatarFallback>
                         </Avatar>
                         <div className="flex-1 min-w-0">
-                          <div className="text-sm font-medium truncate">{user.name}</div>
-                          <div className="text-xs text-muted-foreground truncate">{user.email}</div>
+                          <div className="text-sm font-medium truncate">
+                            {user.name ?? user.handle ?? user.id.slice(0, 8)}
+                          </div>
                         </div>
                       </button>
                     ))

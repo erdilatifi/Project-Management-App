@@ -47,6 +47,11 @@ export default function ProfilePage() {
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
+  const emitProfileUpdated = (detail: { full_name?: string | null; username?: string | null; avatar_url?: string | null }) => {
+    if (typeof window === "undefined") return;
+    window.dispatchEvent(new CustomEvent("profile-updated", { detail }));
+  };
+
   const {
     register,
     handleSubmit,
@@ -230,6 +235,7 @@ export default function ProfilePage() {
       setExistingAvatarUrl(null);
       if (fileInputRef.current) fileInputRef.current.value = "";
 
+      emitProfileUpdated({ avatar_url: null });
       toast.success( "Your profile image was reset." );
       setRemoveOpen(false);
     } catch (err: any) {
@@ -272,6 +278,10 @@ export default function ProfilePage() {
       if (fileInputRef.current) fileInputRef.current.value = "";
       reset({ full_name: values.full_name, job_title: values.job_title || "" });
 
+      emitProfileUpdated({
+        full_name: values.full_name,
+        avatar_url: (newAvatarUrl ?? existingAvatarUrl) ?? null,
+      });
       toast.success( "Your changes have been saved." );
     } catch (e: any) {
       console.error(e);

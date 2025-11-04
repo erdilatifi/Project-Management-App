@@ -22,6 +22,7 @@ type TaskRow = {
   status: Status;
   priority?: number | null;
   assignee_id?: string | null;
+  assignee_ids?: string[] | null;
   due_at?: string | null;
   created_by: string | null;
   created_at: string;
@@ -109,15 +110,21 @@ export default function MyTasksPage() {
     const to = from + limit - 1;
     
     try {
-      const { data, error, count } = await supabase
+      let query = supabase
         .from("tasks")
         .select(
-          "id, project_id, workspace_id, title, description, status, priority, assignee_id, due_at, created_by, created_at",
-          { count: 'exact' }
+          "id, project_id, workspace_id, title, description, status, priority, assignee_id, assignee_ids, due_at, created_by, created_at",
+          { count: "exact" }
         )
-        .eq("assignee_id", userId)
         .order("created_at", { ascending: false })
         .range(from, to);
+
+      if (userId) {
+        const orFilter = `assignee_id.eq.${userId},assignee_ids.cs.{"${userId}"}`;
+        query = query.or(orFilter);
+      }
+
+      const { data, error, count } = await query;
       
       if (error) throw error;
       const rows = (data ?? []) as TaskRow[];

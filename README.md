@@ -4,6 +4,10 @@
 
 A modern, **100% free and open-source** project management application built with Next.js 16, Supabase, and TypeScript. Features real-time collaboration, drag-and-drop task management, workspace chat, and a beautiful theme-aware interface.
 
+## Product Demo
+
+Watch a quick walkthrough of the app on Google Drive: [Project Management App Demo](https://drive.google.com/file/d/1zpNHdGTmo9H9f2fjNkrPdXuOzoXbEQaE/view?usp=drive_link)
+
 **🎉 Completely Free Forever** - No pricing tiers, no credit card required, unlimited workspaces, projects, and team members.
 
 ## ✨ Features
@@ -353,4 +357,3 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 ## 📧 Contact
 
 For questions or support, please open an issue on GitHub.
-

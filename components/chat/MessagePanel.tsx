@@ -10,6 +10,7 @@ import { X, Pencil, Trash2, MoreVertical, LogOut } from "lucide-react";
 import { toast } from "sonner";
 import { formatTimeAgo } from "@/lib/time";
 import { ConfirmationDialog } from "@/components/ui/confirmation-dialog";
+import { getUserDisplayName } from "@/utils/userDisplay";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -37,6 +38,8 @@ export default function MessagePanel({ threadId, workspaceId, title: titleProp, 
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [leaveDialogOpen, setLeaveDialogOpen] = useState(false);
   const [deleteMessageDialogOpen, setDeleteMessageDialogOpen] = useState(false);
+  const [removeParticipantDialogOpen, setRemoveParticipantDialogOpen] = useState(false);
+  const [participantToRemove, setParticipantToRemove] = useState<{ id: string; name: string } | null>(null);
   const [messageToDelete, setMessageToDelete] = useState<string | null>(null);
 
   const [participants, setParticipants] = useState<
@@ -70,11 +73,15 @@ export default function MessagePanel({ threadId, workspaceId, title: titleProp, 
           const username = (row.username as string | null) ?? null;
           const fullName = (row.full_name as string | null) ?? null;
           const email = (row.email as string | null) ?? null;
-          const label =
-            username?.trim() ||
-            fullName?.trim() ||
-            email?.trim() ||
-            null;
+          
+          // Use getUserDisplayName for consistent display logic
+          const label = getUserDisplayName({
+            full_name: fullName,
+            username: username,
+            email: email,
+            id,
+          });
+          
           meta[id] = {
             label,
             email: email?.trim() ?? null,
@@ -261,8 +268,8 @@ export default function MessagePanel({ threadId, workspaceId, title: titleProp, 
     }
     setThreadTitle(thr?.title || null);
 
-    // canManage is ONLY for the creator (not admins). Allow override via prop.
-    setCanManage(isCreatorProp ?? !!manage);
+    // canManage is true when either the parent knows we are creator or our own lookup confirms it.
+    setCanManage(Boolean(isCreatorProp) || manage);
 
     if (ids.length) {
       const meta = await fetchUserMeta(ids);
@@ -678,41 +685,20 @@ export default function MessagePanel({ threadId, workspaceId, title: titleProp, 
     },
     onSuccess: () => {
       toast.success("Participant removed");
+      setParticipantToRemove(null);
+      setRemoveParticipantDialogOpen(false);
     },
   });
 
-  const removeParticipant = async (uid: string) => {
+  const removeParticipant = (uid: string) => {
     // If user is leaving their own thread
     if (userId === uid) {
       // If owner leaves, delete the entire thread
       if (creatorId === uid) {
-        if (!confirm("As the owner, leaving will delete this thread for everyone. Continue?")) return;
-        try {
-          const { error } = await supabase.from("message_threads").delete().eq("id", threadId);
-          if (error) throw error;
-          toast.success("Thread deleted");
-          // Navigate away
-          const u = new URL(window.location.href);
-          u.searchParams.delete("thread");
-          window.location.href = u.toString();
-        } catch (e: any) {
-          toast.error(e?.message ?? "Failed to delete thread");
-        }
+        setDeleteDialogOpen(true);
         return;
       } else {
-        // Regular participant leaving
-        if (!confirm("Leave this conversation?")) return;
-        try {
-          const { error } = await supabase.from("thread_participants").delete().eq("thread_id", threadId).eq("user_id", uid);
-          if (error) throw error;
-          toast.success("Left conversation");
-          // Navigate away
-          const u = new URL(window.location.href);
-          u.searchParams.delete("thread");
-          window.location.href = u.toString();
-        } catch (e: any) {
-          toast.error(e?.message ?? "Failed to leave conversation");
-        }
+        setLeaveDialogOpen(true);
         return;
       }
     }
@@ -720,8 +706,12 @@ export default function MessagePanel({ threadId, workspaceId, title: titleProp, 
     // Admin removing another user
     if (!canManage) return;
     if (creatorId === uid) return; // cannot remove the owner
-    if (!confirm("Remove this participant?")) return;
-    removeParticipantMutation.mutate(uid);
+    const participant = participants.find((p) => p.id === uid);
+    setParticipantToRemove({
+      id: uid,
+      name: participant?.email ?? "this participant",
+    });
+    setRemoveParticipantDialogOpen(true);
   };
 
   // Edit message mutation with optimistic update
@@ -812,7 +802,7 @@ export default function MessagePanel({ threadId, workspaceId, title: titleProp, 
       
       toast.success("Conversation deleted");
       await queryClient.invalidateQueries({ queryKey: ["threads", workspaceId] });
-      router.push(`/workspaces/${workspaceId}/messages`);
+      router.push(`/workspaces`);
     } catch (e: any) {
       toast.error(e?.message ?? "Failed to delete conversation");
       throw e;
@@ -834,7 +824,7 @@ export default function MessagePanel({ threadId, workspaceId, title: titleProp, 
       
       toast.success("Left conversation");
       await queryClient.invalidateQueries({ queryKey: ["threads", workspaceId] });
-      router.push(`/workspaces/${workspaceId}/messages`);
+      router.push(`/workspaces`);
     } catch (e: any) {
       toast.error(e?.message ?? "Failed to leave conversation");
       throw e;
@@ -1074,6 +1064,24 @@ export default function MessagePanel({ threadId, workspaceId, title: titleProp, 
       </div>
 
       {/* Confirmation Dialogs */}
+      <ConfirmationDialog
+        open={removeParticipantDialogOpen}
+        onOpenChange={(open) => {
+          setRemoveParticipantDialogOpen(open);
+          if (!open) setParticipantToRemove(null);
+        }}
+        title="Remove Participant"
+        description={`Remove ${participantToRemove?.name ?? "this participant"} from this conversation? They will immediately lose access to the chat.`}
+        confirmText="Remove"
+        cancelText="Cancel"
+        variant="destructive"
+        loading={removeParticipantMutation.isPending}
+        onConfirm={async () => {
+          if (!participantToRemove) return;
+          await removeParticipantMutation.mutateAsync(participantToRemove.id);
+        }}
+      />
+
       <ConfirmationDialog
         open={deleteDialogOpen}
         onOpenChange={setDeleteDialogOpen}

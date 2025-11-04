@@ -31,11 +31,13 @@ export function subscribeToNotifications(
         const row = payload.new as any
         console.log('[notification-subscribe] Received notification', row)
         onReceive({
-          id: row.id as string,
+          id: String(row.id),
           type: (row.type as string) ?? null,
           title: (row.title as string) ?? null,
           body: (row.body as string) ?? null,
-          created_at: row.created_at as string,
+          created_at: typeof row.created_at === 'string' && row.created_at
+            ? row.created_at
+            : new Date().toISOString(),
           workspace_id: (row.workspace_id as string) ?? null,
           ref_id: (row.ref_id as string) ?? null,
           thread_id: (row.thread_id as string) ?? null,
