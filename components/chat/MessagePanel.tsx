@@ -251,8 +251,8 @@ export default function MessagePanel({ threadId, workspaceId, title: titleProp, 
     }
     setThreadTitle(thr?.title || null);
 
-    // canManage is true when either the parent knows we are creator or our own lookup confirms it.
-    setCanManage(Boolean(isCreatorProp) || manage);
+    // canManage is ONLY for the creator (not admins). Allow override via prop.
+    setCanManage(isCreatorProp ?? !!manage);
 
     if (ids.length) {
       const meta = await fetchUserMeta(ids);

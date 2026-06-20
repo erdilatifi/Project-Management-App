@@ -56,7 +56,7 @@ export default function WorkspaceMessagesPage() {
     getUser();
   }, [supabase]);
 
-  // Fetch thread title and check if user is creator/participant; redirect if unauthorized
+  // Fetch thread title and check if user is creator
   useEffect(() => {
     if (!activeThreadId) {
       setThreadTitle(null);
@@ -70,34 +70,9 @@ export default function WorkspaceMessagesPage() {
         .select('title, created_by')
         .eq('id', activeThreadId)
         .maybeSingle();
-
-      if (error || !data) {
-        setThread(undefined);
-        toast.error('Conversation not found or unavailable');
-        return;
-      }
       
-      setThreadTitle(data.title || 'Untitled thread');
-      const creator = currentUserId ? data?.created_by === currentUserId : false;
-      setIsCreator(creator);
-
-      // If not creator, ensure current user is a participant or admin; otherwise redirect
-      if (!creator && currentUserId) {
-        let participants = [] as Array<{ user_id: string }>
-        try {
-          participants = await getThreadParticipants(supabase, activeThreadId)
-        } catch (e) {
-          toast.error(e instanceof Error ? e.message : 'Failed to load participants');
-          return;
-        }
-
-        const isParticipant = participants.some((p) => String(p.user_id) === currentUserId);
-
-        if (!isParticipant) {
-          setThread(undefined);
-          toast.error('You do not have access to this conversation');
-        }
-      }
+      setThreadTitle(data?.title || 'Untitled thread');
+      setIsCreator(currentUserId ? data?.created_by === currentUserId : false);
     };
     
     fetchThread();
@@ -125,7 +100,7 @@ export default function WorkspaceMessagesPage() {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [activeThreadId, currentUserId, supabase, setThread]);
+  }, [activeThreadId, currentUserId, supabase]);
 
   // Redirect if current thread is deleted
   useEffect(() => {
