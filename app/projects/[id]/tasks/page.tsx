@@ -28,7 +28,7 @@ import {
 } from "@/components/ui/dialog";
 
 import { toast } from "sonner";
-import { Pencil, Trash2, Plus, GripVertical, Calendar, ArrowLeft } from "lucide-react";
+import { Pencil, Trash2, Plus, GripVertical, Calendar, ArrowLeft, Circle, Clock, CheckCircle2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { TaskAssignees } from "@/components/tasks/TaskAssignees";
@@ -474,7 +474,7 @@ export default function ProjectTasksBoardPage() {
 
       remaining = remaining.filter((id) => !resolved[id]);
       remaining.forEach((id) => {
-        resolved[id] = { id, label: id.slice(0, 8) };
+        resolved[id] = { id, label: "Team Member" };
       });
 
       if (Object.keys(resolved).length) {
@@ -600,7 +600,7 @@ export default function ProjectTasksBoardPage() {
                     normalize(profilesMap[id]?.full_name) ||
                     normalize(profilesMap[id]?.username) ||
                     handle ||
-                    id.slice(0, 8);
+                    "Team Member";
 
                   return { id, label: display, email: wmEmail ?? profileEmail };
                 })
@@ -943,7 +943,7 @@ export default function ProjectTasksBoardPage() {
             {COLUMNS.map((c) => (
               <Card
                 key={c.id}
-                className="bg-card border border-border rounded-2xl p-4 shadow-sm"
+                className="glass border border-border rounded-2xl p-4 shadow-sm"
               >
                 <div className="flex items-center justify-between">
                   <div className="text-foreground font-medium">{c.label}</div>
@@ -1064,16 +1064,21 @@ function Column(props: ColumnProps) {
   return (
     <Card
       ref={setNodeRef as unknown as (instance: HTMLDivElement | null) => void}
-      className={`group overflow-hidden rounded-2xl border border-border shadow-sm transition-all ${
+      className={`group overflow-hidden rounded-2xl border border-border glass shadow-sm transition-all ${
         isOver ? "ring-2 ring-ring" : "ring-0"
       }`}
     >
       {/* header */}
       <div
-        className={`sticky top-0 z-10 -mb-1 bg-card px-4 pt-3 pb-2 border-b border-border`}
+        className={`sticky top-0 z-10 -mb-1 bg-transparent px-4 pt-3 pb-2 border-b border-border`}
       >
         <div className="flex items-center justify-between gap-2">
-          <div className="text-foreground font-medium">{props.label}</div>
+          <div className="flex items-center gap-2">
+            {props.columnId === "todo" && <Circle className="h-4 w-4 text-slate-400" />}
+            {props.columnId === "in_progress" && <Clock className="h-4 w-4 text-blue-500" />}
+            {props.columnId === "done" && <CheckCircle2 className="h-4 w-4 text-emerald-500" />}
+            <div className="text-foreground font-semibold tracking-tight">{props.label}</div>
+          </div>
           <Badge
             variant="outline"
             className="border-border bg-background"
@@ -1174,10 +1179,16 @@ function TaskCard(props: TaskCardProps) {
     <div
       ref={setNodeRef}
       style={style as CSSProperties}
-      className={`rounded-xl border border-border bg-card hover:bg-accent transition-colors p-3 shadow-sm hover:shadow-md focus-visible:ring-2 focus-visible:ring-ring outline-none ${
-        isDragging ? "opacity-70" : ""
+      className={`group relative rounded-xl border border-border glass hover:bg-accent/50 transition-all duration-200 p-3 shadow-sm hover:shadow-md hover:border-border/80 focus-visible:ring-2 focus-visible:ring-ring outline-none overflow-hidden ${
+        isDragging ? "opacity-70 scale-[1.02] shadow-lg ring-2 ring-primary/20" : ""
       }`}
     >
+      {/* Top accent bar based on status */}
+      <div className={`absolute top-0 left-0 right-0 h-1 ${
+        props.task.status === "todo" ? "bg-neutral-200 dark:bg-neutral-800" :
+        props.task.status === "in_progress" ? "bg-blue-500" :
+        "bg-emerald-500"
+      }`} />
       {!props.isEditing ? (
         <>
           <div className="flex items-start justify-between gap-3">
@@ -1218,7 +1229,7 @@ function TaskCard(props: TaskCardProps) {
                           membersCount: props.members.length,
                           profilesCount: Object.keys(props.assigneeProfiles).length,
                         });
-                        return { id, label: `User ${id.slice(0, 4)}` };
+                        return { id, label: "Team Member" };
                       })
                       .map(m => ({ id: m!.id, label: m!.label }))}
                     maxDisplay={3}

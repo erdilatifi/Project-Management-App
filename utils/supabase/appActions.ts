@@ -36,8 +36,33 @@ export interface TaskRow {
   created_at: string;
 }
 
+function slugify(name: string): string {
+  const base = name
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+  return base || `workspace-${Date.now()}`;
+}
+
+function mapTaskRow(row: Record<string, unknown>): TaskRow {
+  return {
+    id: row.id as string,
+    project_id: row.project_id as string,
+    workspace_id: (row.workspace_id as string | undefined) ?? undefined,
+    title: row.title as string,
+    description: (row.description as string | null | undefined) ?? null,
+    status: (row.status as TaskRow["status"]) ?? undefined,
+    priority: (row.priority as number | null | undefined) ?? null,
+    assignee_id: (row.assignee_id as string | null | undefined) ?? null,
+    due_at: (row.due_date as string | null | undefined) ?? null,
+    created_by: (row.creator_id as string | null | undefined) ?? null,
+    created_at: row.created_at as string,
+  };
+}
+
 // Create a workspace owned by the current user and upsert owner membership.
-export async function createWorkspace(name: string, slug?: string) : Promise<WorkspaceRow | null>  {
+export async function createWorkspace(name: string, slug?: string): Promise<WorkspaceRow | null> {
   const supabase = createClient();
 
   const { data: userRes, error: userErr } = await supabase.auth.getUser();
@@ -46,14 +71,20 @@ export async function createWorkspace(name: string, slug?: string) : Promise<Wor
     return null;
   }
   const userId = userRes.user.id;
+  const trimmedName = name.trim();
+
+  if (!trimmedName) {
+    toast.error("Workspace name is required");
+    return null;
+  }
 
   try {
-    const payload: Partial<WorkspaceRow> & { owner_id: string } = {
-      name: name.trim(),
+    const payload = {
+      name: trimmedName,
       owner_id: userId,
-      slug: slug ? slug.trim().toLowerCase() : null,
+      slug: slug?.trim() ? slug.trim().toLowerCase() : slugify(trimmedName),
       description: null,
-    } as any;
+    };
 
     const { data: workspace, error } = await supabase
       .from("workspaces")
@@ -63,7 +94,6 @@ export async function createWorkspace(name: string, slug?: string) : Promise<Wor
 
     if (error) throw error;
 
-    // Upsert owner membership (do not fail the overall operation if this part fails)
     const { error: upsertErr } = await supabase
       .from("workspace_members")
       .upsert(
@@ -74,7 +104,11 @@ export async function createWorkspace(name: string, slug?: string) : Promise<Wor
         } as any,
         { onConflict: "workspace_id,user_id" }
       );
-    if (upsertErr) toast.error(upsertErr.message);
+
+    if (upsertErr) {
+      await supabase.from("workspaces").delete().eq("id", workspace.id);
+      throw upsertErr;
+    }
 
     toast.success("Workspace created");
     return workspace;
@@ -85,7 +119,7 @@ export async function createWorkspace(name: string, slug?: string) : Promise<Wor
 }
 
 // Create a project in a workspace for the current user.
-export async function createProject(workspaceId: string, name: string) : Promise<ProjectRow | null>  {
+export async function createProject(workspaceId: string, name: string): Promise<ProjectRow | null> {
   const supabase = createClient();
   const { data: userRes, error: userErr } = await supabase.auth.getUser();
   if (userErr || !userRes?.user) {
@@ -93,12 +127,23 @@ export async function createProject(workspaceId: string, name: string) : Promise
     return null;
   }
   const userId = userRes.user.id;
+  const trimmedName = name.trim();
+
+  if (!trimmedName) {
+    toast.error("Project name is required");
+    return null;
+  }
+
+  if (!workspaceId) {
+    toast.error("Select a workspace to create a project");
+    return null;
+  }
 
   try {
     const { data, error } = await supabase
       .from("projects")
       .insert({
-        name: name.trim(),
+        name: trimmedName,
         workspace_id: workspaceId,
         created_by: userId,
       })
@@ -115,7 +160,7 @@ export async function createProject(workspaceId: string, name: string) : Promise
 }
 
 // Create a task in a project for the current user.
-export async function createTask(projectId: string, title: string) : Promise<TaskRow | null>  {
+export async function createTask(projectId: string, title: string): Promise<TaskRow | null> {
   const supabase = createClient();
   const { data: userRes, error: userErr } = await supabase.auth.getUser();
   if (userErr || !userRes?.user) {
@@ -123,24 +168,54 @@ export async function createTask(projectId: string, title: string) : Promise<Tas
     return null;
   }
   const userId = userRes.user.id;
+  const trimmedTitle = title.trim();
+
+  if (!trimmedTitle) {
+    toast.error("Task title is required");
+    return null;
+  }
 
   try {
     const { data, error } = await supabase
       .from("tasks")
       .insert({
         project_id: projectId,
-        title: title.trim(),
+        title: trimmedTitle,
         creator_id: userId,
       })
-      .select("id, project_id, workspace_id, title, description, status, priority, assignee_id, due_at:due_date, created_by:creator_id, created_at")
-      .single<TaskRow>();
+      .select("id, project_id, workspace_id, title, description, status, priority, assignee_id, due_date, creator_id, created_at")
+      .single();
 
     if (error) throw error;
     toast.success("Task created");
-    return data;
+    return mapTaskRow(data as Record<string, unknown>);
   } catch (e: any) {
     toast.error(e?.message ?? "Failed to create task");
     return null;
   }
 }
 
+export async function loadUserWorkspaces(): Promise<Array<{ id: string; name: string }>> {
+  const supabase = createClient();
+  const { data: userRes, error: userErr } = await supabase.auth.getUser();
+  if (userErr || !userRes?.user) return [];
+
+  const { data: memberships, error: memErr } = await supabase
+    .from("workspace_members")
+    .select("workspace_id")
+    .eq("user_id", userRes.user.id);
+
+  if (memErr) throw memErr;
+
+  const ids = (memberships ?? []).map((row) => row.workspace_id as string);
+  if (!ids.length) return [];
+
+  const { data, error } = await supabase
+    .from("workspaces")
+    .select("id, name")
+    .in("id", ids)
+    .order("name", { ascending: true });
+
+  if (error) throw error;
+  return data ?? [];
+}

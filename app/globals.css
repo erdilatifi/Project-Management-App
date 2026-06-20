@@ -118,6 +118,14 @@
   }
   body {
     @apply bg-background text-foreground;
+    background-image: radial-gradient(var(--border) 1px, transparent 1px);
+    background-size: 24px 24px;
+    background-attachment: fixed;
+  }
+  
+  /* Utilities for glassmorphism */
+  .glass {
+    @apply bg-card/95 backdrop-blur-[2px] border border-border/50 shadow-sm;
   }
 }
 

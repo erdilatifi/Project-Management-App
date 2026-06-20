@@ -35,7 +35,7 @@ const LoginPage = () => {
 
   useEffect(() => {
     if (!isCheckingAuth && user) {
-      router.replace('/')
+      router.replace('/workspaces')
     }
   }, [user, isCheckingAuth, router])
 
@@ -50,7 +50,7 @@ const LoginPage = () => {
         // Refresh auth context to immediately update navbar
         await refreshAuth()
         toast.success('Successfully logged in!')
-        router.push('/')
+        router.push('/workspaces')
         router.refresh()
       }
     } catch {

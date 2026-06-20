@@ -1,13 +1,13 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useState, useRef } from 'react'
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Skeleton } from '@/components/ui/skeleton'
 import { createClient } from '@/utils/supabase/client'
-import { createThread } from '@/lib/workspaces'
+import { addThreadParticipants, getThreadReads, listAccessibleThreads } from '@/lib/chatAccess'
 import type { MessageThread } from '@/types/workspaces'
 import { Plus, MessageSquare, Trash2, Search, Loader2, ArrowLeft } from 'lucide-react'
 import { toast } from 'sonner'
@@ -30,9 +30,6 @@ export default function ThreadList({ workspaceId, onSelect, activeThreadId }: Pr
   const [creating, setCreating] = useState(false)
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null)
-  const [hasMore, setHasMore] = useState(true)
-  const [loadingMore, setLoadingMore] = useState(false)
-  const [cursor, setCursor] = useState<string | null>(null) // ISO created_at of the last item
   const loadMoreRef = useRef<HTMLLIElement | null>(null)
   const observerRef = useRef<IntersectionObserver | null>(null)
   const [unreadCounts, setUnreadCounts] = useState<Record<string, number>>({})
@@ -40,43 +37,28 @@ export default function ThreadList({ workspaceId, onSelect, activeThreadId }: Pr
   const [selectedUserIds, setSelectedUserIds] = useState<string[]>([])
 
   const queryClient = useQueryClient()
-const threadsQ = useQuery({
-  queryKey: ['threads', workspaceId, userId, cursor],
-  enabled: !!userId,
-  staleTime: 30000,
-  gcTime: 300000,
-  placeholderData: (prev) => prev,
-  queryFn: async () => {
-    const limit = 20
+  const pageSize = 20
 
-    const { data, error } = await supabase.rpc('list_accessible_threads', {
-      workspace_id_param: workspaceId,
-      limit_param: limit,
-      cursor_param: cursor,
-    })
-    if (error) {
-      console.error('[thread-list] Failed to load threads', {
+  const threadsQ = useInfiniteQuery({
+    queryKey: ['threads', workspaceId, userId],
+    enabled: !!userId,
+    staleTime: 30000,
+    gcTime: 300000,
+    initialPageParam: null as string | null,
+    queryFn: async ({ pageParam }) => {
+      if (!userId) return []
+      return listAccessibleThreads(supabase, {
         workspaceId,
         userId,
-        cursor,
-        error,
-        message: error.message,
-        details: error.details,
+        cursor: pageParam,
+        limit: pageSize,
       })
-      throw new Error(error.message)
-    }
-
-    const rows = (data ?? []) as MessageThread[]
-    console.log('[thread-list] Loaded threads', {
-      workspaceId,
-      userId,
-      count: rows.length,
-      hasMore: rows.length === limit,
-    })
-    setHasMore(rows.length === limit)
-    return rows
-  },
-})
+    },
+    getNextPageParam: (lastPage) => {
+      if (lastPage.length < pageSize) return undefined
+      return lastPage[lastPage.length - 1]?.created_at ?? undefined
+    },
+  })
 
   useEffect(() => {
     const init = async () => {
@@ -86,24 +68,17 @@ const threadsQ = useQuery({
     init()
   }, [supabase])
 
-  useEffect(() => {
-    if (!userId) {
-      return
-    }
-    threadsQ.refetch()
-  }, [workspaceId, userId, cursor])
+
+  const { fetchNextPage, hasNextPage, isFetchingNextPage } = threadsQ
 
   // Infinite scroll observer (keyset pagination)
   useEffect(() => {
-    if (loadingMore || !hasMore || search) return
+    if (isFetchingNextPage || !hasNextPage || search) return
 
     observerRef.current = new IntersectionObserver(
       (entries) => {
         if (entries[0].isIntersecting) {
-          if (threadsQ.data && threadsQ.data.length) {
-            const last = threadsQ.data[threadsQ.data.length - 1]
-            setCursor(last.created_at as any)
-          }
+          fetchNextPage()
         }
       },
       { threshold: 0.1 }
@@ -119,7 +94,7 @@ const threadsQ = useQuery({
         observerRef.current.unobserve(currentRef)
       }
     }
-  }, [loadingMore, hasMore, search])
+  }, [fetchNextPage, hasNextPage, isFetchingNextPage, search])
 
   useEffect(() => {
     const channel = supabase
@@ -166,63 +141,38 @@ const threadsQ = useQuery({
       ]
 
       if (participantsParam.length) {
-        const { error: participantError } = await supabase.rpc('add_thread_participants', {
-          thread_id_param: threadId,
-          participants_param: participantsParam,
-        })
-
-        if (participantError) throw participantError
+        await addThreadParticipants(supabase, threadId, participantsParam)
       }
 
       return thread
     },
-    onMutate: async ({ title }: { title: string; userIds: string[] }) => {
-      await queryClient.cancelQueries({ queryKey: ['threads', workspaceId, userId] })
-      const prev = queryClient.getQueryData<MessageThread[]>(['threads', workspaceId, userId, 1]) || []
-      const optimistic: MessageThread = { 
-        id: 'temp-' + Date.now().toString(), 
-        workspace_id: workspaceId, 
-        title: title.trim() || null, 
-        created_by: userId, 
-        created_at: new Date().toISOString() 
-      }
-      queryClient.setQueryData(['threads', workspaceId, userId, 1], [optimistic, ...prev])
-      return { prev }
-    },
-    onError: (_err, _vars, ctx) => { if (ctx?.prev) queryClient.setQueryData(['threads', workspaceId, userId, 1], ctx.prev) },
     onSettled: () => { queryClient.invalidateQueries({ queryKey: ['threads', workspaceId, userId] }) },
   })
 
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => { const { error } = await supabase.from('message_threads').delete().eq('id', id); if (error) throw new Error(error.message) },
-    onMutate: async (id: string) => {
-      await queryClient.cancelQueries({ queryKey: ['threads', workspaceId, userId] })
-      const prev = queryClient.getQueryData<MessageThread[]>(['threads', workspaceId, userId, 1]) || []
-      queryClient.setQueryData(['threads', workspaceId, userId, 1], prev.filter(t => t.id !== id))
-      return { prev }
-    },
-    onError: (_err, _vars, ctx) => { if (ctx?.prev) queryClient.setQueryData(['threads', workspaceId, userId, 1], ctx.prev) },
     onSettled: () => { queryClient.invalidateQueries({ queryKey: ['threads', workspaceId, userId] }) },
   })
 
-  const allThreads = threadsQ.data ?? []
+  const allThreads = useMemo(() => {
+    const map = new Map<string, MessageThread>()
+    for (const thread of threadsQ.data?.pages.flat() ?? []) {
+      map.set(thread.id, thread)
+    }
+    return Array.from(map.values())
+  }, [threadsQ.data])
   const shown = allThreads.filter((t) => (t.title ?? '').toLowerCase().includes(search.trim().toLowerCase()))
 
   // Load unread message counts for all threads (messages after last read timestamp)
   useEffect(() => {
-    if (!userId || !threadsQ.data || threadsQ.data.length === 0) return
+    if (!userId || allThreads.length === 0) return
     
     const loadUnreadCounts = async () => {
-      const threadIds = threadsQ.data.map(t => t.id)
+      const threadIds = allThreads.map(t => t.id)
       
       try {
         // Get last read timestamps for all threads
-        const { data: readData, error: readError } = await supabase.rpc('get_thread_reads', {
-          thread_ids_param: threadIds.length ? threadIds : null,
-        })
-        if (readError) {
-          throw readError
-        }
+        const readData = await getThreadReads(supabase, threadIds, userId)
 
         const lastReadMap: Record<string, string | null> = {}
         readData?.forEach((r: any) => {
@@ -256,20 +206,18 @@ const threadsQ = useQuery({
           }
         }
         
-        console.log('[thread-list] Loaded unread counts', counts)
         setUnreadCounts(counts)
       } catch (e) {
-        console.error('[thread-list] Failed to load unread counts', e)
+        setUnreadCounts({})
       }
     }
     
     loadUnreadCounts()
-  }, [userId, threadsQ.data, supabase, activeThreadId])
+  }, [userId, allThreads, supabase, activeThreadId])
 
   // Clear unread count when thread is selected
   useEffect(() => {
     if (activeThreadId && unreadCounts[activeThreadId]) {
-      console.log('[thread-list] Clearing unread count for active thread', activeThreadId)
       setUnreadCounts(prev => {
         const next = { ...prev }
         delete next[activeThreadId]
@@ -295,16 +243,9 @@ const threadsQ = useQuery({
         (payload) => {
           const newMessage = payload.new as any
           
-          console.log('[thread-list] New message received', { 
-            threadId: newMessage.thread_id, 
-            authorId: newMessage.author_id, 
-            currentUserId: userId,
-            activeThreadId 
-          })
           
           // Only count if message is from someone else and not in active thread
           if (newMessage.author_id !== userId && newMessage.thread_id !== activeThreadId) {
-            console.log('[thread-list] Incrementing unread count for thread', newMessage.thread_id)
             setUnreadCounts(prev => ({
               ...prev,
               [newMessage.thread_id]: (prev[newMessage.thread_id] || 0) + 1
@@ -335,8 +276,6 @@ const threadsQ = useQuery({
         },
         (payload) => {
           const updated = payload.new as any
-          console.log('[thread-list] Thread read status updated', updated)
-          
           // If last_read_at was updated, clear the unread count for this thread
           if (updated.last_read_at) {
             setUnreadCounts(prev => {
@@ -394,7 +333,7 @@ const threadsQ = useQuery({
 
       {/* Thread List */}
       <div className="flex-1 overflow-auto">
-        {threadsQ.isFetching && (!threadsQ.data || threadsQ.data.length === 0) ? (
+        {threadsQ.isFetching && allThreads.length === 0 ? (
           <div className="p-3 space-y-2">
             {Array.from({ length: 5 }).map((_, i) => (
               <div key={i} className="flex items-center gap-3 px-3 py-3">
@@ -405,6 +344,18 @@ const threadsQ = useQuery({
                 </div>
               </div>
             ))}
+          </div>
+        ) : threadsQ.isError ? (
+          <div className="p-6 h-full flex items-center justify-center">
+            <div className="text-center space-y-3">
+              <div className="mx-auto h-12 w-12 rounded-full bg-muted flex items-center justify-center">
+                <MessageSquare className="h-6 w-6 text-muted-foreground" />
+              </div>
+              <div className="text-sm text-muted-foreground">Could not load conversations.</div>
+              <Button size="sm" variant="outline" onClick={() => threadsQ.refetch()} className="rounded-full">
+                Try again
+              </Button>
+            </div>
           </div>
         ) : shown.length === 0 ? (
           <div className="p-6 h-full flex items-center justify-center">
@@ -477,9 +428,9 @@ const threadsQ = useQuery({
             ))}
             
             {/* Infinite scroll trigger */}
-            {!search && hasMore && (
+            {!search && threadsQ.hasNextPage && (
               <li ref={loadMoreRef} className="px-4 py-4">
-                {loadingMore || threadsQ.isFetching ? (
+                {threadsQ.isFetchingNextPage ? (
                   <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
                     <Loader2 className="w-4 h-4 animate-spin" />
                     Loading more...

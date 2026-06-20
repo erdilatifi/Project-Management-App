@@ -139,7 +139,7 @@ export default function ProjectDetailsPage() {
 
         {/* Loading State */}
         {loading || !project ? (
-          <Card className="rounded-2xl border-border shadow-sm p-6">
+          <Card className="glass rounded-2xl border-border shadow-sm p-6">
             <Skeleton className="h-8 w-1/2 rounded" />
             <div className="mt-4 space-y-2">
               <Skeleton className="h-4 w-3/4 rounded" />
@@ -156,7 +156,7 @@ export default function ProjectDetailsPage() {
             </div>
           </Card>
         ) : (
-          <Card className="overflow-hidden rounded-2xl border-border shadow-sm">
+          <Card className="glass overflow-hidden rounded-2xl border-border shadow-sm">
             {/* Toolbar */}
             <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between px-6 py-5">
               <div className="flex items-center gap-3">

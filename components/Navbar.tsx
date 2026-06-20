@@ -179,13 +179,13 @@ useEffect(() => {
     }
   };
 
-  const navLinks = [
+  const navLinks = user ? [
     { name: 'Home', path: '/' },
     { name: 'Workspaces', path: '/workspaces' },
     { name: 'Projects', path: '/projects' },
     { name: 'Tasks', path: '/tasks' },
     { name: 'Profile', path: '/profile' },
-  ];
+  ] : [];
 
   // Determine display name with fallback priority: full_name > username > email
   const displayName = useMemo(

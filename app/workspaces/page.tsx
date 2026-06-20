@@ -12,6 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import CreateWorkspaceDialog from "@/components/workspaces/CreateWorkspaceDialog";
 import { Search, RefreshCcw, Trash2, X, Users, MessageSquare, ChevronLeft, ChevronRight, FolderPlus } from "lucide-react";
+import type { WorkspaceRow as CreatedWorkspaceRow } from "@/utils/supabase/appActions";
 import {
   Dialog,
   DialogContent,
@@ -119,27 +120,18 @@ export default function WorkspacesPage() {
           </div>
           <div className="flex items-center gap-2">
             <CreateWorkspaceDialog
-              onCreated={(ws) =>
-                setItems((cur) => [
-                  {
-                    id: ws.id,
-                    name: ws.name,
-                    slug: null,
-                    description: null,
-                    owner_id: "",
-                    created_at: new Date().toISOString()
-                  },
-                  ...cur
-                ])
-              }
+              onCreated={(ws: CreatedWorkspaceRow) => {
+                setItems((cur) => [ws, ...cur.filter((item) => item.id !== ws.id)]);
+                reload();
+              }}
             />
           </div>
         </div>
 
         {/* Search / toolbar card */}
-        <Card className="border-border shadow-sm rounded-2xl">
+        <Card className="glass border-border shadow-sm rounded-2xl">
           <CardContent className="px-3 sm:px-6 py-4">
-            <div className="flex flex-col gap-3">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
               <div className="relative flex-1">
                 <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
@@ -151,7 +143,7 @@ export default function WorkspacesPage() {
                   }}
                   onKeyDown={(e) => { if (e.key === "Enter") reload(); }}
                   placeholder="Search workspaces (Ctrl/Cmd+K)"
-                  className="pl-9 h-10 w-full bg-background/50 backdrop-blur-sm border-border focus-visible:ring-2 focus-visible:ring-ring rounded-xl"
+                  className="pl-9 h-10 w-full bg-background border-border focus-visible:ring-2 focus-visible:ring-ring rounded-xl"
                 />
                 {search ? (
                   <button
@@ -172,7 +164,7 @@ export default function WorkspacesPage() {
               <Button
                 variant="outline"
                 onClick={() => reload()}
-                className="rounded-xl"
+                className="rounded-xl shrink-0"
               >
                 <RefreshCcw className="mr-2 h-4 w-4" /> Refresh
               </Button>
@@ -251,19 +243,19 @@ export default function WorkspacesPage() {
 
                     <Separator />
 
-                    <div className="p-3 flex items-center justify-end gap-2">
+                    <div className="p-3 flex flex-wrap items-center justify-end gap-2">
                       <Link href={`/workspaces/${w.id}/people`}>
-                        <Button variant="outline" size="sm" className="h-7 rounded-lg">
+                        <Button variant="ghost" size="sm" className="h-7 rounded-lg text-muted-foreground hover:text-foreground">
                           <Users className="w-4 h-4 mr-1.5" /> People
                         </Button>
                       </Link>
                       <Link href={`/workspaces/${w.id}/messages`}>
-                        <Button variant="outline" size="sm" className="h-7 rounded-lg">
+                        <Button variant="ghost" size="sm" className="h-7 rounded-lg text-muted-foreground hover:text-foreground">
                           <MessageSquare className="w-4 h-4 mr-1.5" /> Messages
                         </Button>
                       </Link>
                       <Link href={`/projects`}>
-                        <Button variant="ghost" size="sm" className="h-7 rounded-lg">
+                        <Button variant="ghost" size="sm" className="h-7 rounded-lg text-muted-foreground hover:text-foreground">
                           View projects
                         </Button>
                       </Link>
@@ -326,16 +318,16 @@ export default function WorkspacesPage() {
 
 function EmptyState({ onReset }: { onReset: () => void }) {
   return (
-    <Card className="overflow-hidden rounded-2xl border-border">
-      <div className="px-6 py-12 text-center">
-        <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-muted">
-          <FolderPlus className="h-6 w-6 text-muted-foreground" />
+    <Card className="glass overflow-hidden rounded-2xl border-border shadow-sm">
+      <div className="px-6 py-14 text-center">
+        <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-muted border border-border">
+          <FolderPlus className="h-7 w-7 text-muted-foreground" />
         </div>
         <h3 className="text-lg font-semibold text-foreground">No workspaces found</h3>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Try adjusting your search or create a new workspace to get started.
+        <p className="mt-2 text-sm text-muted-foreground max-w-md mx-auto">
+          Create your first workspace or clear your search to see everything you can access.
         </p>
-        <div className="mt-4 flex items-center justify-center gap-2">
+        <div className="mt-5 flex items-center justify-center gap-2">
           <Button onClick={onReset} variant="outline" className="rounded-xl">
             Clear search
           </Button>

@@ -8,14 +8,15 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
-import { createProject, createWorkspace } from "@/utils/supabase/appActions";
+import { createProject, createWorkspace, loadUserWorkspaces, type WorkspaceRow } from "@/utils/supabase/appActions";
 
 type Props = {
   workspaceId: string | null | undefined;
   onCreated?: (project: { id: string; name: string; description: string | null; workspace_id?: string }) => void;
+  onWorkspaceCreated?: (workspace: WorkspaceRow) => void;
 };
 
-export default function CreateProjectDialog({ workspaceId, onCreated }: Props) {
+export default function CreateProjectDialog({ workspaceId, onCreated, onWorkspaceCreated }: Props) {
   const supabase = useMemo(() => createClient(), []);
   const [open, setOpen] = useState(false);
   const [wsId, setWsId] = useState<string | null | undefined>(workspaceId);
@@ -35,28 +36,28 @@ export default function CreateProjectDialog({ workspaceId, onCreated }: Props) {
     }
   }, [open]);
 
-  // Load available workspaces for the user when dialog opens and no workspaceId provided
+  // Load available workspaces for the user when dialog opens
   useEffect(() => {
-    if (!open || workspaceId) return;
+    if (!open) return;
     const load = async () => {
       setLoadingWs(true);
       try {
-        const { data, error } = await supabase
-          .from("workspaces")
-          .select("id, name")
-          .order("name", { ascending: true });
-        if (error) throw error;
-        setWorkspaces(data ?? []);
-        if (!wsId && data && data.length > 0) setWsId(data[0].id);
-      } catch (e: any) {
-        // If user has no workspaces or query fails, keep list empty
+        const data = await loadUserWorkspaces();
+        setWorkspaces(data);
+        if (!wsId && !workspaceId && data.length > 0) setWsId(data[0].id);
+      } catch (e: unknown) {
+        const message = e instanceof Error ? e.message : "Failed to load workspaces";
+        toast.error(message);
+        setWorkspaces([]);
       } finally {
         setLoadingWs(false);
       }
     };
     load();
 
-  }, [open, workspaceId, supabase]);
+  }, [open, workspaceId, wsId]);
+
+  const activeWorkspaceName = workspaces.find(w => w.id === (wsId ?? workspaceId))?.name;
 
   const onSubmit = async () => {
     const chosen = wsId ?? workspaceId;
@@ -102,6 +103,7 @@ export default function CreateProjectDialog({ workspaceId, onCreated }: Props) {
         setWorkspaces((cur) => [...cur, { id: ws.id, name: ws.name }]);
         setWsId(ws.id);
         setWsName("");
+        onWorkspaceCreated?.(ws);
       }
     } finally {
       setCreatingWs(false);
@@ -115,9 +117,16 @@ export default function CreateProjectDialog({ workspaceId, onCreated }: Props) {
       </DialogTrigger>
       <DialogContent className="rounded-2xl">
         <DialogHeader>
-          <DialogTitle className="text-xl font-semibold">Create Project</DialogTitle>
-          <DialogDescription className="text-sm text-muted-foreground">
-            Add a new project to your current workspace.
+          <div className="flex items-center gap-3">
+            <DialogTitle className="text-xl font-semibold">Create Project</DialogTitle>
+            {activeWorkspaceName && (
+              <span className="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 border-transparent bg-secondary text-secondary-foreground hover:bg-secondary/80">
+                {activeWorkspaceName}
+              </span>
+            )}
+          </div>
+          <DialogDescription className="text-sm text-muted-foreground mt-1">
+            Add a new project to your workspace.
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-4 py-4">
