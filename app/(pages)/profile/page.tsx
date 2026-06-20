@@ -21,6 +21,7 @@ import NotificationPreferences from "@/components/profile/NotificationPreference
 import NotificationsList from "@/components/notifications/NotificationsList";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Label } from "@/components/ui/label";
+import { UserCircle } from "lucide-react";
 import { getProfileRoleTitle, PROFILE_ROLE_COLUMN } from "@/lib/profileFields";
 
 // Validation schema for profile form fields
@@ -310,12 +311,17 @@ export default function ProfilePage() {
     <div className="min-h-screen w-full relative">
       {/* Background Textures */}
       <div className="pointer-events-none absolute inset-0 z-0 bg-[linear-gradient(to_right,#80808012_1px,transparent_1px),linear-gradient(to_bottom,#80808012_1px,transparent_1px)] bg-[size:24px_24px]"></div>
-      <div className="pointer-events-none absolute left-0 right-0 top-0 -z-10 m-auto h-[310px] w-[310px] rounded-full bg-primary/20 opacity-20 blur-[100px]"></div>
+      <div className="pointer-events-none absolute left-0 right-0 top-0 -z-10 m-auto h-[310px] w-[310px] rounded-full bg-brand-accent/30 opacity-20 blur-[100px]"></div>
 
       <div className="relative z-10 mx-auto max-w-[1200px] px-3 sm:px-6 lg:px-10 py-8 sm:py-12 space-y-6">
-        <div className="pt-15 max-w-3xl mx-auto space-y-1">
-          <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight text-foreground">Profile</h1>
-          <p className="text-sm text-muted-foreground">Manage your personal details, preferences, and notifications.</p>
+        <div className="pt-15 max-w-3xl mx-auto flex items-center gap-3">
+          <span className="brand-chip h-11 w-11 shrink-0">
+            <UserCircle className="h-5 w-5" />
+          </span>
+          <div className="space-y-1">
+            <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight text-foreground">Profile</h1>
+            <p className="text-sm text-muted-foreground">Manage your personal details, preferences, and notifications.</p>
+          </div>
         </div>
 
         <Tabs defaultValue="personal" className="space-y-6 max-w-3xl mx-auto">
