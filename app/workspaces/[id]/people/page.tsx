@@ -12,7 +12,7 @@ import { Button } from '@/components/ui/button'
 import { toast } from 'sonner'
 import { getWorkspaceRole } from '@/utils/permissions'
 import { useRouter } from 'next/navigation'
-import { Search, X, UserMinus, Loader2, ArrowLeft } from 'lucide-react'
+import { Search, X, UserMinus, Loader2, ArrowLeft, Users } from 'lucide-react'
 import { getProfileRoleTitle, PROFILE_ROLE_COLUMN } from '@/lib/profileFields'
 
 export default function WorkspacePeoplePage() {
@@ -253,6 +253,9 @@ export default function WorkspacePeoplePage() {
             >
               <ArrowLeft className="h-5 w-5" />
             </Button>
+            <span className="brand-chip h-11 w-11 shrink-0 mt-0.5">
+              <Users className="h-5 w-5" />
+            </span>
             <div>
               <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight text-foreground">People</h1>
               <p className="text-sm text-muted-foreground mt-0.5">Invite teammates and manage access.</p>
@@ -332,7 +335,7 @@ export default function WorkspacePeoplePage() {
                         {m.avatar_url ? (
                           <AvatarImage src={m.avatar_url} alt={m.name ?? 'Avatar'} />
                         ) : null}
-                        <AvatarFallback className="text-xs font-medium">
+                        <AvatarFallback className="text-xs font-semibold bg-brand-accent/12 text-brand-accent">
                           {(m.name?.[0] ?? m.email?.[0] ?? 'U').toUpperCase()}
                         </AvatarFallback>
                       </Avatar>

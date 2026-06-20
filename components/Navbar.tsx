@@ -205,7 +205,7 @@ useEffect(() => {
         <Link
           href={path}
           className={`font-medium transition-colors ${
-            isActive ? 'text-foreground' : 'text-muted-foreground hover:text-foreground'
+            isActive ? 'text-brand-accent' : 'text-muted-foreground hover:text-foreground'
           }`}
         >
           <span className="inline-flex items-center gap-1.5">
@@ -218,7 +218,7 @@ useEffect(() => {
           </span>
         </Link>
         <span
-          className={`pointer-events-none absolute -bottom-1 left-0 h-0.5 bg-primary transition-all duration-200 ease-out ${
+          className={`pointer-events-none absolute -bottom-1 left-0 h-0.5 bg-brand-accent transition-all duration-200 ease-out ${
             isActive ? 'w-full' : 'w-0 group-hover:w-full'
           }`}
         />
@@ -265,7 +265,9 @@ useEffect(() => {
           <div className="flex justify-between items-center py-3">
             {/* Logo */}
             <Link href="/" className="flex items-center gap-2 text-xl font-semibold tracking-wide text-foreground">
-              <Workflow className="h-6 w-6 text-primary" />
+              <span className="brand-chip h-8 w-8">
+                <Workflow className="h-5 w-5" />
+              </span>
               Flow<span className="font-bold">foundry</span>
             </Link>
 
@@ -339,12 +341,12 @@ useEffect(() => {
                     href={l.path}
                     onClick={() => setShowMenu(false)}
                     className={`relative inline-block text-lg font-medium ${
-                      pathname === l.path ? 'text-foreground' : 'text-muted-foreground hover:text-foreground'
+                      pathname === l.path ? 'text-brand-accent' : 'text-muted-foreground hover:text-foreground'
                     }`}
                   >
                     {l.name}
                     <span
-                      className={`block h-0.5 bg-primary transition-all duration-200 ease-out ${
+                      className={`block h-0.5 bg-brand-accent transition-all duration-200 ease-out ${
                         pathname === l.path ? 'w-full' : 'w-0 group-hover:w-full'
                       }`}
                     />

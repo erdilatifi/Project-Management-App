@@ -14,7 +14,7 @@ import CreateProjectDialog from "@/components/projects/CreateProjectDialog";
 import CreateWorkspaceDialog from "@/components/workspaces/CreateWorkspaceDialog";
 import EditProjectMenu from "@/components/projects/EditProjectMenu";
 import { useProjects, ProjectRow } from "@/hooks/useProjects";
-import { Search, RefreshCcw, FolderPlus, ChevronLeft, ChevronRight, X, ArrowLeft } from "lucide-react";
+import { Search, RefreshCcw, FolderPlus, ChevronLeft, ChevronRight, X, ArrowLeft, FolderKanban } from "lucide-react";
 import { useRouter } from "next/navigation";
 
 export default function ProjectsPage() {
@@ -109,7 +109,7 @@ export default function ProjectsPage() {
   const Avatar = ({ name }: { name: string }) => {
     const initial = (name?.trim()?.[0] ?? "?").toUpperCase();
     return (
-      <div className="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-muted text-foreground shrink-0">
+      <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-brand-accent/12 text-brand-accent ring-1 ring-brand-accent/20 font-semibold shrink-0">
         {initial}
       </div>
     );
@@ -120,9 +120,14 @@ export default function ProjectsPage() {
       <div className="mx-auto max-w-[1200px] px-3 sm:px-6 lg:px-10 py-8 sm:py-12 space-y-6">
         {/* Header */}
         <div className="pt-15 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight text-foreground">Projects</h1>
-            <p className="text-sm text-muted-foreground mt-0.5">Manage projects in your current workspace.</p>
+          <div className="flex items-center gap-3">
+            <span className="brand-chip h-11 w-11 shrink-0">
+              <FolderKanban className="h-5 w-5" />
+            </span>
+            <div>
+              <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight text-foreground">Projects</h1>
+              <p className="text-sm text-muted-foreground mt-0.5">Manage projects in your current workspace.</p>
+            </div>
           </div>
           <div className="flex items-center gap-2">
             <CreateWorkspaceDialog
@@ -258,13 +263,13 @@ export default function ProjectsPage() {
                     <div className="p-3 flex flex-wrap items-center justify-end gap-2">
                       <Link
                         href={`/projects/${p.id}/tasks`}
-                        className="inline-flex items-center text-xs font-medium text-muted-foreground hover:text-foreground px-2 py-1.5 rounded-lg hover:bg-accent transition-colors"
+                        className="inline-flex items-center text-xs font-medium text-muted-foreground hover:text-brand-accent px-2 py-1.5 rounded-lg hover:bg-brand-accent/10 transition-colors"
                       >
                         View tasks
                       </Link>
                       <Link
                         href={`/projects/${p.id}`}
-                        className="inline-flex items-center text-xs font-medium text-muted-foreground hover:text-foreground px-2 py-1.5 rounded-lg hover:bg-accent transition-colors"
+                        className="inline-flex items-center text-xs font-medium text-brand-accent px-2 py-1.5 rounded-lg hover:bg-brand-accent/10 transition-colors"
                       >
                         Open
                       </Link>
@@ -309,8 +314,8 @@ function EmptyState({ onReset }: { onReset: () => void }) {
   return (
     <Card className="glass overflow-hidden rounded-2xl border-border shadow-sm">
       <div className="px-6 py-14 text-center">
-        <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-muted border border-border">
-          <FolderPlus className="h-7 w-7 text-muted-foreground" />
+        <div className="brand-chip mx-auto mb-4 h-14 w-14 rounded-2xl">
+          <FolderPlus className="h-7 w-7" />
         </div>
         <h3 className="text-lg font-semibold text-foreground">No projects found</h3>
         <p className="mt-2 text-sm text-muted-foreground max-w-md mx-auto">
