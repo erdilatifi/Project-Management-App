@@ -4,12 +4,13 @@ import ThreadList from "@/components/chat/ThreadList";
 import MessagePanel from "@/components/chat/MessagePanel";
 import { useCallback, useMemo, useState, useEffect } from "react";
 import { usePathname, useRouter, useSearchParams, useParams } from "next/navigation";
-import { MessageSquare, ArrowLeft, Edit2, Home } from "lucide-react";
+import { MessageSquare, ArrowLeft, Edit2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { createClient } from "@/utils/supabase/client";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
+import { getThreadParticipants } from "@/lib/chatAccess";
 
 /**
  * WorkspaceMessagesPage
@@ -64,35 +65,33 @@ export default function WorkspaceMessagesPage() {
     }
     
     const fetchThread = async () => {
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from('message_threads')
         .select('title, created_by')
         .eq('id', activeThreadId)
         .maybeSingle();
+
+      if (error || !data) {
+        setThread(undefined);
+        toast.error('Conversation not found or unavailable');
+        return;
+      }
       
-      setThreadTitle(data?.title || 'Untitled thread');
+      setThreadTitle(data.title || 'Untitled thread');
       const creator = currentUserId ? data?.created_by === currentUserId : false;
       setIsCreator(creator);
 
       // If not creator, ensure current user is a participant or admin; otherwise redirect
       if (!creator && currentUserId) {
-        const { data: participants, error: participantsError } = await supabase.rpc('get_thread_participants', {
-          thread_id_param: activeThreadId,
-        });
-
-        if (participantsError) {
-          if (participantsError.message?.toLowerCase().includes('not allowed')) {
-            setThread(undefined);
-            toast.error('You do not have access to this conversation');
-            return;
-          }
-          toast.error(participantsError.message || 'Failed to load participants');
+        let participants = [] as Array<{ user_id: string }>
+        try {
+          participants = await getThreadParticipants(supabase, activeThreadId)
+        } catch (e) {
+          toast.error(e instanceof Error ? e.message : 'Failed to load participants');
           return;
         }
 
-        const isParticipant = Array.isArray(participants)
-          ? participants.some((p: any) => String(p.user_id) === currentUserId)
-          : false;
+        const isParticipant = participants.some((p) => String(p.user_id) === currentUserId);
 
         if (!isParticipant) {
           setThread(undefined);

@@ -13,6 +13,7 @@ import { toast } from 'sonner'
 import { getWorkspaceRole } from '@/utils/permissions'
 import { useRouter } from 'next/navigation'
 import { Search, X, UserMinus, Loader2, ArrowLeft } from 'lucide-react'
+import { getProfileRoleTitle, PROFILE_ROLE_COLUMN } from '@/lib/profileFields'
 
 export default function WorkspacePeoplePage() {
   const { id } = useParams<{ id: string }>()
@@ -21,6 +22,7 @@ export default function WorkspacePeoplePage() {
   const router = useRouter()
   const [rows, setRows] = useState<Member[]>([])
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState<string | null>(null)
   const [loadingMore, setLoadingMore] = useState(false)
   const [hasMore, setHasMore] = useState(false)
   const [page, setPage] = useState(1)
@@ -35,6 +37,7 @@ export default function WorkspacePeoplePage() {
     if (append) {
       setLoadingMore(true)
     } else {
+      setLoadError(null)
       setLoading(true)
     }
     
@@ -50,8 +53,15 @@ export default function WorkspacePeoplePage() {
       .range(from, to)
     
     if (error) {
-      if (append) setLoadingMore(false)
-      else setLoading(false)
+      const message = error.message || 'Failed to load members'
+      if (append) {
+        setLoadingMore(false)
+      } else {
+        setRows([])
+        setLoadError(message)
+        setLoading(false)
+      }
+      toast.error(message)
       return
     }
     
@@ -64,8 +74,11 @@ export default function WorkspacePeoplePage() {
       if (ids.length) {
         const profsRes = await supabase
           .from('profiles')
-          .select('id, email, avatar_url, username, full_name, job_title')
+          .select(`id, email, avatar_url, username, full_name, ${PROFILE_ROLE_COLUMN}`)
           .in('id', ids)
+        if (profsRes.error) {
+          toast.error(profsRes.error.message || 'Failed to load member profile details')
+        }
         const profs = profsRes?.data as any[] | null
         profileMap = Object.fromEntries(
           (profs ?? []).map((p: any) => [
@@ -75,7 +88,7 @@ export default function WorkspacePeoplePage() {
               avatar_url: (p.avatar_url as string | null) ?? null,
               username: (p.username as string | null) ?? null,
               full_name: (p.full_name as string | null) ?? null,
-              job_title: (p.job_title as string | null) ?? null,
+              job_title: getProfileRoleTitle(p) || null,
             },
           ])
         )
@@ -87,7 +100,7 @@ export default function WorkspacePeoplePage() {
           const username = profile?.username ? profile.username.trim() : null
           const email = profile?.email ?? null
           const nameCandidate = fullName || username || null
-          const displayName = nameCandidate || (email ? email.split('@')[0] : 'Unknown')
+          const displayName = nameCandidate || (email ? email.split('@')[0] : 'Team Member')
           return {
             workspace_id: m.workspace_id,
             user_id: id,
@@ -255,7 +268,7 @@ export default function WorkspacePeoplePage() {
           ) : null}
         </div>
 
-        <InviteUser workspaceId={workspaceId} />
+        {canManage ? <InviteUser workspaceId={workspaceId} /> : null}
 
         <div className="space-y-4">
           <div className="flex items-center justify-between">
@@ -263,7 +276,7 @@ export default function WorkspacePeoplePage() {
           </div>
           
           {/* Search bar */}
-          <Card className="border-border shadow-sm rounded-2xl">
+          <Card className="glass rounded-2xl">
             <div className="px-4 sm:px-6 py-4">
               <div className="relative">
                 <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -290,7 +303,7 @@ export default function WorkspacePeoplePage() {
             </div>
           </Card>
 
-          <div className="rounded-xl border border-border overflow-hidden bg-card shadow-sm">
+          <div className="rounded-xl border border-border overflow-hidden glass shadow-sm">
             <div className="hidden md:grid grid-cols-4 gap-4 px-4 py-3 text-xs font-semibold text-muted-foreground bg-muted/50 border-b border-border">
               <div>Member</div>
               <div>Position</div>
@@ -298,7 +311,14 @@ export default function WorkspacePeoplePage() {
               <div>Actions</div>
             </div>
             {loading ? (
-              <div className="px-4 py-8 text-sm text-muted-foreground text-center">Loading…</div>
+              <div className="px-4 py-8 text-sm text-muted-foreground text-center">Loading...</div>
+            ) : loadError ? (
+              <div className="px-4 py-8 text-sm text-muted-foreground text-center space-y-3">
+                <div>{loadError}</div>
+                <Button variant="outline" size="sm" onClick={() => loadMembers(1, false)} className="rounded-lg">
+                  Try again
+                </Button>
+              </div>
             ) : filteredRows.length === 0 ? (
               <div className="px-4 py-8 text-sm text-muted-foreground text-center">
                 {searchQuery ? 'No members match your search.' : 'No members yet.'}

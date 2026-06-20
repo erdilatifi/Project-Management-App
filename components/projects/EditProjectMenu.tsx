@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 
 type Props = {
@@ -35,6 +36,10 @@ export default function EditProjectMenu({ project, onUpdated, onDeleted }: Props
   const [deleting, setDeleting] = useState(false);
 
   const onRename = async () => {
+    if (!name.trim()) {
+      toast.error("Project name is required");
+      return;
+    }
     setSaving(true);
     try {
       const { data, error } = await supabase
@@ -88,48 +93,62 @@ export default function EditProjectMenu({ project, onUpdated, onDeleted }: Props
 
   return (
     <div className="flex items-center">
-      <Button variant="outline" size="sm" onClick={() => setOpen(true)}>
+      <Button variant="outline" size="sm" onClick={() => setOpen(true)} className="rounded-lg">
         Manage
       </Button>
 
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent>
+        <DialogContent className="rounded-2xl sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Edit Project</DialogTitle>
+            <DialogTitle>Edit project</DialogTitle>
             <DialogDescription>Rename or update the description.</DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-2">
             <div className="space-y-2">
-              <label className="text-sm">Name</label>
-              <Input value={name} onChange={(e) => setName(e.target.value)} />
+              <Label htmlFor="project-name">Name</Label>
+              <Input
+                id="project-name"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                className="rounded-xl bg-background border-border"
+              />
             </div>
             <div className="space-y-2">
-              <label className="text-sm">Description</label>
-              <Textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={4} />
+              <Label htmlFor="project-description">Description</Label>
+              <Textarea
+                id="project-description"
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                rows={4}
+                className="rounded-xl bg-background border-border resize-none"
+              />
             </div>
           </div>
-          <DialogFooter className="flex items-center justify-between gap-2">
-            <Button onClick={onDelete} variant="outline">Delete</Button>
-            <Button onClick={onRename} disabled={saving} variant="outline">
-              {saving ? "Saving..." : "Save"}
+          <DialogFooter className="flex items-center justify-between gap-2 sm:justify-between">
+            <Button onClick={onDelete} variant="outline" className="rounded-xl text-destructive hover:text-destructive">
+              Delete
+            </Button>
+            <Button onClick={onRename} disabled={saving} className="rounded-xl">
+              {saving ? "Saving..." : "Save changes"}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* Confirm Delete */}
       <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
-        <DialogContent>
+        <DialogContent className="rounded-2xl">
           <DialogHeader>
             <DialogTitle>Delete project</DialogTitle>
             <DialogDescription>
               Are you sure you want to delete &quot;{project.name}&quot;? This action cannot be undone.
             </DialogDescription>
           </DialogHeader>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setDeleteOpen(false)} disabled={deleting}>Cancel</Button>
-            <Button variant="outline" onClick={onDeleteConfirmed} disabled={deleting}>
-              {deleting ? "Deleting..." : "Delete"}
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setDeleteOpen(false)} disabled={deleting} className="rounded-xl">
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={onDeleteConfirmed} disabled={deleting} className="rounded-xl">
+              {deleting ? "Deleting..." : "Delete project"}
             </Button>
           </DialogFooter>
         </DialogContent>

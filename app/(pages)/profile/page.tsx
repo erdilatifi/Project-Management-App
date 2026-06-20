@@ -20,6 +20,8 @@ import { toast } from "sonner";
 import NotificationPreferences from "@/components/profile/NotificationPreferences";
 import NotificationsList from "@/components/notifications/NotificationsList";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Label } from "@/components/ui/label";
+import { getProfileRoleTitle, PROFILE_ROLE_COLUMN } from "@/lib/profileFields";
 
 // Validation schema for profile form fields
 const schema = z.object({
@@ -99,7 +101,7 @@ export default function ProfilePage() {
       // Fetch user profile from database
       const { data: profile, error: profErr, status } = await supabase
         .from("profiles")
-        .select("full_name, job_title, avatar_url")
+        .select(`full_name, ${PROFILE_ROLE_COLUMN}, avatar_url`)
         .eq("id", uid)
         .maybeSingle();
 
@@ -115,7 +117,7 @@ export default function ProfilePage() {
       if (profile) {
         reset({
           full_name: profile.full_name ?? "",
-          job_title: profile.job_title ?? "",
+          job_title: getProfileRoleTitle(profile),
         });
         setExistingAvatarUrl(profile.avatar_url ?? null);
       } else {
@@ -262,7 +264,7 @@ export default function ProfilePage() {
       const payload = {
         id: userId,
         full_name: values.full_name,
-        job_title: values.job_title || null,
+        [PROFILE_ROLE_COLUMN]: values.job_title || null,
         ...(newAvatarUrl ? { avatar_url: newAvatarUrl } : {}),
       };
 
@@ -296,7 +298,7 @@ export default function ProfilePage() {
   if (authChecked && !userId) {
     return (
       <div className="mx-auto max-w-[1200px] p-6">
-        <Card className="p-6 max-w-2xl mx-auto space-y-4">
+        <Card className="glass p-6 max-w-2xl mx-auto space-y-4">
           <CardTitle className="text-2xl font-semibold">Profile</CardTitle>
           <CardContent>You need to sign in to view your profile.</CardContent>
         </Card>
@@ -305,130 +307,161 @@ export default function ProfilePage() {
   }
 
   return (
-    <div className="mx-auto max-w-[1200px] p-6 space-y-6">
-      <div className="flex items-center pt-15">
-      </div>
+    <div className="min-h-screen w-full relative">
+      {/* Background Textures */}
+      <div className="pointer-events-none absolute inset-0 z-0 bg-[linear-gradient(to_right,#80808012_1px,transparent_1px),linear-gradient(to_bottom,#80808012_1px,transparent_1px)] bg-[size:24px_24px]"></div>
+      <div className="pointer-events-none absolute left-0 right-0 top-0 -z-10 m-auto h-[310px] w-[310px] rounded-full bg-primary/20 opacity-20 blur-[100px]"></div>
 
-      <Tabs defaultValue="personal" className="space-y-6 max-w-3xl mx-auto">
-        <TabsList>
-          <TabsTrigger value="personal">Personal</TabsTrigger>
-          <TabsTrigger value="preferences">Preferences</TabsTrigger>
-          <TabsTrigger value="notifications">Notifications</TabsTrigger>
-        </TabsList>
+      <div className="relative z-10 mx-auto max-w-[1200px] px-3 sm:px-6 lg:px-10 py-8 sm:py-12 space-y-6">
+        <div className="pt-15 max-w-3xl mx-auto space-y-1">
+          <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight text-foreground">Profile</h1>
+          <p className="text-sm text-muted-foreground">Manage your personal details, preferences, and notifications.</p>
+        </div>
 
-        <TabsContent value="personal">
-      <Card className="p-6 space-y-6">
-        <CardTitle className="text-2xl font-semibold">Profile</CardTitle>
+        <Tabs defaultValue="personal" className="space-y-6 max-w-3xl mx-auto">
+          <TabsList className="grid w-full grid-cols-3 rounded-xl h-11 p-1">
+            <TabsTrigger value="personal" className="rounded-lg">Personal</TabsTrigger>
+            <TabsTrigger value="preferences" className="rounded-lg">Preferences</TabsTrigger>
+            <TabsTrigger value="notifications" className="rounded-lg">Notifications</TabsTrigger>
+          </TabsList>
 
-        <CardContent className="space-y-6">
-          {errorMsg && <div className="text-sm text-red-600">{errorMsg}</div>}
-
-          <form onSubmit={handleSubmit(onSubmit)} className="space-y-6" noValidate>
-            <div className="flex items-center gap-4">
-              <div className="h-20 w-20 overflow-hidden rounded-full bg-muted flex items-center justify-center">
-                {previewUrl ? (
-                  <img
-                    src={previewUrl}
-                    alt="Avatar"
-                    className="h-full w-full object-cover"
-                  />
-                ) : (
-                  <span className="text-xs text-muted-foreground">No avatar</span>
-                )}
+          <TabsContent value="personal">
+            <Card className="glass rounded-2xl border-border shadow-sm overflow-hidden">
+              <div className="px-6 pt-6 pb-2">
+                <CardTitle className="text-lg font-semibold">Personal information</CardTitle>
+                <p className="text-sm text-muted-foreground mt-1">Update your name, job title, and profile photo.</p>
               </div>
 
-              <div className="flex-1">
-                <label className="text-sm font-medium">Avatar</label>
-                <Input
-                  type="file"
-                  accept="image/*"
-                  {...register("avatar_file")}
-                  ref={(el) => {
-                    register("avatar_file").ref(el);
-                    fileInputRef.current = el;
-                  }}
-                  onChange={(e) => {
-                    register("avatar_file").onChange(e);
-                    // Validate immediately on file selection
-                    const ok = validateAvatarLocal();
-                    if (!ok) {
-                      // Clear input if validation fails
-                      if (fileInputRef.current) fileInputRef.current.value = "";
-                    }
-                  }}
-                />
-                <div className="mt-2 flex items-center gap-2">
-                  {existingAvatarUrl && (
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      className="border-neutral-700"
-                      onClick={() => setRemoveOpen(true)}
-                    >
-                      Remove avatar
+              <CardContent className="px-6 pb-6 space-y-6">
+                {errorMsg && (
+                  <div className="rounded-xl border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">
+                    {errorMsg}
+                  </div>
+                )}
+
+                <form onSubmit={handleSubmit(onSubmit)} className="space-y-6" noValidate>
+                  <div className="flex flex-col sm:flex-row sm:items-start gap-5 rounded-2xl border border-border bg-muted/30 p-5">
+                    <div className="h-24 w-24 shrink-0 overflow-hidden rounded-full border-2 border-border bg-muted flex items-center justify-center shadow-sm">
+                      {previewUrl ? (
+                        <img
+                          src={previewUrl}
+                          alt="Avatar"
+                          className="h-full w-full object-cover"
+                        />
+                      ) : (
+                        <span className="text-xs text-muted-foreground">No photo</span>
+                      )}
+                    </div>
+
+                    <div className="flex-1 space-y-3 min-w-0">
+                      <Label htmlFor="avatar_file" className="text-sm font-medium">Profile photo</Label>
+                      <Input
+                        id="avatar_file"
+                        type="file"
+                        accept="image/*"
+                        className="rounded-xl bg-background border-border"
+                        {...register("avatar_file")}
+                        ref={(el) => {
+                          register("avatar_file").ref(el);
+                          fileInputRef.current = el;
+                        }}
+                        onChange={(e) => {
+                          register("avatar_file").onChange(e);
+                          const ok = validateAvatarLocal();
+                          if (!ok && fileInputRef.current) {
+                            fileInputRef.current.value = "";
+                          }
+                        }}
+                      />
+                      <div className="flex flex-wrap items-center gap-2">
+                        {existingAvatarUrl && (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className="rounded-lg"
+                            onClick={() => setRemoveOpen(true)}
+                          >
+                            Remove photo
+                          </Button>
+                        )}
+                        <p className="text-xs text-muted-foreground">
+                          Square image recommended, max 2MB.
+                        </p>
+                      </div>
+                      {errors.avatar_file && (
+                        <p className="text-xs text-destructive">
+                          {String(errors.avatar_file.message)}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="grid gap-5 sm:grid-cols-2">
+                    <div className="space-y-2">
+                      <Label htmlFor="full_name">Full name</Label>
+                      <Input
+                        id="full_name"
+                        placeholder="John Doe"
+                        className="rounded-xl bg-background border-border"
+                        {...register("full_name")}
+                      />
+                      {errors.full_name && (
+                        <p className="text-xs text-destructive">{errors.full_name.message}</p>
+                      )}
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="job_title">Job title</Label>
+                      <Input
+                        id="job_title"
+                        placeholder="Project Manager"
+                        className="rounded-xl bg-background border-border"
+                        {...register("job_title")}
+                      />
+                      {errors.job_title && (
+                        <p className="text-xs text-destructive">
+                          {String(errors.job_title.message)}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-3 pt-2 border-t border-border">
+                    <Button type="submit" disabled={saving || uploading} className="rounded-xl">
+                      {saving ? "Saving…" : "Save changes"}
                     </Button>
-                  )}
-                  <p className="ml-auto text-xs text-muted-foreground">
-                    Recommended: square image, &lt; 2MB.
-                  </p>
-                </div>
-                {errors.avatar_file && (
-                  <p className="mt-1 text-xs text-red-500">
-                    {String(errors.avatar_file.message)}
-                  </p>
-                )}
+                    {uploading && <span className="text-sm text-muted-foreground">Uploading image…</span>}
+                  </div>
+                </form>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="preferences">
+            <Card className="glass rounded-2xl border-border shadow-sm">
+              <div className="px-6 pt-6 pb-2">
+                <CardTitle className="text-lg font-semibold">Preferences</CardTitle>
+                <p className="text-sm text-muted-foreground mt-1">Customize notifications and app behavior.</p>
               </div>
-            </div>
+              <CardContent className="px-6 pb-6">
+                <NotificationPreferences />
+              </CardContent>
+            </Card>
+          </TabsContent>
 
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Full name</label>
-              <Input placeholder="John Doe" {...register("full_name")} />
-              {errors.full_name && (
-                <p className="text-xs text-red-500">{errors.full_name.message}</p>
-              )}
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Job title</label>
-              <Input placeholder="Project Manager" {...register("job_title")} />
-              {errors.job_title && (
-                <p className="text-xs text-red-500">
-                  {String(errors.job_title.message)}
-                </p>
-              )}
-            </div>
-
-            <div className="flex items-center gap-3">
-              <Button type="submit" disabled={saving || uploading}>
-                {saving ? "Saving…" : "Save changes"}
-              </Button>
-              {uploading && <span className="text-sm">Uploading image…</span>}
-            </div>
-          </form>
-        </CardContent>
-      </Card>
-        </TabsContent>
-
-        <TabsContent value="preferences">
-          <Card className="p-6 space-y-6">
-            <CardTitle className="text-xl font-semibold">Preferences</CardTitle>
-            <CardContent>
-              <NotificationPreferences />
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="notifications">
-          <Card className="p-6 space-y-6">
-            <CardTitle className="text-xl font-semibold">Notifications</CardTitle>
-            <CardContent>
-              <NotificationsList />
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-      </Tabs>
+          <TabsContent value="notifications">
+            <Card className="glass rounded-2xl border-border shadow-sm">
+              <div className="px-6 pt-6 pb-2">
+                <CardTitle className="text-lg font-semibold">Notifications</CardTitle>
+                <p className="text-sm text-muted-foreground mt-1">Review recent activity and updates.</p>
+              </div>
+              <CardContent className="px-6 pb-6">
+                <NotificationsList />
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
 
       <Dialog open={removeOpen} onOpenChange={setRemoveOpen}>
         <DialogContent>
@@ -459,6 +492,7 @@ export default function ProfilePage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      </div>
     </div>
   );
 }

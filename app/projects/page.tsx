@@ -109,7 +109,7 @@ export default function ProjectsPage() {
   const Avatar = ({ name }: { name: string }) => {
     const initial = (name?.trim()?.[0] ?? "?").toUpperCase();
     return (
-      <div className="flex h-8 w-8 items-center justify-center rounded-lg border border-neutral-200 bg-neutral-50 text-neutral-700">
+      <div className="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-muted text-foreground shrink-0">
         {initial}
       </div>
     );
@@ -117,21 +117,29 @@ export default function ProjectsPage() {
 
   return (
     <div className="min-h-screen w-full">
-      <div className="mx-auto max-w-[1200px] px-6 lg:px-10 py-12 space-y-6">
+      <div className="mx-auto max-w-[1200px] px-3 sm:px-6 lg:px-10 py-8 sm:py-12 space-y-6">
         {/* Header */}
         <div className="pt-15 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h1 className="text-3xl font-semibold tracking-tight text-foreground">Projects</h1>
+            <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight text-foreground">Projects</h1>
             <p className="text-sm text-muted-foreground mt-0.5">Manage projects in your current workspace.</p>
           </div>
           <div className="flex items-center gap-2">
-            <CreateWorkspaceDialog onCreated={(ws) => setWorkspaceId(ws.id)} />
-            <CreateProjectDialog workspaceId={workspaceId} onCreated={onCreated} />
+            <CreateWorkspaceDialog
+              onCreated={(ws) => {
+                setWorkspaceId(ws.id);
+              }}
+            />
+            <CreateProjectDialog
+              workspaceId={workspaceId}
+              onCreated={onCreated}
+              onWorkspaceCreated={(ws) => setWorkspaceId(ws.id)}
+            />
           </div>
         </div>
 
         {/* Controls */}
-        <Card className="border-border shadow-sm rounded-2xl">
+        <Card className="glass border-border shadow-sm rounded-2xl">
           <CardContent className="px-4 sm:px-6 py-4">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
               <div className="relative flex-1">
@@ -247,7 +255,7 @@ export default function ProjectsPage() {
 
                     <Separator />
 
-                    <div className="p-3 flex items-center justify-end gap-2">
+                    <div className="p-3 flex flex-wrap items-center justify-end gap-2">
                       <Link
                         href={`/projects/${p.id}/tasks`}
                         className="inline-flex items-center text-xs font-medium text-muted-foreground hover:text-foreground px-2 py-1.5 rounded-lg hover:bg-accent transition-colors"
@@ -299,16 +307,16 @@ export default function ProjectsPage() {
 
 function EmptyState({ onReset }: { onReset: () => void }) {
   return (
-    <Card className="overflow-hidden rounded-2xl border-border">
-      <div className="px-6 py-12 text-center">
-        <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-muted">
-          <FolderPlus className="h-6 w-6 text-muted-foreground" />
+    <Card className="glass overflow-hidden rounded-2xl border-border shadow-sm">
+      <div className="px-6 py-14 text-center">
+        <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-muted border border-border">
+          <FolderPlus className="h-7 w-7 text-muted-foreground" />
         </div>
         <h3 className="text-lg font-semibold text-foreground">No projects found</h3>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Try adjusting your search or create a new project to get started.
+        <p className="mt-2 text-sm text-muted-foreground max-w-md mx-auto">
+          Create a project in your workspace or clear your search to browse everything.
         </p>
-        <div className="mt-4 flex items-center justify-center gap-2">
+        <div className="mt-5 flex items-center justify-center gap-2">
           <Button onClick={onReset} variant="outline" className="rounded-xl">
             Clear search
           </Button>

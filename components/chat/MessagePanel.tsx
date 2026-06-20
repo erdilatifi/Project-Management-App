@@ -11,6 +11,7 @@ import { toast } from "sonner";
 import { formatTimeAgo } from "@/lib/time";
 import { ConfirmationDialog } from "@/components/ui/confirmation-dialog";
 import { getUserDisplayName } from "@/utils/userDisplay";
+import { getThreadParticipants, markThreadRead } from "@/lib/chatAccess";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -222,24 +223,13 @@ export default function MessagePanel({ threadId, workspaceId, title: titleProp, 
 
   // participants + permissions
   const loadParticipants = useCallback(async () => {
-    const { data: tp, error } = await supabase.rpc("get_thread_participants", {
-      thread_id_param: threadId,
-    });
-    if (error) {
-      console.error("[message-panel] Failed to load participants", {
-        threadId,
-        error,
-      });
-      setParticipants([]);
-      return;
+    let participantsRows = [] as Array<{ user_id: string; is_admin: boolean | null }>
+    try {
+      participantsRows = await getThreadParticipants(supabase, threadId)
+    } catch {
+      setParticipants([])
+      return
     }
-
-    const participantsRows = Array.isArray(tp) ? tp : [];
-
-    console.log("[message-panel] Loaded participants", {
-      threadId,
-      count: participantsRows.length,
-    });
 
     const ids = Array.from(
       new Set(participantsRows.map((r: any) => String(r.user_id)))
@@ -249,18 +239,11 @@ export default function MessagePanel({ threadId, workspaceId, title: titleProp, 
     const { data: u } = await supabase.auth.getUser();
     const uid = u.user?.id;
 
-    const { data: thr, error: threadErr } = await supabase
+    const { data: thr } = await supabase
       .from("message_threads")
       .select("created_by, title")
       .eq("id", threadId)
       .maybeSingle<{ created_by: string | null; title: string | null }>();
-    if (threadErr) {
-      console.error("[message-panel] Failed to load thread metadata", {
-        threadId,
-        error: threadErr,
-      });
-    }
-
     if (thr?.created_by) {
       setCreatorId(thr.created_by);
       // Only the creator can manage (edit title, delete thread)
@@ -299,26 +282,9 @@ export default function MessagePanel({ threadId, workspaceId, title: titleProp, 
     
     const markAsRead = async () => {
       try {
-        console.log('[message-panel] Marking thread as read', { threadId, userId })
-        
-        const { error } = await supabase.rpc('mark_thread_read', {
-          thread_id_param: threadId,
-        })
-        
-        if (error) {
-          if (error.message?.toLowerCase().includes('not allowed')) {
-            console.debug('[message-panel] Skipped marking thread as read (not allowed)', {
-              threadId,
-              userId,
-            })
-          } else {
-            console.error('[message-panel] Failed to mark thread as read', error)
-          }
-        } else {
-          console.log('[message-panel] Thread marked as read successfully')
-        }
-      } catch (e) {
-        console.error('[message-panel] Error marking thread as read', e)
+        await markThreadRead(supabase, threadId, userId)
+      } catch {
+        // Read receipts are best-effort and should not interrupt messaging.
       }
     }
     
@@ -597,10 +563,7 @@ export default function MessagePanel({ threadId, workspaceId, title: titleProp, 
       // Fanout notifications to participants or workspace members (exclude author)
       try {
         const actor = userId;
-        if (!actor) {
-          console.warn('[message-fanout] No actor ID available')
-          return;
-        }
+        if (!actor) return
         
         let recipients = participants.map((p) => p.id).filter((id) => id && id !== actor);
         
@@ -617,8 +580,6 @@ export default function MessagePanel({ threadId, workspaceId, title: titleProp, 
         
         if (recipients.length) {
           const type = /@\w+/.test(msg.body) ? 'message_mention' : 'message_new';
-          console.log('[message-fanout] Sending notifications', { type, recipients: recipients.length, threadId, messageId: msg.id })
-          
           const res = await fetch('/api/notifications/fanout', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -634,17 +595,11 @@ export default function MessagePanel({ threadId, workspaceId, title: titleProp, 
           });
           
           if (!res.ok) {
-            const error = await res.json();
-            console.error('[message-fanout] Failed to send notifications', error);
-          } else {
-            const result = await res.json();
-            console.log('[message-fanout] Notifications sent successfully', result);
+            await res.json().catch(() => null)
           }
-        } else {
-          console.warn('[message-fanout] No recipients to notify')
         }
-      } catch (e) {
-        console.error('[message-fanout] Error sending notifications', e);
+      } catch {
+        // Notification fanout should not block the sent message.
       }
     },
   });
