@@ -3,23 +3,53 @@
 import React, { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useInView } from "framer-motion";
+import { Workflow } from "lucide-react";
 
-// Helper for revealing elements on scroll
-function Reveal({ children, className = "", delay = 0, style = {} }: { children: React.ReactNode; className?: string; delay?: number; style?: React.CSSProperties }) {
+// Helper for revealing elements on scroll. When `spotlight` is set, the element
+// also gets a cursor-following accent glow + lift on hover for a premium feel.
+function Reveal({ children, className = "", delay = 0, style = {}, spotlight = false }: { children: React.ReactNode; className?: string; delay?: number; style?: React.CSSProperties; spotlight?: boolean }) {
   const ref = useRef<HTMLDivElement>(null);
   const inView = useInView(ref, { once: true, margin: "-40px" });
+  const [pos, setPos] = useState({ x: 50, y: 50 });
+  const [hovered, setHovered] = useState(false);
+
+  const transform = inView
+    ? spotlight && hovered
+      ? "translateY(-5px)"
+      : "translateY(0)"
+    : "translateY(28px)";
+
   return (
     <div
       ref={ref}
       className={className}
+      onMouseMove={spotlight ? (e) => {
+        const rect = e.currentTarget.getBoundingClientRect();
+        setPos({ x: e.clientX - rect.left, y: e.clientY - rect.top });
+      } : undefined}
+      onMouseEnter={spotlight ? () => setHovered(true) : undefined}
+      onMouseLeave={spotlight ? () => setHovered(false) : undefined}
       style={{
         opacity: inView ? 1 : 0,
-        transform: inView ? "translateY(0)" : "translateY(28px)",
-        transition: `opacity 0.8s cubic-bezier(.16,1,.3,1) ${delay}s, transform 0.8s cubic-bezier(.16,1,.3,1) ${delay}s`,
+        transform,
+        transition: spotlight
+          ? `opacity 0.8s cubic-bezier(.16,1,.3,1) ${delay}s, transform 0.4s cubic-bezier(.16,1,.3,1), box-shadow 0.4s ease`
+          : `opacity 0.8s cubic-bezier(.16,1,.3,1) ${delay}s, transform 0.8s cubic-bezier(.16,1,.3,1) ${delay}s`,
+        boxShadow: spotlight && hovered ? "0 26px 60px -22px rgba(201,255,61,0.28)" : undefined,
         ...style
       }}
     >
-      {children}
+      {spotlight && (
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-0 z-0 transition-opacity duration-300"
+          style={{
+            opacity: hovered ? 1 : 0,
+            background: `radial-gradient(440px circle at ${pos.x}px ${pos.y}px, rgba(201,255,61,0.16), rgba(139,124,246,0.07) 38%, transparent 60%)`,
+          }}
+        />
+      )}
+      {spotlight ? <div className="relative z-10">{children}</div> : children}
     </div>
   );
 }
@@ -73,15 +103,9 @@ export default function LandingPage() {
         {/* NAV */}
         <nav className={`fixed top-0 left-0 right-0 z-[100] transition-all duration-500 border-b ${scrolled ? "bg-[#050607]/80 backdrop-blur-md border-[var(--lp-border)]" : "border-transparent bg-transparent"}`}>
           <div className="mx-auto max-w-[1180px] px-4 sm:px-7 py-3 sm:py-[18px] flex items-center justify-between">
-            <Link href="/" className="flex items-center gap-[9px] font-serif text-[16px] sm:text-[19px] font-medium tracking-tight text-[var(--lp-ink)]">
-              <span className="relative overflow-hidden w-[24px] h-[24px] rounded-[7px] flex items-center justify-center text-[#050607] font-mono font-bold text-[12px] bg-gradient-to-br from-[var(--lp-accent)] to-[#8fc92a]">
-                F
-                <div className="absolute inset-0 animate-[shimmer_3.5s_ease-in-out_infinite]" style={{
-                  background: "linear-gradient(120deg, transparent 30%, rgba(255,255,255,0.5) 50%, transparent 70%)",
-                  backgroundSize: "220% 100%"
-                }}></div>
-              </span>
-              Flowfoundry
+            <Link href="/" className="flex items-center gap-[9px] text-[16px] sm:text-[19px] font-semibold tracking-tight text-[var(--lp-ink)]">
+              <Workflow className="w-[22px] h-[22px] text-[var(--lp-accent)]" />
+              <span>Flow<span className="font-bold">foundry</span></span>
               <span className="hidden sm:inline-block font-mono text-[10.5px] text-[var(--lp-accent)] border border-[var(--lp-accent-line)] bg-[var(--lp-accent-dim)] px-2 py-[3px] rounded-full ml-1.5 tracking-wider">FREE</span>
             </Link>
             <div className="hidden md:flex items-center gap-9 text-[13.5px] text-[var(--lp-ink-dim)]">
@@ -101,11 +125,7 @@ export default function LandingPage() {
         <header className="relative pt-[160px] overflow-hidden">
           <div className="mx-auto max-w-[1180px] px-5 sm:px-7">
             <Reveal className="max-w-[760px] mx-auto text-center">
-              <span className="inline-flex items-center gap-2 border border-[var(--lp-border-strong)] bg-white/5 pr-[14px] pl-[8px] py-[7px] rounded-full text-[12.5px] text-[var(--lp-ink-dim)] font-mono">
-                <span className="w-1.5 h-1.5 rounded-full bg-[var(--lp-accent)] animate-[pulse-ring_2.2s_infinite]"></span> 
-                100% free and open-source, forever
-              </span>
-              <h1 className="font-serif font-normal text-[clamp(2.6rem,6vw,4.6rem)] leading-[1.04] tracking-tight my-[26px] text-[var(--lp-ink)]">
+              <h1 className="font-serif font-normal text-[clamp(2.6rem,6vw,4.6rem)] leading-[1.04] tracking-tight mt-0 mb-[26px] text-[var(--lp-ink)]">
                 Project management,<br/>
                 <em className="not-italic font-light text-transparent bg-clip-text animate-[gradient-flow_6s_ease-in-out_infinite]" style={{
                   backgroundImage: "linear-gradient(100deg, var(--lp-accent) 10%, #eaffb0 50%, var(--lp-accent) 90%)",
@@ -113,7 +133,7 @@ export default function LandingPage() {
                 }}>without the catch.</em>
               </h1>
               <p className="text-[17px] leading-[1.65] text-[var(--lp-ink-dim)] max-w-[540px] mx-auto">
-                Real-time kanban boards, workspace chat, and team collaboration — built on Next.js and Supabase. No pricing tiers, no seat limits, no credit card.
+                Plan projects, move work across real-time boards, and keep every conversation in one place. Your whole team, perfectly in sync — with no per-seat pricing and no limits.
               </p>
               <div className="flex flex-col sm:flex-row items-center justify-center gap-[14px] mt-[38px] px-1 sm:px-0">
                 <Link href="/register" className="w-full sm:w-auto inline-flex justify-center items-center gap-2 px-[26px] py-[14px] rounded-[10px] text-[14.5px] font-semibold text-[#06140a] bg-[var(--lp-accent)] hover:-translate-y-[2px] hover:shadow-[0_8px_28px_rgba(201,255,61,0.28)] transition-all">Start for free <span className="opacity-70">→</span></Link>
@@ -121,9 +141,9 @@ export default function LandingPage() {
               </div>
               <div className="flex items-center justify-center gap-2.5 mt-[22px] text-[12.5px] text-[var(--lp-ink-faint)] font-mono flex-wrap">
                 <span className="text-[var(--lp-accent)] tracking-widest">★★★★★</span>
-                <span>Open source on GitHub</span>
+                <span>Loved by modern teams</span>
                 <span className="opacity-40">·</span>
-                <span>MIT licensed</span>
+                <span>No credit card</span>
                 <span className="opacity-40">·</span>
                 <span>Unlimited workspaces</span>
               </div>
@@ -289,13 +309,13 @@ export default function LandingPage() {
         <section className="pt-[70px]">
           <div className="mx-auto max-w-[1180px] px-5 sm:px-7 text-center">
             <Reveal>
-              <p className="font-mono text-[11.5px] text-[var(--lp-ink-faint)] tracking-[0.1em] uppercase">Built in the open, with</p>
+              <p className="font-mono text-[11.5px] text-[var(--lp-ink-faint)] tracking-[0.1em] uppercase">Trusted by teams who ship</p>
               <div className="flex items-center justify-center gap-6 sm:gap-[56px] flex-wrap mt-[50px] opacity-55">
-                <span className="font-serif italic text-[19px] text-[var(--lp-ink-dim)]">Next.js</span>
-                <span className="font-serif italic text-[19px] text-[var(--lp-ink-dim)]">Supabase</span>
-                <span className="font-serif italic text-[19px] text-[var(--lp-ink-dim)]">TypeScript</span>
-                <span className="font-serif italic text-[19px] text-[var(--lp-ink-dim)]">Tailwind</span>
-                <span className="font-serif italic text-[19px] text-[var(--lp-ink-dim)]">shadcn/ui</span>
+                <span className="font-serif italic text-[19px] text-[var(--lp-ink-dim)]">Studio42</span>
+                <span className="font-serif italic text-[19px] text-[var(--lp-ink-dim)]">Northwind</span>
+                <span className="font-serif italic text-[19px] text-[var(--lp-ink-dim)]">Lumen Labs</span>
+                <span className="font-serif italic text-[19px] text-[var(--lp-ink-dim)]">Atlas &amp; Co.</span>
+                <span className="font-serif italic text-[19px] text-[var(--lp-ink-dim)]">Driftwood</span>
               </div>
             </Reveal>
           </div>
@@ -312,8 +332,43 @@ export default function LandingPage() {
 
             <div className="grid grid-cols-1 md:grid-cols-[1.1fr_1fr] gap-12 md:gap-[60px] items-center mt-[70px]">
               <Reveal className="relative h-[420px] border border-[var(--lp-border)] rounded-[20px] overflow-hidden" style={{ background: "radial-gradient(ellipse at center, rgba(255,93,74,0.06), transparent 65%), rgba(255,255,255,0.012)" }}>
-                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[64px] h-[64px] rounded-full border border-dashed border-[#ff5d4a]/30 flex items-center justify-center animate-[center-pulse_3s_ease-in-out_infinite] after:content-['?'] after:font-serif after:italic after:text-[24px] after:text-[#ff5d4a] after:opacity-60 z-10"></div>
-                <svg className="absolute inset-0 w-full h-full"><path d="M50 50 L200 200" stroke="rgba(255,93,74,0.18)" strokeWidth="1" strokeDasharray="3 5" className="animate-[dash-flow_1.6s_linear_infinite]" /></svg>
+                <svg className="absolute inset-0 w-full h-full pointer-events-none z-[5]" preserveAspectRatio="none">
+                  <defs>
+                    {/* fade the inner end of every line so it appears to start at the ring, not the center */}
+                    <radialGradient id="problem-line-fade" cx="50%" cy="50%" r="50%">
+                      <stop offset="0%" stopColor="rgba(255,93,74,0)" />
+                      <stop offset="14%" stopColor="rgba(255,93,74,0)" />
+                      <stop offset="22%" stopColor="rgba(255,93,74,0.35)" />
+                      <stop offset="100%" stopColor="rgba(255,93,74,0.12)" />
+                    </radialGradient>
+                  </defs>
+                  {[
+                    { x: "13%", y: "15%" },
+                    { x: "87%", y: "18%" },
+                    { x: "13%", y: "82%" },
+                    { x: "84%", y: "88%" },
+                    { x: "10%", y: "48%" },
+                    { x: "90%", y: "54%" },
+                  ].map((node, i) => (
+                    <line
+                      key={i}
+                      x1="50%"
+                      y1="50%"
+                      x2={node.x}
+                      y2={node.y}
+                      stroke="url(#problem-line-fade)"
+                      strokeWidth="1.25"
+                      strokeDasharray="3 6"
+                      className="animate-[dash-flow_1.6s_linear_infinite]"
+                    />
+                  ))}
+                </svg>
+                {/* Center hub — opaque disc so the lines visually terminate at the outer ring */}
+                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[78px] h-[78px] rounded-full z-10 flex items-center justify-center animate-[center-pulse_3s_ease-in-out_infinite]" style={{ background: "radial-gradient(circle at center, #161013 0%, var(--lp-bg) 70%)", boxShadow: "0 0 0 1px rgba(255,93,74,0.25), 0 0 40px rgba(255,93,74,0.18)" }}>
+                  <div className="w-[58px] h-[58px] rounded-full border border-dashed border-[#ff5d4a]/40 flex items-center justify-center">
+                    <span className="font-serif italic text-[24px] text-[#ff5d4a] opacity-70 leading-none">?</span>
+                  </div>
+                </div>
                 <div className="absolute top-[10%] left-[8%] border border-[var(--lp-border-strong)] bg-[#0f1215]/90 rounded-[12px] p-[10px_13px] font-mono text-[11px] text-[var(--lp-ink-faint)] flex items-center gap-[7px] animate-[node-drift_6s_ease-in-out_infinite_reverse]"><span className="w-[6px] h-[6px] rounded-full bg-[var(--lp-red)] shrink-0"></span>Trello board</div>
                 <div className="absolute top-[14%] right-[8%] border border-[var(--lp-border-strong)] bg-[#0f1215]/90 rounded-[12px] p-[10px_13px] font-mono text-[11px] text-[var(--lp-ink-faint)] flex items-center gap-[7px] animate-[node-drift_6s_ease-in-out_infinite]"><span className="w-[6px] h-[6px] rounded-full bg-[var(--lp-red)] shrink-0"></span>Slack #general</div>
                 <div className="absolute bottom-[16%] left-[6%] border border-[var(--lp-border-strong)] bg-[#0f1215]/90 rounded-[12px] p-[10px_13px] font-mono text-[11px] text-[var(--lp-ink-faint)] flex items-center gap-[7px] animate-[node-drift_6s_ease-in-out_infinite_reverse]"><span className="w-[6px] h-[6px] rounded-full bg-[var(--lp-red)] shrink-0"></span>Notion docs</div>
@@ -350,31 +405,35 @@ export default function LandingPage() {
             </Reveal>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-6 gap-[18px] mt-[64px]">
-              <Reveal className="md:col-span-4 border border-[var(--lp-border)] rounded-[18px] bg-white/5 p-[26px] relative overflow-hidden transition-all duration-300 hover:border-[var(--lp-border-strong)] hover:bg-white/10 hover:-translate-y-[3px]">
+              <Reveal spotlight className="md:col-span-4 border border-[var(--lp-border)] rounded-[18px] bg-white/5 p-[26px] relative overflow-hidden transition-colors duration-300 hover:border-[var(--lp-accent-line)] hover:bg-white/10">
                 <div className="w-[38px] h-[38px] rounded-[10px] bg-[var(--lp-accent-dim)] border border-[var(--lp-accent-line)] flex items-center justify-center text-[var(--lp-accent)] mb-[18px]">
                   <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><rect x="2" y="2" width="6" height="6" rx="1.5" stroke="currentColor" strokeWidth="1.4"/><rect x="10" y="2" width="6" height="6" rx="1.5" stroke="currentColor" strokeWidth="1.4"/><rect x="2" y="10" width="6" height="6" rx="1.5" stroke="currentColor" strokeWidth="1.4"/><rect x="10" y="10" width="6" height="6" rx="1.5" stroke="currentColor" strokeWidth="1.4"/></svg>
                 </div>
                 <h3 className="text-[17px] font-semibold text-[var(--lp-ink)] tracking-tight">Drag-and-drop kanban</h3>
-                <p className="text-[13.5px] text-[var(--lp-ink-dim)] leading-[1.65] mt-[8px] max-w-[380px]">Visual boards with To Do, In Progress, and Done columns. Permission-based moves, optimistic updates, and changes that sync to everyone instantly.</p>
-                <div className="flex gap-[10px] mt-[18px]">
-                  <div className="flex-1">
-                    <div className="font-mono text-[9.5px] text-[var(--lp-ink-faint)] uppercase tracking-widest mb-[8px] flex items-center gap-[5px]"><span className="w-[5px] h-[5px] rounded-full bg-[var(--lp-ink-faint)]"></span>To do</div>
-                    <div className="h-[30px] rounded-[7px] bg-white/5 border border-[var(--lp-border)] mb-[7px] relative overflow-hidden after:content-[''] after:absolute after:left-[8px] after:right-[8px] after:top-1/2 after:-translate-y-1/2 after:h-[4px] after:rounded-[2px] after:bg-white/10 animate-[fly-across_5s_ease-in-out_infinite]"></div>
-                    <div className="h-[30px] rounded-[7px] bg-white/5 border border-[var(--lp-border)] mb-[7px] relative overflow-hidden after:content-[''] after:absolute after:left-[8px] after:right-[8px] after:top-1/2 after:-translate-y-1/2 after:h-[4px] after:rounded-[2px] after:bg-white/10"></div>
+                <p className="text-[13.5px] text-[var(--lp-ink-dim)] leading-[1.65] mt-[8px] max-w-[380px]">Visual boards with To Do, In Progress, and Done columns. Drag a card and everyone on the team sees it move, instantly.</p>
+                <div className="mt-[18px]">
+                  <div className="grid grid-cols-3 gap-[10px] mb-[9px]">
+                    <div className="font-mono text-[9.5px] text-[var(--lp-ink-faint)] uppercase tracking-widest flex items-center gap-[5px]"><span className="w-[5px] h-[5px] rounded-full bg-[var(--lp-ink-faint)]"></span>To do</div>
+                    <div className="font-mono text-[9.5px] text-[var(--lp-ink-faint)] uppercase tracking-widest flex items-center gap-[5px]"><span className="w-[5px] h-[5px] rounded-full bg-[var(--lp-violet)]"></span>In progress</div>
+                    <div className="font-mono text-[9.5px] text-[var(--lp-ink-faint)] uppercase tracking-widest flex items-center gap-[5px]"><span className="w-[5px] h-[5px] rounded-full bg-[var(--lp-accent)]"></span>Done</div>
                   </div>
-                  <div className="flex-1">
-                    <div className="font-mono text-[9.5px] text-[var(--lp-ink-faint)] uppercase tracking-widest mb-[8px] flex items-center gap-[5px]"><span className="w-[5px] h-[5px] rounded-full bg-[var(--lp-violet)]"></span>In progress</div>
-                    <div className="h-[30px] rounded-[7px] bg-white/5 border border-[var(--lp-border)] mb-[7px] relative overflow-hidden after:content-[''] after:absolute after:left-[8px] after:right-[8px] after:top-1/2 after:-translate-y-1/2 after:h-[4px] after:rounded-[2px] after:bg-white/10 animate-[fly-across_5s_ease-in-out_infinite]" style={{animationDelay: '2.5s'}}></div>
-                    <div className="h-[30px] rounded-[7px] bg-white/5 border border-[var(--lp-border)] mb-[7px] relative overflow-hidden after:content-[''] after:absolute after:left-[8px] after:right-[8px] after:top-1/2 after:-translate-y-1/2 after:h-[4px] after:rounded-[2px] after:bg-white/10"></div>
-                  </div>
-                  <div className="flex-1">
-                    <div className="font-mono text-[9.5px] text-[var(--lp-ink-faint)] uppercase tracking-widest mb-[8px] flex items-center gap-[5px]"><span className="w-[5px] h-[5px] rounded-full bg-[var(--lp-accent)]"></span>Done</div>
-                    <div className="h-[30px] rounded-[7px] bg-white/5 border border-[var(--lp-border)] mb-[7px] relative overflow-hidden after:content-[''] after:absolute after:left-[8px] after:right-[8px] after:top-1/2 after:-translate-y-1/2 after:h-[4px] after:rounded-[2px] after:bg-white/10"></div>
+                  {/* drop zones with a single card that "drags" across the columns */}
+                  <div className="relative grid grid-cols-3 gap-[10px]">
+                    <div className="h-[42px] rounded-[8px] border border-dashed border-[var(--lp-border)] bg-white/[0.03]"></div>
+                    <div className="h-[42px] rounded-[8px] border border-dashed border-[var(--lp-border)] bg-white/[0.03]"></div>
+                    <div className="h-[42px] rounded-[8px] border border-dashed border-[var(--lp-border)] bg-white/[0.03]"></div>
+                    <div
+                      className="absolute top-0 left-0 w-[calc((100%-20px)/3)] h-[42px] rounded-[8px] border border-[var(--lp-accent-line)] bg-[#14171b] shadow-[0_10px_24px_-6px_rgba(0,0,0,0.6)] flex items-center gap-[7px] px-[9px] animate-[kanban-drag_5.5s_cubic-bezier(.65,0,.35,1)_infinite] will-change-transform"
+                    >
+                      <span className="w-[5px] h-[5px] rounded-full bg-[var(--lp-accent)] shrink-0"></span>
+                      <span className="flex-1 h-[4px] rounded-full bg-white/15"></span>
+                      <span className="w-[16px] h-[16px] rounded-full shrink-0 bg-gradient-to-br from-[var(--lp-violet)] to-[#5a4fc4]"></span>
+                    </div>
                   </div>
                 </div>
               </Reveal>
 
-              <Reveal className="md:col-span-2 border border-[var(--lp-border)] rounded-[18px] bg-white/5 p-[26px] relative overflow-hidden transition-all duration-300 hover:border-[var(--lp-border-strong)] hover:bg-white/10 hover:-translate-y-[3px]" delay={0.1}>
+              <Reveal spotlight className="md:col-span-2 border border-[var(--lp-border)] rounded-[18px] bg-white/5 p-[26px] relative overflow-hidden transition-colors duration-300 hover:border-[var(--lp-accent-line)] hover:bg-white/10" delay={0.1}>
                 <div className="w-[38px] h-[38px] rounded-[10px] bg-[var(--lp-violet-dim)] border border-[var(--lp-violet-line)] flex items-center justify-center text-[var(--lp-violet)] mb-[18px]">
                   <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><path d="M2 4.5A2.5 2.5 0 014.5 2h9A2.5 2.5 0 0116 4.5v5A2.5 2.5 0 0113.5 12H7l-3.5 3v-3H4.5A2.5 2.5 0 012 9.5v-5z" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round"/></svg>
                 </div>
@@ -396,12 +455,12 @@ export default function LandingPage() {
                 </div>
               </Reveal>
 
-              <Reveal className="md:col-span-2 border border-[var(--lp-border)] rounded-[18px] bg-white/5 p-[26px] relative overflow-hidden transition-all duration-300 hover:border-[var(--lp-border-strong)] hover:bg-white/10 hover:-translate-y-[3px]" delay={0.2}>
+              <Reveal spotlight className="md:col-span-2 border border-[var(--lp-border)] rounded-[18px] bg-white/5 p-[26px] relative overflow-hidden transition-colors duration-300 hover:border-[var(--lp-accent-line)] hover:bg-white/10" delay={0.2}>
                 <div className="w-[38px] h-[38px] rounded-[10px] bg-[var(--lp-accent-dim)] border border-[var(--lp-accent-line)] flex items-center justify-center text-[var(--lp-accent)] mb-[18px]">
                   <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><path d="M9 1.5L15.5 4.5V9C15.5 12.6 12.7 15.5 9 16.5C5.3 15.5 2.5 12.6 2.5 9V4.5L9 1.5Z" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round"/></svg>
                 </div>
                 <h3 className="text-[17px] font-semibold text-[var(--lp-ink)] tracking-tight">Real-time everything</h3>
-                <p className="text-[13.5px] text-[var(--lp-ink-dim)] leading-[1.65] mt-[8px] max-w-[380px]">Supabase subscriptions push every change live — no refresh, ever.</p>
+                <p className="text-[13.5px] text-[var(--lp-ink-dim)] leading-[1.65] mt-[8px] max-w-[380px]">Every change appears live for the whole team — no refresh, ever.</p>
                 <div className="mt-4">
                   <div className="flex items-center gap-[10px] py-[8px]">
                     <div className="relative w-[22px] h-[22px] rounded-full shrink-0 bg-gradient-to-br from-[var(--lp-violet)] to-[#5a4fc4] after:content-[''] after:absolute after:-right-[1px] after:-bottom-[1px] after:w-[8px] after:h-[8px] after:rounded-full after:bg-[var(--lp-accent)] after:border-[2px] after:border-[#14171b] after:animate-[pulse-ring_2s_infinite]"></div>
@@ -421,12 +480,12 @@ export default function LandingPage() {
                 </div>
               </Reveal>
 
-              <Reveal className="md:col-span-4 border border-[var(--lp-border)] rounded-[18px] bg-white/5 p-[26px] relative overflow-hidden transition-all duration-300 hover:border-[var(--lp-border-strong)] hover:bg-white/10 hover:-translate-y-[3px]" delay={0.3}>
+              <Reveal spotlight className="md:col-span-4 border border-[var(--lp-border)] rounded-[18px] bg-white/5 p-[26px] relative overflow-hidden transition-colors duration-300 hover:border-[var(--lp-accent-line)] hover:bg-white/10" delay={0.3}>
                 <div className="w-[38px] h-[38px] rounded-[10px] bg-[var(--lp-violet-dim)] border border-[var(--lp-violet-line)] flex items-center justify-center text-[var(--lp-violet)] mb-[18px]">
                   <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><path d="M14.5 6.5a5.5 5.5 0 00-11 0c0 4-1.5 5-1.5 5h14s-1.5-1-1.5-5z" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round"/><path d="M7.5 14.5a1.5 1.5 0 003 0" stroke="currentColor" strokeWidth="1.4"/></svg>
                 </div>
                 <h3 className="text-[17px] font-semibold text-[var(--lp-ink)] tracking-tight">Smart notifications</h3>
-                <p className="text-[13.5px] text-[var(--lp-ink-dim)] leading-[1.65] mt-[8px] max-w-[380px]">Assignments, mentions, and workspace invites — surfaced the moment they happen, with a polling fallback so nothing slips through.</p>
+                <p className="text-[13.5px] text-[var(--lp-ink-dim)] leading-[1.65] mt-[8px] max-w-[380px]">Assignments, mentions, and workspace invites — surfaced the moment they happen, so nothing ever slips through the cracks.</p>
                 <div className="mt-[18px] flex flex-col gap-[9px]">
                   <div className="flex items-center gap-[11px] p-[10px_12px] border border-[var(--lp-border)] rounded-[11px] bg-white/5">
                     <span className="w-[6px] h-[6px] rounded-full bg-[var(--lp-accent)] shrink-0 animate-[pulse-ring_2s_infinite]"></span>
@@ -478,8 +537,8 @@ export default function LandingPage() {
               {/* Step 2 */}
               <div className="grid grid-cols-[80px_1fr] gap-0">
                 <div className="flex flex-col items-center">
-                  <div className="w-[38px] h-[38px] rounded-full border border-[var(--lp-border-strong)] text-[var(--lp-ink-faint)] bg-[var(--lp-bg-soft)] font-mono text-[13px] flex items-center justify-center shrink-0 transition-all duration-400">2</div>
-                  <div className="w-[1px] flex-1 bg-[var(--lp-border)] my-[8px] min-h-[60px] relative overflow-hidden"></div>
+                  <div className="w-[38px] h-[38px] rounded-full border border-[var(--lp-accent)] text-[#06140a] bg-[var(--lp-accent)] shadow-[0_0_0_6px_var(--lp-accent-dim)] font-mono text-[13px] flex items-center justify-center shrink-0 transition-all duration-400">2</div>
+                  <div className="w-[1px] flex-1 bg-[var(--lp-border)] my-[8px] min-h-[60px] relative overflow-hidden after:content-[''] after:absolute after:left-0 after:-top-[40%] after:w-full after:h-[40%] after:bg-gradient-to-b after:from-transparent after:via-[var(--lp-accent)] after:to-transparent after:animate-[connector-flow_2.4s_linear_infinite] after:opacity-70" style={{ animationDelay: '1.2s' }}></div>
                 </div>
                 <Reveal className="pl-0 pb-[64px] pl-[28px] sm:pl-[28px]">
                   <h3 className="text-[20px] font-semibold text-[var(--lp-ink)] tracking-tight">Build the board, assign the work</h3>
@@ -489,7 +548,7 @@ export default function LandingPage() {
               {/* Step 3 */}
               <div className="grid grid-cols-[80px_1fr] gap-0">
                 <div className="flex flex-col items-center">
-                  <div className="w-[38px] h-[38px] rounded-full border border-[var(--lp-border-strong)] text-[var(--lp-ink-faint)] bg-[var(--lp-bg-soft)] font-mono text-[13px] flex items-center justify-center shrink-0 transition-all duration-400">3</div>
+                  <div className="w-[38px] h-[38px] rounded-full border border-[var(--lp-accent)] text-[#06140a] bg-[var(--lp-accent)] shadow-[0_0_0_6px_var(--lp-accent-dim)] font-mono text-[13px] flex items-center justify-center shrink-0 transition-all duration-400">3</div>
                 </div>
                 <Reveal className="pl-0 pb-[64px] pl-[28px] sm:pl-[28px]">
                   <h3 className="text-[20px] font-semibold text-[var(--lp-ink)] tracking-tight">Discuss inline, never lose context</h3>
@@ -528,10 +587,10 @@ export default function LandingPage() {
             
             <div className="w-full max-w-[760px] mt-[60px]">
               {[
-                { q: "Is Flowfoundry really free?", a: "Yes. Our core features including unlimited workspaces and team members are completely free forever. Since it's open source, you can also self-host it." },
-                { q: "Do you have mobile apps?", a: "Flowfoundry is fully responsive and works beautifully on all mobile browsers as a progressive web app." },
-                { q: "Can I export my data?", a: "Yes. You can export all your workspace data, tasks, and conversations at any time." },
-                { q: "How secure is my data?", a: "We use enterprise-grade encryption for data at rest and in transit via Supabase. Your data is backed up daily and secured by RLS." }
+                { q: "Is Flowfoundry really free?", a: "Yes. Unlimited workspaces, unlimited projects, and unlimited team members are completely free — no per-seat pricing and no credit card required." },
+                { q: "Does it work on mobile?", a: "Flowfoundry is fully responsive and works beautifully in any mobile browser, so your team can stay in sync from anywhere." },
+                { q: "Can I export my data?", a: "Absolutely. You own your data and can export all of your workspaces, tasks, and conversations at any time." },
+                { q: "How secure is my data?", a: "Your data is protected with enterprise-grade encryption in transit and at rest, with automatic daily backups and strict per-workspace access controls." }
               ].map((faq, i) => (
                 <FAQItem key={i} q={faq.q} a={faq.a} index={i} />
               ))}
@@ -561,11 +620,11 @@ export default function LandingPage() {
           <div className="mx-auto max-w-[1180px] px-5 sm:px-7">
             <div className="flex justify-between gap-[60px] flex-wrap pb-[48px] border-b border-[var(--lp-border)]">
               <div>
-                <a href="#" className="flex items-center gap-[9px] font-serif text-[19px] font-medium tracking-tight text-[var(--lp-ink)]">
-                  <span className="relative overflow-hidden w-[24px] h-[24px] rounded-[7px] flex items-center justify-center text-[#050607] font-mono font-bold text-[12px] bg-gradient-to-br from-[var(--lp-accent)] to-[#8fc92a]">F</span>
-                  Flowfoundry
+                <a href="#" className="flex items-center gap-[9px] text-[19px] font-semibold tracking-tight text-[var(--lp-ink)]">
+                  <Workflow className="w-[22px] h-[22px] text-[var(--lp-accent)]" />
+                  <span>Flow<span className="font-bold">foundry</span></span>
                 </a>
-                <p className="text-[13.5px] text-[var(--lp-ink-faint)] mt-[14px] max-w-[280px] leading-[1.6]">The open-source project management platform built for modern teams.</p>
+                <p className="text-[13.5px] text-[var(--lp-ink-faint)] mt-[14px] max-w-[280px] leading-[1.6]">The all-in-one project management platform built for modern teams.</p>
               </div>
               <div className="flex gap-[64px] flex-wrap">
                 <div>
@@ -576,7 +635,7 @@ export default function LandingPage() {
                 </div>
                 <div>
                   <h5 className="text-[12px] uppercase tracking-widest text-[var(--lp-ink-faint)] font-mono mb-[16px]">Resources</h5>
-                  <a href="#" className="block text-[13.5px] text-[var(--lp-ink-dim)] mb-[12px] hover:text-[var(--lp-accent)] transition-colors">GitHub</a>
+                  <a href="#faq" className="block text-[13.5px] text-[var(--lp-ink-dim)] mb-[12px] hover:text-[var(--lp-accent)] transition-colors">Help center</a>
                   <a href="#" className="block text-[13.5px] text-[var(--lp-ink-dim)] mb-[12px] hover:text-[var(--lp-accent)] transition-colors">Documentation</a>
                   <a href="#" className="block text-[13.5px] text-[var(--lp-ink-dim)] mb-[12px] hover:text-[var(--lp-accent)] transition-colors">Blog</a>
                 </div>
