@@ -272,15 +272,6 @@ export default function MyTasksPage() {
       <div className="mx-auto max-w-[1400px] px-3 sm:px-6 lg:px-10 py-8 sm:py-12">
         {/* Header */}
         <div className="mb-8 pt-15 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-<<<<<<< HEAD
-          <div>
-            <h1 className="text-2xl sm:text-3xl font-semibold text-foreground tracking-tight">
-              My Tasks
-            </h1>
-            <p className="text-sm text-muted-foreground mt-0.5">
-              {filtered.length} task{filtered.length !== 1 ? "s" : ""} assigned to you
-            </p>
-=======
           <div className="flex items-center gap-3">
             <span className="brand-chip h-12 w-12 shrink-0">
               <CheckSquare className="h-6 w-6" />
@@ -293,7 +284,6 @@ export default function MyTasksPage() {
                 {filtered.length} task{filtered.length !== 1 ? "s" : ""} assigned to you
               </p>
             </div>
->>>>>>> origin/polish-protected-routes
           </div>
           <div className="flex items-center gap-2">
             <Button
