@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef, useState, useCallback } from "react";
 import Link from "next/link";
 import { useInView } from "framer-motion";
 import { Workflow } from "lucide-react";
@@ -97,6 +97,200 @@ function Reveal({ children, className = "", delay = 0, style = {}, spotlight = f
   );
 }
 
+/* ═══════════════════════════════════════════════════════════════════════════
+   LiveFeed – Vertically-scrolling activity ticker with staggered fade-in/out
+   ═══════════════════════════════════════════════════════════════════════════ */
+const ALL_FEED_ITEMS = [
+  { name: "Priya", action: "moved a task", project: "Redesign", color: "var(--lp-violet)" },
+  { name: "Theo", action: "commented on", project: "Marketing Site", color: "var(--lp-accent)" },
+  { name: "Sasha", action: "created workspace", project: "Engineering", color: "#ffb84d" },
+  { name: "Maya", action: "invited", project: "Alex", color: "var(--lp-violet)" },
+  { name: "Alex", action: "completed", project: "Q3 Planning", color: "var(--lp-accent)" },
+  { name: "Jordan", action: "assigned", project: "API Refactor", color: "#ffb84d" },
+  { name: "Lina", action: "archived", project: "Old Branding", color: "var(--lp-violet)" },
+  { name: "Kai", action: "moved a task", project: "Sprint 12", color: "var(--lp-accent)" },
+];
+
+function LiveFeed() {
+  const VISIBLE = 4;
+  const [offset, setOffset] = useState(0);
+
+  useEffect(() => {
+    const id = setInterval(() => setOffset((o) => o + 1), 2400);
+    return () => clearInterval(id);
+  }, []);
+
+  // Build the visible window (wrapping around)
+  const items: typeof ALL_FEED_ITEMS = [];
+  for (let i = 0; i < VISIBLE; i++) {
+    items.push(ALL_FEED_ITEMS[(offset + i) % ALL_FEED_ITEMS.length]);
+  }
+
+  return (
+    <div className="relative border-y border-[var(--lp-border)] bg-[#080a0c]/80 overflow-hidden">
+      {/* edge fades */}
+      <div className="absolute top-0 left-0 right-0 h-[28px] bg-gradient-to-b from-[var(--lp-bg)] to-transparent z-10 pointer-events-none" />
+      <div className="absolute bottom-0 left-0 right-0 h-[28px] bg-gradient-to-t from-[var(--lp-bg)] to-transparent z-10 pointer-events-none" />
+
+      {/* live badge */}
+      <div className="absolute top-[10px] right-[16px] z-20 flex items-center gap-[6px] font-mono text-[10px] text-[var(--lp-accent)] tracking-widest uppercase">
+        <span className="w-[5px] h-[5px] rounded-full bg-[var(--lp-accent)] animate-[pulse-ring_2s_infinite]" />
+        LIVE
+      </div>
+
+      <div className="flex flex-col items-center py-[16px] gap-0" style={{ minHeight: `${VISIBLE * 44}px` }}>
+        {items.map((item, i) => (
+          <div
+            key={`${offset}-${i}`}
+            className="flex items-center gap-[10px] px-[20px] sm:px-[30px] py-[10px] font-mono text-[12.5px] text-[var(--lp-ink-dim)] whitespace-nowrap w-full max-w-[480px] animate-[feed-item-in_0.6s_cubic-bezier(.16,1,.3,1)_forwards]"
+            style={{ animationDelay: `${i * 0.08}s`, opacity: 0 }}
+          >
+            <div className="relative">
+              <div className="w-[26px] h-[26px] rounded-full shrink-0 border border-white/10" style={{ background: `linear-gradient(135deg, ${item.color}, ${item.color}88)` }} />
+              <span className="absolute -bottom-[1px] -right-[1px] w-[8px] h-[8px] rounded-full bg-[var(--lp-accent)] border-[2px] border-[#080a0c]" />
+            </div>
+            <span className="font-semibold text-[var(--lp-ink)]">{item.name}</span>
+            <span className="text-[var(--lp-ink-faint)]">{item.action}</span>
+            <span style={{ color: item.color }}>{item.project}</span>
+            <span className="ml-auto text-[10px] text-[var(--lp-ink-faint)] opacity-50">just now</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   TestimonialCarousel – Auto-rotating quotes with crossfade + progress bar
+   ═══════════════════════════════════════════════════════════════════════════ */
+const TESTIMONIALS = [
+  {
+    quote: "Our boards, our conversations, and every client update finally live in one place. Status meetings basically disappeared — people just open the board and see exactly where things stand.",
+    name: "David K.",
+    role: "Studio Lead at Studio42",
+    gradient: "from-[var(--lp-accent)] to-[#6b8a1f]",
+  },
+  {
+    quote: "We tried every tool on the market. Flowfoundry is the only one where our designers, engineers, and clients are genuinely in sync — no Slack pings, no email chains, just the board.",
+    name: "Anya M.",
+    role: "Head of Product at Northwind",
+    gradient: "from-[var(--lp-violet)] to-[#5a4fc4]",
+  },
+  {
+    quote: "The real-time updates are a game-changer. I drag a task to Done and my PM sees it instantly across the world. It feels like we're actually in the same room.",
+    name: "Marcus T.",
+    role: "Engineering Lead at Lumen Labs",
+    gradient: "from-[#ffb84d] to-[#e0962b]",
+  },
+];
+
+function TestimonialCarousel() {
+  const [active, setActive] = useState(0);
+  const [progress, setProgress] = useState(0);
+  const DURATION = 6000;
+
+  useEffect(() => {
+    const start = Date.now();
+    let raf: number;
+    const tick = () => {
+      const elapsed = Date.now() - start;
+      const p = (elapsed % DURATION) / DURATION;
+      setProgress(p);
+      if (elapsed > 0 && elapsed % DURATION < 16) {
+        setActive((a) => (a + 1) % TESTIMONIALS.length);
+      }
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, []);
+
+  // Simple auto-advance every DURATION ms
+  useEffect(() => {
+    const id = setInterval(() => {
+      setActive((a) => (a + 1) % TESTIMONIALS.length);
+    }, DURATION);
+    return () => clearInterval(id);
+  }, []);
+
+  return (
+    <section className="border-y border-[var(--lp-border)] bg-white/[0.03] py-[100px] relative overflow-hidden">
+      {/* subtle ambient glow behind the quote */}
+      <div className="absolute inset-0 pointer-events-none" style={{
+        background: "radial-gradient(ellipse 60% 50% at 50% 50%, rgba(201,255,61,0.04), transparent 70%)"
+      }} />
+
+      <div className="mx-auto max-w-[1180px] px-5 sm:px-7 flex flex-col items-center text-center relative z-10">
+        {/* large decorative quote mark */}
+        <div className="font-serif italic text-[80px] text-[var(--lp-accent)] opacity-40 leading-[0.5] h-[40px] select-none">&ldquo;</div>
+
+        {/* quote container with fixed height for smooth transition */}
+        <div className="relative w-full max-w-[780px]" style={{ minHeight: "160px" }}>
+          {TESTIMONIALS.map((t, i) => (
+            <blockquote
+              key={i}
+              className="absolute inset-0 font-serif font-normal italic text-[clamp(1.4rem,3vw,2.2rem)] leading-[1.35] tracking-tight text-[var(--lp-ink)] transition-all duration-700 ease-[cubic-bezier(.16,1,.3,1)]"
+              style={{
+                opacity: active === i ? 1 : 0,
+                transform: active === i ? "translateY(0) scale(1)" : "translateY(12px) scale(0.98)",
+                pointerEvents: active === i ? "auto" : "none",
+              }}
+            >
+              {t.quote}
+            </blockquote>
+          ))}
+        </div>
+
+        {/* author info */}
+        <div className="mt-[32px] flex items-center justify-center gap-[12px] relative" style={{ minHeight: "42px" }}>
+          {TESTIMONIALS.map((t, i) => (
+            <div
+              key={i}
+              className="absolute inset-0 flex items-center justify-center gap-[12px] transition-all duration-500"
+              style={{
+                opacity: active === i ? 1 : 0,
+                transform: active === i ? "translateY(0)" : "translateY(8px)",
+              }}
+            >
+              <div className={`w-[38px] h-[38px] rounded-full bg-gradient-to-br ${t.gradient} ring-2 ring-white/10`} />
+              <div className="text-left">
+                <div className="text-[14px] font-semibold text-[var(--lp-ink)]">{t.name}</div>
+                <div className="text-[12.5px] text-[var(--lp-ink-faint)] mt-[1px]">{t.role}</div>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* dot indicators + progress bar */}
+        <div className="flex items-center gap-[12px] mt-[32px]">
+          {TESTIMONIALS.map((_, i) => (
+            <button
+              key={i}
+              onClick={() => setActive(i)}
+              className="relative h-[3px] rounded-full overflow-hidden transition-all duration-300"
+              style={{
+                width: active === i ? "36px" : "12px",
+                background: active === i ? "rgba(201,255,61,0.2)" : "rgba(255,255,255,0.1)",
+              }}
+              aria-label={`View testimonial ${i + 1}`}
+            >
+              {active === i && (
+                <div
+                  className="absolute inset-0 rounded-full bg-[var(--lp-accent)] origin-left"
+                  style={{
+                    transform: `scaleX(${progress})`,
+                    transition: "none",
+                  }}
+                />
+              )}
+            </button>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
 export default function LandingPage() {
   const [scrolled, setScrolled] = useState(false);
 
@@ -108,16 +302,8 @@ export default function LandingPage() {
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
-  // For the infinite tape, duplicate the content so it loops smoothly
-  const tapeItems = [
-    { name: "Priya", action: "moved a task", project: "Redesign" },
-    { name: "Theo", action: "commented on", project: "Marketing Site" },
-    { name: "Sasha", action: "created workspace", project: "Engineering" },
-    { name: "Maya", action: "invited", project: "Alex" },
-    { name: "Alex", action: "completed", project: "Q3 Planning" },
-  ];
-  // Duplicate a few times to ensure the marquee covers the screen
-  const marqueeItems = [...tapeItems, ...tapeItems, ...tapeItems, ...tapeItems];
+
+
 
   return (
     <div className="landing-page relative min-h-screen font-sans selection:bg-[var(--lp-accent)] selection:text-[#050607]" style={{ background: "var(--lp-bg)", color: "var(--lp-ink)", overflowX: "hidden" }}>
@@ -192,19 +378,8 @@ export default function LandingPage() {
             </Reveal>
           </div>
 
-          <Reveal className="relative mt-[60px] border-y border-[var(--lp-border)] bg-white/5 overflow-hidden" delay={0.2}>
-            <div className="absolute top-0 bottom-0 left-0 w-[120px] bg-gradient-to-r from-[var(--lp-bg)] to-transparent z-10 pointer-events-none"></div>
-            <div className="absolute top-0 bottom-0 right-0 w-[120px] bg-gradient-to-l from-[var(--lp-bg)] to-transparent z-10 pointer-events-none"></div>
-            <div className="flex w-max animate-[scroll-left_42s_linear_infinite]">
-              {marqueeItems.map((item, i) => (
-                <div key={i} className="flex items-center gap-[9px] px-[26px] py-[13px] font-mono text-[12.5px] text-[var(--lp-ink-dim)] border-r border-[var(--lp-border)] whitespace-nowrap">
-                  <div className="w-4 h-4 rounded-[5px] shrink-0" style={{ background: `linear-gradient(135deg, ${i%2==0 ? 'var(--lp-accent)' : 'var(--lp-violet)'}, ${i%2==0 ? '#8fc92a' : '#5a4fc4'})` }}></div>
-                  <span className="font-medium text-[var(--lp-ink)]">{item.name}</span>
-                  <span className="text-[var(--lp-ink-faint)]">{item.action}</span>
-                  <span className={i%2==0 ? "text-[var(--lp-accent)]" : "text-[var(--lp-violet)]"}>{item.project}</span>
-                </div>
-              ))}
-            </div>
+          <Reveal className="relative mt-[60px]" delay={0.2}>
+            <LiveFeed />
           </Reveal>
 
           <Reveal className="relative max-w-[1040px] mx-auto mt-[76px] px-5 sm:px-7" delay={0.3}>
@@ -246,16 +421,36 @@ export default function LandingPage() {
                 <div className="w-[48px]"></div>
               </div>
               
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-[16px] p-[22px]">
+              <div className="relative grid grid-cols-1 md:grid-cols-3 gap-[16px] p-[22px]">
+                
+                {/* Floating Animated Card that drags across columns */}
+                <div className="absolute top-[58px] left-[22px] w-[calc((100%-76px)/3)] z-50 animate-[hero-kanban-drag_7s_cubic-bezier(.65,0,.35,1)_infinite] pointer-events-none hidden md:block">
+                  <div className="border border-[var(--lp-accent-line)] rounded-[11px] bg-[#1a1e23] p-[12px_13px] shadow-[0_20px_40px_-10px_rgba(0,0,0,0.8)] backdrop-blur-md">
+                    <div className="flex items-center justify-between gap-[8px]"><span className="font-mono text-[9.5px] font-semibold px-[6px] py-[2px] rounded-[5px] tracking-wider text-[#ff8a7a] bg-[#ff5d4a]/10">P1</span></div>
+                    <div className="text-[12.5px] text-[var(--lp-ink)] mt-[9px] leading-[1.4] font-medium">Fix mobile nav overflow</div>
+                    <div className="flex items-center justify-between mt-[11px]">
+                      <div className="flex">
+                        <div className="w-[19px] h-[19px] rounded-full border-[1.5px] border-[#14171b] bg-gradient-to-br from-[var(--lp-amber)] to-[#e0962b]"></div>
+                        <div className="w-[19px] h-[19px] rounded-full border-[1.5px] border-[#14171b] bg-gradient-to-br from-[var(--lp-violet)] to-[#5a4fc4] -ml-[6px]"></div>
+                      </div>
+                      <span className="font-mono text-[9.5px] text-[#ff8a7a] flex items-center gap-[4px]">Overdue</span>
+                    </div>
+                  </div>
+                </div>
+
                 {/* Column 1 */}
                 <div className="min-h-[380px]">
                   <div className="flex items-center justify-between px-1 pb-[12px]">
                     <div className="flex items-center gap-[8px] text-[12.5px] font-semibold text-[var(--lp-ink-dim)]">
                       <span className="w-[7px] h-[7px] rounded-full bg-[var(--lp-ink-faint)]"></span>To Do
                     </div>
-                    <span className="font-mono text-[11px] text-[var(--lp-ink-faint)] bg-white/5 px-[7px] py-[2px] rounded-full">3</span>
+                    <span className="font-mono text-[11px] text-[var(--lp-ink-faint)] bg-white/5 px-[7px] py-[2px] rounded-full">2</span>
                   </div>
                   <div className="min-h-[300px] rounded-[14px] border border-dashed border-[var(--lp-border)] p-[8px] flex flex-col gap-[8px] bg-white/5">
+                    
+                    {/* Empty placeholder where the dragged card starts */}
+                    <div className="h-[96px] border border-dashed border-[var(--lp-border-strong)] rounded-[11px] bg-white/[0.02]"></div>
+                    
                     <div className="border border-[var(--lp-border)] rounded-[11px] bg-[#14171b]/90 p-[12px_13px] hover:border-[var(--lp-border-strong)] transition-colors cursor-grab">
                       <div className="flex items-center justify-between gap-[8px]"><span className="font-mono text-[9.5px] font-semibold px-[6px] py-[2px] rounded-[5px] tracking-wider text-[#ffb84d] bg-[#ffb84d]/10">P2</span></div>
                       <div className="text-[12.5px] text-[var(--lp-ink)] mt-[9px] leading-[1.4] font-medium">Write onboarding copy</div>
@@ -272,17 +467,6 @@ export default function LandingPage() {
                         <span className="font-mono text-[9.5px] text-[var(--lp-ink-faint)] flex items-center gap-[4px]">No due date</span>
                       </div>
                     </div>
-                    <div className="border border-[var(--lp-border)] rounded-[11px] bg-[#14171b]/90 p-[12px_13px] hover:border-[var(--lp-border-strong)] transition-colors cursor-grab">
-                      <div className="flex items-center justify-between gap-[8px]"><span className="font-mono text-[9.5px] font-semibold px-[6px] py-[2px] rounded-[5px] tracking-wider text-[#ff8a7a] bg-[#ff5d4a]/10">P1</span></div>
-                      <div className="text-[12.5px] text-[var(--lp-ink)] mt-[9px] leading-[1.4] font-medium">Fix mobile nav overflow</div>
-                      <div className="flex items-center justify-between mt-[11px]">
-                        <div className="flex">
-                          <div className="w-[19px] h-[19px] rounded-full border-[1.5px] border-[#14171b] bg-gradient-to-br from-[var(--lp-amber)] to-[#e0962b]"></div>
-                          <div className="w-[19px] h-[19px] rounded-full border-[1.5px] border-[#14171b] bg-gradient-to-br from-[var(--lp-violet)] to-[#5a4fc4] -ml-[6px]"></div>
-                        </div>
-                        <span className="font-mono text-[9.5px] text-[#ff8a7a] flex items-center gap-[4px]">Overdue</span>
-                      </div>
-                    </div>
                   </div>
                 </div>
                 
@@ -294,8 +478,12 @@ export default function LandingPage() {
                     </div>
                     <span className="font-mono text-[11px] text-[var(--lp-ink-faint)] bg-white/5 px-[7px] py-[2px] rounded-full">2</span>
                   </div>
-                  <div className="min-h-[300px] rounded-[14px] border border-dashed border-[var(--lp-border)] p-[8px] flex flex-col gap-[8px] bg-white/5">
-                    <div className="border border-[var(--lp-border)] rounded-[11px] bg-[#14171b]/90 p-[12px_13px] hover:border-[var(--lp-border-strong)] transition-colors cursor-grab">
+                  <div className="min-h-[300px] rounded-[14px] border border-dashed border-[var(--lp-border)] p-[8px] flex flex-col gap-[8px] bg-white/5 relative">
+                    {/* Pulse ring indicating drop zone */}
+                    <div className="absolute top-[8px] left-[8px] right-[8px] h-[96px] rounded-[11px] border-2 border-[var(--lp-accent-line)] bg-[var(--lp-accent-dim)]/20 animate-[pulse-fade_2.3s_ease-in-out_infinite] z-0 opacity-0" style={{ animationDelay: '1s' }}></div>
+                    <div className="h-[96px] border border-dashed border-[var(--lp-border-strong)] rounded-[11px] bg-white/[0.02] relative z-10"></div>
+                    
+                    <div className="border border-[var(--lp-border)] rounded-[11px] bg-[#14171b]/90 p-[12px_13px] hover:border-[var(--lp-border-strong)] transition-colors cursor-grab relative z-10">
                       <div className="flex items-center justify-between gap-[8px]"><span className="font-mono text-[9.5px] font-semibold px-[6px] py-[2px] rounded-[5px] tracking-wider text-[#ffb84d] bg-[#ffb84d]/10">P2</span></div>
                       <div className="text-[12.5px] text-[var(--lp-ink)] mt-[9px] leading-[1.4] font-medium">Design the new homepage</div>
                       <div className="flex items-center justify-between mt-[11px]">
@@ -303,8 +491,7 @@ export default function LandingPage() {
                         <span className="font-mono text-[9.5px] text-[var(--lp-amber)] flex items-center gap-[4px]">Due today</span>
                       </div>
                     </div>
-                    <div className="h-0 opacity-0 border border-dashed border-[var(--lp-border-strong)] rounded-[11px] bg-[var(--lp-accent)]/5 transition-all duration-300"></div>
-                    <div className="border border-[var(--lp-border)] rounded-[11px] bg-[#14171b]/90 p-[12px_13px] hover:border-[var(--lp-border-strong)] transition-colors cursor-grab">
+                    <div className="border border-[var(--lp-border)] rounded-[11px] bg-[#14171b]/90 p-[12px_13px] hover:border-[var(--lp-border-strong)] transition-colors cursor-grab relative z-10">
                       <div className="flex items-center justify-between gap-[8px]"><span className="font-mono text-[9.5px] font-semibold px-[6px] py-[2px] rounded-[5px] tracking-wider text-[var(--lp-violet)] bg-[var(--lp-violet-dim)]">P3</span></div>
                       <div className="text-[12.5px] text-[var(--lp-ink)] mt-[9px] leading-[1.4] font-medium">Draft the client proposal</div>
                       <div className="flex items-center justify-between mt-[11px]">
@@ -321,10 +508,13 @@ export default function LandingPage() {
                     <div className="flex items-center gap-[8px] text-[12.5px] font-semibold text-[var(--lp-ink-dim)]">
                       <span className="w-[7px] h-[7px] rounded-full bg-[var(--lp-accent)]"></span>Done
                     </div>
-                    <span className="font-mono text-[11px] text-[var(--lp-ink-faint)] bg-white/5 px-[7px] py-[2px] rounded-full">2</span>
+                    <span className="font-mono text-[11px] text-[var(--lp-ink-faint)] bg-white/5 px-[7px] py-[2px] rounded-full">3</span>
                   </div>
-                  <div className="min-h-[300px] rounded-[14px] border border-dashed border-[var(--lp-border)] p-[8px] flex flex-col gap-[8px] bg-white/5">
-                    <div className="border border-[var(--lp-border)] rounded-[11px] bg-[#14171b]/90 p-[12px_13px] hover:border-[var(--lp-border-strong)] transition-colors cursor-grab">
+                  <div className="min-h-[300px] rounded-[14px] border border-dashed border-[var(--lp-border)] p-[8px] flex flex-col gap-[8px] bg-white/5 relative">
+                    <div className="absolute top-[8px] left-[8px] right-[8px] h-[96px] rounded-[11px] border-2 border-[var(--lp-accent-line)] bg-[var(--lp-accent-dim)]/20 animate-[pulse-fade_2.3s_ease-in-out_infinite] z-0 opacity-0" style={{ animationDelay: '3s' }}></div>
+                    <div className="h-[96px] border border-dashed border-[var(--lp-border-strong)] rounded-[11px] bg-white/[0.02] relative z-10"></div>
+                    
+                    <div className="border border-[var(--lp-border)] rounded-[11px] bg-[#14171b]/90 p-[12px_13px] hover:border-[var(--lp-border-strong)] transition-colors cursor-grab relative z-10">
                       <div className="flex items-center justify-between gap-[8px]"><span className="font-mono text-[9.5px] font-semibold px-[6px] py-[2px] rounded-[5px] tracking-wider text-[var(--lp-violet)] bg-[var(--lp-violet-dim)]">P3</span></div>
                       <div className="text-[12.5px] text-[var(--lp-ink)] mt-[9px] leading-[1.4] font-medium">Send kickoff deck to client</div>
                       <div className="flex items-center justify-between mt-[11px]">
@@ -332,7 +522,7 @@ export default function LandingPage() {
                         <span className="font-mono text-[9.5px] text-[var(--lp-ink-faint)] flex items-center gap-[4px]">Completed</span>
                       </div>
                     </div>
-                    <div className="border border-[var(--lp-border)] rounded-[11px] bg-[#14171b]/90 p-[12px_13px] hover:border-[var(--lp-border-strong)] transition-colors cursor-grab">
+                    <div className="border border-[var(--lp-border)] rounded-[11px] bg-[#14171b]/90 p-[12px_13px] hover:border-[var(--lp-border-strong)] transition-colors cursor-grab relative z-10">
                       <div className="flex items-center justify-between gap-[8px]"><span className="font-mono text-[9.5px] font-semibold px-[6px] py-[2px] rounded-[5px] tracking-wider text-[#ffb84d] bg-[#ffb84d]/10">P2</span></div>
                       <div className="text-[12.5px] text-[var(--lp-ink)] mt-[9px] leading-[1.4] font-medium">Workspace invite flow</div>
                       <div className="flex items-center justify-between mt-[11px]">
@@ -348,20 +538,7 @@ export default function LandingPage() {
           </Reveal>
         </header>
 
-        <section className="pt-[70px]">
-          <div className="mx-auto max-w-[1180px] px-5 sm:px-7 text-center">
-            <Reveal>
-              <p className="font-mono text-[11.5px] text-[var(--lp-ink-faint)] tracking-[0.1em] uppercase">Trusted by teams who ship</p>
-              <div className="flex items-center justify-center gap-6 sm:gap-[56px] flex-wrap mt-[50px] opacity-55">
-                <span className="font-serif italic text-[19px] text-[var(--lp-ink-dim)]">Studio42</span>
-                <span className="font-serif italic text-[19px] text-[var(--lp-ink-dim)]">Northwind</span>
-                <span className="font-serif italic text-[19px] text-[var(--lp-ink-dim)]">Lumen Labs</span>
-                <span className="font-serif italic text-[19px] text-[var(--lp-ink-dim)]">Atlas &amp; Co.</span>
-                <span className="font-serif italic text-[19px] text-[var(--lp-ink-dim)]">Driftwood</span>
-              </div>
-            </Reveal>
-          </div>
-        </section>
+
 
         {/* PROBLEM */}
         <section id="problem" className="relative py-[130px]">
@@ -374,13 +551,10 @@ export default function LandingPage() {
 
             <div className="grid grid-cols-1 md:grid-cols-[1.1fr_1fr] gap-12 md:gap-[60px] items-center mt-[70px]">
               <Reveal className="relative h-[420px] border border-[var(--lp-border)] rounded-[20px] overflow-hidden" style={{ background: "radial-gradient(ellipse at center, rgba(255,93,74,0.06), transparent 65%), rgba(255,255,255,0.012)" }}>
-                <svg className="absolute inset-0 w-full h-full pointer-events-none z-[5]" preserveAspectRatio="none">
+                <svg className="absolute inset-0 w-full h-full pointer-events-none z-0" preserveAspectRatio="none">
                   <defs>
-                    {/* fade the inner end of every line so it appears to start at the ring, not the center */}
                     <radialGradient id="problem-line-fade" cx="50%" cy="50%" r="50%">
-                      <stop offset="0%" stopColor="rgba(255,93,74,0)" />
-                      <stop offset="26%" stopColor="rgba(255,93,74,0)" />
-                      <stop offset="36%" stopColor="rgba(255,93,74,0.4)" />
+                      <stop offset="0%" stopColor="rgba(255,93,74,0.4)" />
                       <stop offset="100%" stopColor="rgba(255,93,74,0.12)" />
                     </radialGradient>
                   </defs>
@@ -411,12 +585,30 @@ export default function LandingPage() {
                     <span className="font-serif italic text-[24px] text-[#ff5d4a] opacity-70 leading-none">?</span>
                   </div>
                 </div>
-                <div className="absolute top-[10%] left-[8%] border border-[var(--lp-border-strong)] bg-[#0f1215]/90 rounded-[12px] p-[10px_13px] font-mono text-[11px] text-[var(--lp-ink-faint)] flex items-center gap-[7px] animate-[node-drift_6s_ease-in-out_infinite_reverse]"><span className="w-[6px] h-[6px] rounded-full bg-[var(--lp-red)] shrink-0"></span>Trello board</div>
-                <div className="absolute top-[14%] right-[8%] border border-[var(--lp-border-strong)] bg-[#0f1215]/90 rounded-[12px] p-[10px_13px] font-mono text-[11px] text-[var(--lp-ink-faint)] flex items-center gap-[7px] animate-[node-drift_6s_ease-in-out_infinite]"><span className="w-[6px] h-[6px] rounded-full bg-[var(--lp-red)] shrink-0"></span>Slack #general</div>
-                <div className="absolute bottom-[16%] left-[6%] border border-[var(--lp-border-strong)] bg-[#0f1215]/90 rounded-[12px] p-[10px_13px] font-mono text-[11px] text-[var(--lp-ink-faint)] flex items-center gap-[7px] animate-[node-drift_6s_ease-in-out_infinite_reverse]"><span className="w-[6px] h-[6px] rounded-full bg-[var(--lp-red)] shrink-0"></span>Notion docs</div>
-                <div className="absolute bottom-[10%] right-[10%] border border-[var(--lp-border-strong)] bg-[#0f1215]/90 rounded-[12px] p-[10px_13px] font-mono text-[11px] text-[var(--lp-ink-faint)] flex items-center gap-[7px] animate-[node-drift_6s_ease-in-out_infinite]"><span className="w-[6px] h-[6px] rounded-full bg-[var(--lp-red)] shrink-0"></span>Email threads</div>
-                <div className="absolute top-[44%] left-[2%] border border-[var(--lp-border-strong)] bg-[#0f1215]/90 rounded-[12px] p-[10px_13px] font-mono text-[11px] text-[var(--lp-ink-faint)] flex items-center gap-[7px] animate-[node-drift_6s_ease-in-out_infinite_reverse]"><span className="w-[6px] h-[6px] rounded-full bg-[var(--lp-red)] shrink-0"></span>Google Sheets</div>
-                <div className="absolute top-[50%] right-[0%] border border-[var(--lp-border-strong)] bg-[#0f1215]/90 rounded-[12px] p-[10px_13px] font-mono text-[11px] text-[var(--lp-ink-faint)] flex items-center gap-[7px] animate-[node-drift_6s_ease-in-out_infinite]"><span className="w-[6px] h-[6px] rounded-full bg-[var(--lp-red)] shrink-0"></span>Zoom recordings</div>
+                <div className="absolute top-[8%] left-[5%] border border-[var(--lp-border-strong)] bg-[#0f1215]/90 backdrop-blur-md rounded-[12px] p-[10px_14px] shadow-lg flex flex-col gap-[6px] animate-[node-drift_7s_ease-in-out_infinite_reverse] z-10">
+                  <div className="font-mono text-[11px] text-[var(--lp-ink-faint)] flex items-center gap-[7px]"><span className="w-[6px] h-[6px] rounded-full bg-[#ffb84d] shrink-0"></span>Trello</div>
+                  <div className="text-[10px] text-[var(--lp-ink)] font-medium">Where is the Q3 roadmap?</div>
+                </div>
+                <div className="absolute top-[12%] right-[5%] border border-[var(--lp-border-strong)] bg-[#0f1215]/90 backdrop-blur-md rounded-[12px] p-[10px_14px] shadow-lg flex flex-col gap-[6px] animate-[node-drift_5s_ease-in-out_infinite] delay-100 z-10">
+                  <div className="font-mono text-[11px] text-[var(--lp-ink-faint)] flex items-center gap-[7px]"><span className="w-[6px] h-[6px] rounded-full bg-[var(--lp-red)] shrink-0 animate-pulse"></span>Slack</div>
+                  <div className="text-[10px] text-[#ff5d4a] font-medium">42 unread in #design-sync</div>
+                </div>
+                <div className="absolute bottom-[16%] left-[6%] border border-[var(--lp-border-strong)] bg-[#0f1215]/90 backdrop-blur-md rounded-[12px] p-[10px_14px] shadow-lg flex flex-col gap-[6px] animate-[node-drift_6s_ease-in-out_infinite_reverse] delay-300 z-10">
+                  <div className="font-mono text-[11px] text-[var(--lp-ink-faint)] flex items-center gap-[7px]"><span className="w-[6px] h-[6px] rounded-full bg-[var(--lp-violet)] shrink-0"></span>Notion</div>
+                  <div className="text-[10px] text-[var(--lp-ink-dim)] font-medium">Document is out of date</div>
+                </div>
+                <div className="absolute bottom-[12%] right-[8%] border border-[var(--lp-border-strong)] bg-[#0f1215]/90 backdrop-blur-md rounded-[12px] p-[10px_14px] shadow-lg flex flex-col gap-[6px] animate-[node-drift_8s_ease-in-out_infinite] delay-200 z-10">
+                  <div className="font-mono text-[11px] text-[var(--lp-ink-faint)] flex items-center gap-[7px]"><span className="w-[6px] h-[6px] rounded-full bg-[var(--lp-ink-faint)] shrink-0"></span>Email</div>
+                  <div className="text-[10px] text-[var(--lp-ink)] font-medium">Re: Re: Re: Final assets V4</div>
+                </div>
+                <div className="absolute top-[42%] left-[2%] border border-[var(--lp-border-strong)] bg-[#0f1215]/90 backdrop-blur-md rounded-[12px] p-[10px_14px] shadow-lg flex flex-col gap-[6px] animate-[node-drift_5s_ease-in-out_infinite_reverse] delay-500 z-10">
+                  <div className="font-mono text-[11px] text-[var(--lp-ink-faint)] flex items-center gap-[7px]"><span className="w-[6px] h-[6px] rounded-full bg-[#8fc92a] shrink-0"></span>Sheets</div>
+                  <div className="text-[10px] text-[var(--lp-ink-dim)] font-medium">Request access to view</div>
+                </div>
+                <div className="absolute top-[48%] right-[0%] border border-[var(--lp-border-strong)] bg-[#0f1215]/90 backdrop-blur-md rounded-[12px] p-[10px_14px] shadow-lg flex flex-col gap-[6px] animate-[node-drift_7s_ease-in-out_infinite] delay-700 z-10">
+                  <div className="font-mono text-[11px] text-[var(--lp-ink-faint)] flex items-center gap-[7px]"><span className="w-[6px] h-[6px] rounded-full bg-[#5a4fc4] shrink-0"></span>Zoom</div>
+                  <div className="text-[10px] text-[var(--lp-ink-dim)] font-medium">Recording expired</div>
+                </div>
               </Reveal>
 
               <Reveal className="flex flex-col mt-0 md:mt-[36px]">
@@ -558,67 +750,84 @@ export default function LandingPage() {
 
             <div className="mt-[80px]">
               {/* Step 1 */}
-              <div className="grid grid-cols-[80px_1fr] gap-0">
-                <div className="flex flex-col items-center">
-                  <div className="w-[38px] h-[38px] rounded-full border border-[var(--lp-accent)] text-[#06140a] bg-[var(--lp-accent)] shadow-[0_0_0_6px_var(--lp-accent-dim)] font-mono text-[13px] flex items-center justify-center shrink-0 transition-all duration-400">1</div>
-                  <div className="w-[1px] flex-1 bg-[var(--lp-border)] my-[8px] min-h-[60px] relative overflow-hidden after:content-[''] after:absolute after:left-0 after:-top-[40%] after:w-full after:h-[40%] after:bg-gradient-to-b after:from-transparent after:via-[var(--lp-accent)] after:to-transparent after:animate-[connector-flow_2.4s_linear_infinite] after:opacity-70"></div>
+              <Reveal spotlight className="grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-12 items-center border border-[var(--lp-border)] rounded-[24px] bg-white/[0.02] p-6 md:p-10 relative overflow-hidden mb-[24px] hover:bg-white/[0.04] transition-colors duration-300">
+                <div className="flex flex-col items-start relative z-10">
+                  <div className="w-[38px] h-[38px] rounded-[10px] border border-[var(--lp-accent-line)] bg-[var(--lp-accent-dim)] text-[var(--lp-accent)] font-mono text-[14px] flex items-center justify-center mb-6 shadow-[0_0_15px_rgba(201,255,61,0.15)]">1</div>
+                  <h3 className="text-[22px] font-semibold text-[var(--lp-ink)] tracking-tight">Create a workspace, invite your team</h3>
+                  <p className="text-[15px] text-[var(--lp-ink-dim)] mt-[10px] leading-[1.7]">Spin up a workspace in seconds and invite your team by email. Everyone lands in the same place, ready to start the moment they accept.</p>
                 </div>
-                <Reveal className="pl-0 pb-[64px] pl-[28px] sm:pl-[28px]">
-                  <h3 className="text-[20px] font-semibold text-[var(--lp-ink)] tracking-tight">Create a workspace, invite your team</h3>
-                  <p className="text-[14.5px] text-[var(--lp-ink-dim)] mt-[10px] leading-[1.7] max-w-[480px]">Spin up a workspace in seconds and invite your team by email. Everyone lands in the same place, ready to start the moment they accept.</p>
-                  <div className="mt-[20px] border border-[var(--lp-border)] rounded-[14px] p-[16px] bg-white/5 max-w-[480px]">
-                    <div className="flex items-center gap-[10px] flex-wrap">
-                      <span className="flex items-center gap-[7px] font-mono text-[11.5px] text-[var(--lp-ink-dim)] border border-[var(--lp-border)] rounded-full px-[12px] py-[6px]"><span className="w-[6px] h-[6px] rounded-full bg-[var(--lp-accent)]"></span>maya@studio.co</span>
-                      <span className="flex items-center gap-[7px] font-mono text-[11.5px] text-[var(--lp-ink-dim)] border border-[var(--lp-border)] rounded-full px-[12px] py-[6px]"><span className="w-[6px] h-[6px] rounded-full bg-[var(--lp-accent)]"></span>theo@studio.co</span>
-                      <span className="flex items-center gap-[7px] font-mono text-[11.5px] text-[var(--lp-ink-dim)] border border-[var(--lp-border)] rounded-full px-[12px] py-[6px]"><span className="w-[6px] h-[6px] rounded-full bg-[var(--lp-ink-faint)] animate-[pulse-fade_1.6s_ease-in-out_infinite]"></span>sasha@studio.co</span>
-                      <span className="flex items-center gap-[7px] font-mono text-[11.5px] text-[var(--lp-ink-faint)] border border-[var(--lp-border)] rounded-full px-[12px] py-[6px]">+ invite more</span>
+                <div className="relative h-[220px] border border-[var(--lp-border-strong)] rounded-[16px] bg-[#0b0d10] flex flex-col justify-center p-6 shadow-xl overflow-hidden z-10">
+                  <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,rgba(201,255,61,0.08),transparent_50%)]"></div>
+                  <div className="text-[13px] text-[var(--lp-ink-dim)] mb-3 relative z-10">Invite team members</div>
+                  <div className="flex bg-[#14171b] border border-[var(--lp-border)] rounded-[10px] overflow-hidden mb-4 relative z-10">
+                    <div className="px-3 py-2 text-[12px] text-[var(--lp-ink-faint)] flex-1">maya@studio.co</div>
+                    <div className="px-4 py-2 bg-[var(--lp-accent)] text-[#06140a] text-[12px] font-semibold cursor-pointer hover:bg-[#b0e62a]">Invite</div>
+                  </div>
+                  <div className="flex gap-2 items-center relative z-10">
+                    <span className="flex items-center gap-[6px] text-[11px] text-[var(--lp-ink-dim)] border border-[var(--lp-border)] rounded-full px-[10px] py-[4px] bg-white/5"><span className="w-[5px] h-[5px] rounded-full bg-[var(--lp-accent)]"></span>maya@studio.co</span>
+                    <span className="flex items-center gap-[6px] text-[11px] text-[var(--lp-ink-dim)] border border-[var(--lp-border)] rounded-full px-[10px] py-[4px] bg-white/5"><span className="w-[5px] h-[5px] rounded-full bg-[var(--lp-accent)]"></span>theo@studio.co</span>
+                  </div>
+                </div>
+              </Reveal>
+
+              {/* Step 2 */}
+              <Reveal spotlight delay={0.1} className="grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-12 items-center border border-[var(--lp-border)] rounded-[24px] bg-white/[0.02] p-6 md:p-10 relative overflow-hidden mb-[24px] hover:bg-white/[0.04] transition-colors duration-300">
+                <div className="flex flex-col items-start relative z-10 md:order-2">
+                  <div className="w-[38px] h-[38px] rounded-[10px] border border-[var(--lp-violet-line)] bg-[var(--lp-violet-dim)] text-[var(--lp-violet)] font-mono text-[14px] flex items-center justify-center mb-6 shadow-[0_0_15px_rgba(139,124,246,0.15)]">2</div>
+                  <h3 className="text-[22px] font-semibold text-[var(--lp-ink)] tracking-tight">Build the board, assign the work</h3>
+                  <p className="text-[15px] text-[var(--lp-ink-dim)] mt-[10px] leading-[1.7]">Create projects, add tasks, set due dates, and assign them out. Everyone sees the same board, updating in real-time.</p>
+                </div>
+                <div className="relative h-[220px] border border-[var(--lp-border-strong)] rounded-[16px] bg-[#0b0d10] flex gap-3 p-5 shadow-xl overflow-hidden z-10 md:order-1">
+                  <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_bottom_left,rgba(139,124,246,0.08),transparent_50%)]"></div>
+                  <div className="flex-1 flex flex-col gap-2 relative z-10">
+                    <div className="flex items-center gap-2 mb-1"><span className="w-[6px] h-[6px] rounded-full bg-[var(--lp-ink-faint)]"></span><span className="text-[10px] text-[var(--lp-ink-faint)] uppercase tracking-wider">To Do</span></div>
+                    <div className="h-[46px] rounded-[8px] bg-[#14171b] border border-[var(--lp-border)] flex items-center px-3"><div className="w-[60%] h-[4px] rounded-full bg-[var(--lp-ink-faint)]/20"></div></div>
+                    <div className="h-[46px] rounded-[8px] bg-[#14171b] border border-[var(--lp-border)] flex items-center px-3"><div className="w-[45%] h-[4px] rounded-full bg-[var(--lp-ink-faint)]/20"></div></div>
+                  </div>
+                  <div className="flex-1 flex flex-col gap-2 relative z-10">
+                    <div className="flex items-center gap-2 mb-1"><span className="w-[6px] h-[6px] rounded-full bg-[var(--lp-violet)]"></span><span className="text-[10px] text-[var(--lp-ink-faint)] uppercase tracking-wider">In Progress</span></div>
+                    <div className="h-[54px] rounded-[8px] bg-[#1a1e23] border border-[var(--lp-accent-line)] shadow-[0_10px_20px_rgba(0,0,0,0.5)] transform -rotate-2 -translate-y-1 relative z-10 p-3 flex flex-col justify-between hover:-translate-y-2 hover:-rotate-3 transition-transform cursor-grab">
+                      <div className="w-[70%] h-[4px] rounded-full bg-[var(--lp-ink)]/80"></div>
+                      <div className="flex justify-between items-center">
+                        <div className="w-[30%] h-[4px] rounded-full bg-[var(--lp-ink-faint)]/40"></div>
+                        <div className="w-[14px] h-[14px] rounded-full bg-gradient-to-br from-[var(--lp-violet)] to-[#5a4fc4]"></div>
+                      </div>
                     </div>
                   </div>
-                </Reveal>
-              </div>
-              {/* Step 2 */}
-              <div className="grid grid-cols-[80px_1fr] gap-0">
-                <div className="flex flex-col items-center">
-                  <div className="w-[38px] h-[38px] rounded-full border border-[var(--lp-accent)] text-[#06140a] bg-[var(--lp-accent)] shadow-[0_0_0_6px_var(--lp-accent-dim)] font-mono text-[13px] flex items-center justify-center shrink-0 transition-all duration-400">2</div>
-                  <div className="w-[1px] flex-1 bg-[var(--lp-border)] my-[8px] min-h-[60px] relative overflow-hidden after:content-[''] after:absolute after:left-0 after:-top-[40%] after:w-full after:h-[40%] after:bg-gradient-to-b after:from-transparent after:via-[var(--lp-accent)] after:to-transparent after:animate-[connector-flow_2.4s_linear_infinite] after:opacity-70" style={{ animationDelay: '1.2s' }}></div>
                 </div>
-                <Reveal className="pl-0 pb-[64px] pl-[28px] sm:pl-[28px]">
-                  <h3 className="text-[20px] font-semibold text-[var(--lp-ink)] tracking-tight">Build the board, assign the work</h3>
-                  <p className="text-[14.5px] text-[var(--lp-ink-dim)] mt-[10px] leading-[1.7] max-w-[480px]">Create projects, add tasks, set due dates, and assign them out. Everyone sees the same board, updating in real-time.</p>
-                </Reveal>
-              </div>
+              </Reveal>
+
               {/* Step 3 */}
-              <div className="grid grid-cols-[80px_1fr] gap-0">
-                <div className="flex flex-col items-center">
-                  <div className="w-[38px] h-[38px] rounded-full border border-[var(--lp-accent)] text-[#06140a] bg-[var(--lp-accent)] shadow-[0_0_0_6px_var(--lp-accent-dim)] font-mono text-[13px] flex items-center justify-center shrink-0 transition-all duration-400">3</div>
+              <Reveal spotlight delay={0.2} className="grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-12 items-center border border-[var(--lp-border)] rounded-[24px] bg-white/[0.02] p-6 md:p-10 relative overflow-hidden hover:bg-white/[0.04] transition-colors duration-300">
+                <div className="flex flex-col items-start relative z-10">
+                  <div className="w-[38px] h-[38px] rounded-[10px] border border-[#ffb84d]/30 bg-[#ffb84d]/10 text-[#ffb84d] font-mono text-[14px] flex items-center justify-center mb-6 shadow-[0_0_15px_rgba(255,184,77,0.1)]">3</div>
+                  <h3 className="text-[22px] font-semibold text-[var(--lp-ink)] tracking-tight">Discuss inline, never lose context</h3>
+                  <p className="text-[15px] text-[var(--lp-ink-dim)] mt-[10px] leading-[1.7]">Use the built-in workspace chat to discuss features, share links, and celebrate wins without ever tabbing over to Slack.</p>
                 </div>
-                <Reveal className="pl-0 pb-[64px] pl-[28px] sm:pl-[28px]">
-                  <h3 className="text-[20px] font-semibold text-[var(--lp-ink)] tracking-tight">Discuss inline, never lose context</h3>
-                  <p className="text-[14.5px] text-[var(--lp-ink-dim)] mt-[10px] leading-[1.7] max-w-[480px]">Use the built-in workspace chat to discuss features, share links, and celebrate wins without ever tabbing over to Slack.</p>
-                </Reveal>
-              </div>
+                <div className="relative h-[220px] border border-[var(--lp-border-strong)] rounded-[16px] bg-[#0b0d10] flex flex-col justify-end p-5 shadow-xl overflow-hidden z-10">
+                  <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_left,rgba(255,184,77,0.06),transparent_50%)]"></div>
+                  <div className="flex flex-col gap-4 relative z-10">
+                    <div className="flex gap-2 items-end">
+                      <div className="w-[22px] h-[22px] rounded-full bg-gradient-to-br from-[var(--lp-violet)] to-[#5a4fc4] shrink-0 border border-[#0b0d10]"></div>
+                      <div className="bg-[#14171b] border border-[var(--lp-border)] rounded-[12px] rounded-bl-[4px] p-2 px-3 text-[11.5px] text-[var(--lp-ink-dim)] max-w-[80%] shadow-sm">Did we finalize the copy?</div>
+                    </div>
+                    <div className="flex gap-2 items-end self-end flex-row-reverse">
+                      <div className="w-[22px] h-[22px] rounded-full bg-gradient-to-br from-[var(--lp-accent)] to-[#8fc92a] shrink-0 border border-[#0b0d10]"></div>
+                      <div className="bg-[#1a1e23] border border-[var(--lp-accent-line)] rounded-[12px] rounded-br-[4px] p-2 px-3 text-[11.5px] text-[var(--lp-ink)] max-w-[80%] shadow-sm">Yep, it's attached to the card above 🚀</div>
+                    </div>
+                    <div className="mt-1 relative">
+                      <div className="h-[32px] rounded-full bg-[#14171b] border border-[var(--lp-border)] flex items-center px-4">
+                        <span className="text-[10.5px] text-[var(--lp-ink-faint)] animate-pulse">Reply to thread...</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </Reveal>
             </div>
           </div>
         </section>
 
-        {/* QUOTE */}
-        <section className="border-y border-[var(--lp-border)] bg-white/5 py-[100px]">
-          <div className="mx-auto max-w-[1180px] px-5 sm:px-7 flex flex-col items-center text-center">
-            <Reveal>
-              <div className="font-serif italic text-[80px] text-[var(--lp-accent)] opacity-50 leading-[0.5] h-[40px]">"</div>
-              <blockquote className="font-serif font-normal italic text-[clamp(1.5rem,3.2vw,2.3rem)] leading-[1.35] tracking-tight text-[var(--lp-ink)] max-w-[780px]">
-                Our boards, our conversations, and every client update finally live in one place. Status meetings basically disappeared — people just open the board and see exactly where things stand.
-              </blockquote>
-              <div className="mt-[28px] flex items-center justify-center gap-[12px]">
-                <div className="w-[38px] h-[38px] rounded-full bg-gradient-to-br from-[var(--lp-accent)] to-[#6b8a1f]"></div>
-                <div className="text-left">
-                  <div className="text-[14px] font-semibold text-[var(--lp-ink)]">David K.</div>
-                  <div className="text-[12.5px] text-[var(--lp-ink-faint)] mt-[1px]">Studio Lead at Studio42</div>
-                </div>
-              </div>
-            </Reveal>
-          </div>
-        </section>
+        <TestimonialCarousel />
 
         {/* FAQ */}
         <section id="faq" className="relative py-[130px]">

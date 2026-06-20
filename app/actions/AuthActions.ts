@@ -5,6 +5,17 @@ import { headers } from "next/headers";
 import { signInSchema, signUpSchema, resetPasswordRequestSchema, passwordResetSchema, emailSchema, usernameSchema } from "@/lib/validation/schemas";
 import { sanitizeEmail, sanitizeUsername } from "@/lib/validation/sanitize";
 
+const getSiteUrl = async () => {
+  if (process.env.NEXT_PUBLIC_SITE_URL) return process.env.NEXT_PUBLIC_SITE_URL;
+  const h = await headers();
+  const forwardedHost = h.get("x-forwarded-host");
+  if (forwardedHost) return `https://${forwardedHost}`;
+  const origin = h.get("origin");
+  if (origin) return origin;
+  const host = h.get("host");
+  if (host) return host.includes('localhost') ? `http://${host}` : `https://${host}`;
+  return 'http://localhost:3000';
+};
 export const SignIn = async (email: string, password: string) => {
   try {
     // Validate and sanitize inputs
@@ -60,7 +71,7 @@ export const SignUp = async (email: string, password: string, username?: string)
       email: sanitizedEmail, 
       password: validation.data.password,
       options: {
-        emailRedirectTo: `${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/auth/callback`,
+        emailRedirectTo: `${await getSiteUrl()}/auth/callback`,
         // Stash desired username in auth metadata; we'll persist to public.users on callback
         data: sanitizedUsername ? { username: sanitizedUsername } : undefined,
       }
@@ -77,12 +88,12 @@ export const SignUp = async (email: string, password: string, username?: string)
 
 export const SignInWithGoogle = async () => {
   const supabase = await createClient();
-  const origin = (await headers()).get("origin") || process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
+  const siteUrl = await getSiteUrl();
   
   const { data, error } = await supabase.auth.signInWithOAuth({
     provider: "google",
     options: {
-      redirectTo: `${origin}/auth/callback`,
+      redirectTo: `${siteUrl}/auth/callback`,
     },
   });
 
@@ -107,10 +118,10 @@ export const ResetPassword = async (email: string) => {
     }
 
     const supabase = await createClient();
-    const origin = (await headers()).get("origin") || process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
+    const siteUrl = await getSiteUrl();
     
     const { error } = await supabase.auth.resetPasswordForEmail(sanitizedEmail, {
-      redirectTo: `${origin}/auth/reset-password`,
+      redirectTo: `${siteUrl}/auth/reset-password`,
     });
 
     if (error) {
