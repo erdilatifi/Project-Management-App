@@ -243,7 +243,6 @@ npm run dev
 - **Assignee Selection** - Searchable user dropdown
 - **Priority Levels** - P1 (High) to P5 (Low) with color coding
 - **Due Dates** - Date picker with smart categorization:
-  - Overdue (red badge)
   - Due Today (amber badge)
   - Next Week (blue badge)
   - No Due Date (neutral badge)
