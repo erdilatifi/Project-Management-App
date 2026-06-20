@@ -28,7 +28,7 @@ import {
 } from "@/components/ui/dialog";
 
 import { toast } from "sonner";
-import { Pencil, Trash2, Plus, GripVertical, Calendar, ArrowLeft, Circle, Clock, CheckCircle2 } from "lucide-react";
+import { Pencil, Trash2, Plus, GripVertical, Calendar, ArrowLeft, Circle, Clock, CheckCircle2, LayoutGrid } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { TaskAssignees } from "@/components/tasks/TaskAssignees";
@@ -885,6 +885,9 @@ export default function ProjectTasksBoardPage() {
             >
               <ArrowLeft className="h-5 w-5" />
             </Button>
+            <span className="brand-chip h-11 w-11 shrink-0">
+              <LayoutGrid className="h-5 w-5" />
+            </span>
             <h1 className="text-3xl font-bold tracking-tight">Tasks Board</h1>
           </div>
           {canCreate && workspaceId && (

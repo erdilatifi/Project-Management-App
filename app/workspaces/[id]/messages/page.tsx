@@ -294,8 +294,8 @@ function EmptyState() {
   return (
     <div className="flex h-full items-center justify-center bg-muted/20">
       <div className="mx-auto flex max-w-md flex-col items-center text-center px-6">
-        <div className="mb-6 inline-flex h-16 w-16 items-center justify-center rounded-full bg-primary/10">
-          <MessageSquare className="h-8 w-8 text-primary" />
+        <div className="mb-6 inline-flex h-16 w-16 items-center justify-center rounded-full bg-brand-accent/12 text-brand-accent ring-1 ring-brand-accent/20">
+          <MessageSquare className="h-8 w-8" />
         </div>
         <h2 className="text-xl font-semibold text-foreground">Select a Chat</h2>
         <p className="mt-2 text-sm text-muted-foreground leading-relaxed">
