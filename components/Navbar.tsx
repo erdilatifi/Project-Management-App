@@ -246,6 +246,14 @@ useEffect(() => {
     </div>
   );
 
+  // The landing page ("/") renders its own marketing navbar, and the auth
+  // screens (login/register/reset) are intentionally full-bleed, so we hide the
+  // global app navbar on all of these routes.
+  const hideNavbarRoutes = ['/', '/login', '/register'];
+  if (hideNavbarRoutes.includes(pathname) || pathname.startsWith('/auth')) {
+    return null;
+  }
+
   return (
     <nav className={`fixed left-1/2 -translate-x-1/2 z-50 transition-all duration-300 ${
       scrolled ? 'top-0 w-full' : 'top-4 w-[90%]'
