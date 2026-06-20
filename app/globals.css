@@ -149,3 +149,49 @@ html {
 .animate-slideDown {
   animation: slideDown 0.3s ease-out;
 }
+
+/* --- Landing Page Custom Variables & Animations --- */
+.landing-page {
+  --lp-bg: #050607;
+  --lp-bg-soft: #0a0c0e;
+  --lp-surface: #0b0d10;
+  --lp-surface-2: #0f1215;
+  --lp-border: rgba(255,255,255,0.08);
+  --lp-border-strong: rgba(255,255,255,0.14);
+  --lp-ink: #e9e6df;
+  --lp-ink-dim: #9a978f;
+  --lp-ink-faint: #615f5a;
+  --lp-accent: #c9ff3d;
+  --lp-accent-dim: rgba(201,255,61,0.12);
+  --lp-accent-line: rgba(201,255,61,0.3);
+  --lp-violet: #8b7cf6;
+  --lp-violet-dim: rgba(139,124,246,0.13);
+  --lp-violet-line: rgba(139,124,246,0.3);
+  --lp-amber: #ffb84d;
+  --lp-red: #ff5d4a;
+}
+
+@keyframes mesh-drift {
+  0%, 100% { transform: translate(0,0) scale(1); }
+  33% { transform: translate(-2%, 1.5%) scale(1.04); }
+  66% { transform: translate(2%, -1%) scale(1.02); }
+}
+@keyframes scan-fall {
+  0% { top: -240px; }
+  100% { top: 100%; }
+}
+@keyframes shimmer { 0%{background-position:140% 0;} 100%{background-position:-40% 0;} }
+@keyframes pulse-ring { 0%{box-shadow:0 0 0 0 rgba(201,255,61,0.55);} 70%{box-shadow:0 0 0 8px rgba(201,255,61,0);} 100%{box-shadow:0 0 0 0 rgba(201,255,61,0);} }
+@keyframes gradient-flow { 0%,100%{background-position:0% 50%;} 50%{background-position:100% 50%;} }
+@keyframes scroll-left { from{transform:translateX(0);} to{transform:translateX(-50%);} }
+@keyframes float-1 { 0%,100%{transform:translateY(0);} 50%{transform:translateY(-14px);} }
+@keyframes float-2 { 0%,100%{transform:translateY(0);} 50%{transform:translateY(12px);} }
+@keyframes typing-bounce { 0%,60%,100%{transform:translateY(0); opacity:0.5;} 30%{transform:translateY(-3px); opacity:1;} }
+@keyframes node-drift { 0%,100%{ transform:translateY(0); } 50%{ transform:translateY(-6px); } }
+@keyframes center-pulse { 0%,100%{ box-shadow:0 0 0 0 rgba(255,93,74,0.12); } 50%{ box-shadow:0 0 0 14px rgba(255,93,74,0); } }
+@keyframes dash-flow { to{ stroke-dashoffset:-16; } }
+@keyframes fly-across { 0%, 15%{ transform:translateX(0); opacity:1; } 40%{ transform:translateX(118%); opacity:1; } 45%, 100%{ transform:translateX(118%); opacity:1; } }
+@keyframes msg-in { from{ opacity:0; transform:translateY(6px); } to{ opacity:1; transform:translateY(0); } }
+@keyframes pulse-fade { 0%,100%{ opacity:0.3; } 50%{ opacity:1; } }
+@keyframes connector-flow { to{ top:140%; } }
+@keyframes cta-pulse { 0%,100%{ opacity:0.7; transform:translateX(-50%) scale(1); } 50%{ opacity:1; transform:translateX(-50%) scale(1.08); } }
