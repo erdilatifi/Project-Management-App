@@ -124,9 +124,9 @@ export default function ProjectDetailsPage() {
 
   return (
     <div className="min-h-[calc(100dvh-64px)] w-full ">
-      <div className="mx-auto max-w-[1000px] px-6 lg:px-10 py-10 pt-15">
+      <div className="mx-auto max-w-[1000px] px-4 sm:px-6 lg:px-10 py-8 sm:py-12 pt-20 sm:pt-24">
         {/* Breadcrumbs / Back */}
-        <div className="mb-4 pt-10 flex items-center gap-3 text-sm">
+        <div className="mb-4 flex items-center gap-3 text-sm">
           <Link
             href="/projects"
             className="inline-flex items-center gap-2 text-muted-foreground hover:text-foreground"
@@ -170,11 +170,11 @@ export default function ProjectDetailsPage() {
                   </Badge>
                 )}
               </div>
-              <div className="flex items-center gap-3">
-                <Link href={`/projects/${project.id}/tasks`}>
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-3">
+                <Link href={`/projects/${project.id}/tasks`} className="w-full sm:w-auto">
                   <Button
                     variant="outline"
-                    className="rounded-xl"
+                    className="rounded-xl w-full sm:w-auto"
                   >
                     <ListChecks className="mr-2 h-4 w-4" /> Open Tasks Board
                   </Button>
@@ -182,7 +182,7 @@ export default function ProjectDetailsPage() {
                 <Button
                   onClick={onSave}
                   disabled={saving || !dirty}
-                  className="rounded-xl"
+                  className="rounded-xl w-full sm:w-auto"
                 >
                   {saving ? (
                     <>
