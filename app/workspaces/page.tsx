@@ -205,7 +205,7 @@ export default function WorkspacesPage() {
                 {items.map((w) => (
                   <Card
                     key={w.id}
-                    className="group overflow-hidden rounded-2xl border-border shadow-sm hover:shadow-md transition-all"
+                    className="group overflow-hidden rounded-2xl border-border shadow-sm hover:shadow-lg hover:border-border/70 hover:-translate-y-0.5 transition-all duration-200"
                   >
                     <div className="p-5 flex flex-col gap-3">
                       <div className="flex items-start justify-between gap-4">
