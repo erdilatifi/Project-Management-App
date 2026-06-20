@@ -3,6 +3,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useInView } from "framer-motion";
+import { Workflow } from "lucide-react";
 
 // Helper for revealing elements on scroll
 function Reveal({ children, className = "", delay = 0, style = {} }: { children: React.ReactNode; className?: string; delay?: number; style?: React.CSSProperties }) {
@@ -73,15 +74,9 @@ export default function LandingPage() {
         {/* NAV */}
         <nav className={`fixed top-0 left-0 right-0 z-[100] transition-all duration-500 border-b ${scrolled ? "bg-[#050607]/80 backdrop-blur-md border-[var(--lp-border)]" : "border-transparent bg-transparent"}`}>
           <div className="mx-auto max-w-[1180px] px-4 sm:px-7 py-3 sm:py-[18px] flex items-center justify-between">
-            <Link href="/" className="flex items-center gap-[9px] font-serif text-[16px] sm:text-[19px] font-medium tracking-tight text-[var(--lp-ink)]">
-              <span className="relative overflow-hidden w-[24px] h-[24px] rounded-[7px] flex items-center justify-center text-[#050607] font-mono font-bold text-[12px] bg-gradient-to-br from-[var(--lp-accent)] to-[#8fc92a]">
-                F
-                <div className="absolute inset-0 animate-[shimmer_3.5s_ease-in-out_infinite]" style={{
-                  background: "linear-gradient(120deg, transparent 30%, rgba(255,255,255,0.5) 50%, transparent 70%)",
-                  backgroundSize: "220% 100%"
-                }}></div>
-              </span>
-              Flowfoundry
+            <Link href="/" className="flex items-center gap-[9px] text-[16px] sm:text-[19px] font-semibold tracking-tight text-[var(--lp-ink)]">
+              <Workflow className="w-[22px] h-[22px] text-[var(--lp-accent)]" />
+              <span>Flow<span className="font-bold">foundry</span></span>
               <span className="hidden sm:inline-block font-mono text-[10.5px] text-[var(--lp-accent)] border border-[var(--lp-accent-line)] bg-[var(--lp-accent-dim)] px-2 py-[3px] rounded-full ml-1.5 tracking-wider">FREE</span>
             </Link>
             <div className="hidden md:flex items-center gap-9 text-[13.5px] text-[var(--lp-ink-dim)]">
@@ -313,7 +308,28 @@ export default function LandingPage() {
             <div className="grid grid-cols-1 md:grid-cols-[1.1fr_1fr] gap-12 md:gap-[60px] items-center mt-[70px]">
               <Reveal className="relative h-[420px] border border-[var(--lp-border)] rounded-[20px] overflow-hidden" style={{ background: "radial-gradient(ellipse at center, rgba(255,93,74,0.06), transparent 65%), rgba(255,255,255,0.012)" }}>
                 <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[64px] h-[64px] rounded-full border border-dashed border-[#ff5d4a]/30 flex items-center justify-center animate-[center-pulse_3s_ease-in-out_infinite] after:content-['?'] after:font-serif after:italic after:text-[24px] after:text-[#ff5d4a] after:opacity-60 z-10"></div>
-                <svg className="absolute inset-0 w-full h-full"><path d="M50 50 L200 200" stroke="rgba(255,93,74,0.18)" strokeWidth="1" strokeDasharray="3 5" className="animate-[dash-flow_1.6s_linear_infinite]" /></svg>
+                <svg className="absolute inset-0 w-full h-full pointer-events-none" preserveAspectRatio="none">
+                  {[
+                    { x: "13%", y: "15%" },
+                    { x: "87%", y: "18%" },
+                    { x: "13%", y: "82%" },
+                    { x: "84%", y: "88%" },
+                    { x: "10%", y: "48%" },
+                    { x: "90%", y: "54%" },
+                  ].map((node, i) => (
+                    <line
+                      key={i}
+                      x1="50%"
+                      y1="50%"
+                      x2={node.x}
+                      y2={node.y}
+                      stroke="rgba(255,93,74,0.22)"
+                      strokeWidth="1"
+                      strokeDasharray="3 6"
+                      className="animate-[dash-flow_1.6s_linear_infinite]"
+                    />
+                  ))}
+                </svg>
                 <div className="absolute top-[10%] left-[8%] border border-[var(--lp-border-strong)] bg-[#0f1215]/90 rounded-[12px] p-[10px_13px] font-mono text-[11px] text-[var(--lp-ink-faint)] flex items-center gap-[7px] animate-[node-drift_6s_ease-in-out_infinite_reverse]"><span className="w-[6px] h-[6px] rounded-full bg-[var(--lp-red)] shrink-0"></span>Trello board</div>
                 <div className="absolute top-[14%] right-[8%] border border-[var(--lp-border-strong)] bg-[#0f1215]/90 rounded-[12px] p-[10px_13px] font-mono text-[11px] text-[var(--lp-ink-faint)] flex items-center gap-[7px] animate-[node-drift_6s_ease-in-out_infinite]"><span className="w-[6px] h-[6px] rounded-full bg-[var(--lp-red)] shrink-0"></span>Slack #general</div>
                 <div className="absolute bottom-[16%] left-[6%] border border-[var(--lp-border-strong)] bg-[#0f1215]/90 rounded-[12px] p-[10px_13px] font-mono text-[11px] text-[var(--lp-ink-faint)] flex items-center gap-[7px] animate-[node-drift_6s_ease-in-out_infinite_reverse]"><span className="w-[6px] h-[6px] rounded-full bg-[var(--lp-red)] shrink-0"></span>Notion docs</div>
@@ -356,20 +372,24 @@ export default function LandingPage() {
                 </div>
                 <h3 className="text-[17px] font-semibold text-[var(--lp-ink)] tracking-tight">Drag-and-drop kanban</h3>
                 <p className="text-[13.5px] text-[var(--lp-ink-dim)] leading-[1.65] mt-[8px] max-w-[380px]">Visual boards with To Do, In Progress, and Done columns. Permission-based moves, optimistic updates, and changes that sync to everyone instantly.</p>
-                <div className="flex gap-[10px] mt-[18px]">
-                  <div className="flex-1">
-                    <div className="font-mono text-[9.5px] text-[var(--lp-ink-faint)] uppercase tracking-widest mb-[8px] flex items-center gap-[5px]"><span className="w-[5px] h-[5px] rounded-full bg-[var(--lp-ink-faint)]"></span>To do</div>
-                    <div className="h-[30px] rounded-[7px] bg-white/5 border border-[var(--lp-border)] mb-[7px] relative overflow-hidden after:content-[''] after:absolute after:left-[8px] after:right-[8px] after:top-1/2 after:-translate-y-1/2 after:h-[4px] after:rounded-[2px] after:bg-white/10 animate-[fly-across_5s_ease-in-out_infinite]"></div>
-                    <div className="h-[30px] rounded-[7px] bg-white/5 border border-[var(--lp-border)] mb-[7px] relative overflow-hidden after:content-[''] after:absolute after:left-[8px] after:right-[8px] after:top-1/2 after:-translate-y-1/2 after:h-[4px] after:rounded-[2px] after:bg-white/10"></div>
+                <div className="mt-[18px]">
+                  <div className="grid grid-cols-3 gap-[10px] mb-[9px]">
+                    <div className="font-mono text-[9.5px] text-[var(--lp-ink-faint)] uppercase tracking-widest flex items-center gap-[5px]"><span className="w-[5px] h-[5px] rounded-full bg-[var(--lp-ink-faint)]"></span>To do</div>
+                    <div className="font-mono text-[9.5px] text-[var(--lp-ink-faint)] uppercase tracking-widest flex items-center gap-[5px]"><span className="w-[5px] h-[5px] rounded-full bg-[var(--lp-violet)]"></span>In progress</div>
+                    <div className="font-mono text-[9.5px] text-[var(--lp-ink-faint)] uppercase tracking-widest flex items-center gap-[5px]"><span className="w-[5px] h-[5px] rounded-full bg-[var(--lp-accent)]"></span>Done</div>
                   </div>
-                  <div className="flex-1">
-                    <div className="font-mono text-[9.5px] text-[var(--lp-ink-faint)] uppercase tracking-widest mb-[8px] flex items-center gap-[5px]"><span className="w-[5px] h-[5px] rounded-full bg-[var(--lp-violet)]"></span>In progress</div>
-                    <div className="h-[30px] rounded-[7px] bg-white/5 border border-[var(--lp-border)] mb-[7px] relative overflow-hidden after:content-[''] after:absolute after:left-[8px] after:right-[8px] after:top-1/2 after:-translate-y-1/2 after:h-[4px] after:rounded-[2px] after:bg-white/10 animate-[fly-across_5s_ease-in-out_infinite]" style={{animationDelay: '2.5s'}}></div>
-                    <div className="h-[30px] rounded-[7px] bg-white/5 border border-[var(--lp-border)] mb-[7px] relative overflow-hidden after:content-[''] after:absolute after:left-[8px] after:right-[8px] after:top-1/2 after:-translate-y-1/2 after:h-[4px] after:rounded-[2px] after:bg-white/10"></div>
-                  </div>
-                  <div className="flex-1">
-                    <div className="font-mono text-[9.5px] text-[var(--lp-ink-faint)] uppercase tracking-widest mb-[8px] flex items-center gap-[5px]"><span className="w-[5px] h-[5px] rounded-full bg-[var(--lp-accent)]"></span>Done</div>
-                    <div className="h-[30px] rounded-[7px] bg-white/5 border border-[var(--lp-border)] mb-[7px] relative overflow-hidden after:content-[''] after:absolute after:left-[8px] after:right-[8px] after:top-1/2 after:-translate-y-1/2 after:h-[4px] after:rounded-[2px] after:bg-white/10"></div>
+                  {/* drop zones with a single card that "drags" across the columns */}
+                  <div className="relative grid grid-cols-3 gap-[10px]">
+                    <div className="h-[42px] rounded-[8px] border border-dashed border-[var(--lp-border)] bg-white/[0.03]"></div>
+                    <div className="h-[42px] rounded-[8px] border border-dashed border-[var(--lp-border)] bg-white/[0.03]"></div>
+                    <div className="h-[42px] rounded-[8px] border border-dashed border-[var(--lp-border)] bg-white/[0.03]"></div>
+                    <div
+                      className="absolute top-0 left-0 w-[calc((100%-20px)/3)] h-[42px] rounded-[8px] border border-[var(--lp-accent-line)] bg-[#14171b] shadow-[0_10px_24px_-6px_rgba(0,0,0,0.6)] flex items-center gap-[7px] px-[9px] animate-[kanban-drag_5.5s_cubic-bezier(.65,0,.35,1)_infinite] will-change-transform"
+                    >
+                      <span className="w-[5px] h-[5px] rounded-full bg-[var(--lp-accent)] shrink-0"></span>
+                      <span className="flex-1 h-[4px] rounded-full bg-white/15"></span>
+                      <span className="w-[16px] h-[16px] rounded-full shrink-0 bg-gradient-to-br from-[var(--lp-violet)] to-[#5a4fc4]"></span>
+                    </div>
                   </div>
                 </div>
               </Reveal>
@@ -478,8 +498,8 @@ export default function LandingPage() {
               {/* Step 2 */}
               <div className="grid grid-cols-[80px_1fr] gap-0">
                 <div className="flex flex-col items-center">
-                  <div className="w-[38px] h-[38px] rounded-full border border-[var(--lp-border-strong)] text-[var(--lp-ink-faint)] bg-[var(--lp-bg-soft)] font-mono text-[13px] flex items-center justify-center shrink-0 transition-all duration-400">2</div>
-                  <div className="w-[1px] flex-1 bg-[var(--lp-border)] my-[8px] min-h-[60px] relative overflow-hidden"></div>
+                  <div className="w-[38px] h-[38px] rounded-full border border-[var(--lp-accent)] text-[#06140a] bg-[var(--lp-accent)] shadow-[0_0_0_6px_var(--lp-accent-dim)] font-mono text-[13px] flex items-center justify-center shrink-0 transition-all duration-400">2</div>
+                  <div className="w-[1px] flex-1 bg-[var(--lp-border)] my-[8px] min-h-[60px] relative overflow-hidden after:content-[''] after:absolute after:left-0 after:-top-[40%] after:w-full after:h-[40%] after:bg-gradient-to-b after:from-transparent after:via-[var(--lp-accent)] after:to-transparent after:animate-[connector-flow_2.4s_linear_infinite] after:opacity-70" style={{ animationDelay: '1.2s' }}></div>
                 </div>
                 <Reveal className="pl-0 pb-[64px] pl-[28px] sm:pl-[28px]">
                   <h3 className="text-[20px] font-semibold text-[var(--lp-ink)] tracking-tight">Build the board, assign the work</h3>
@@ -489,7 +509,7 @@ export default function LandingPage() {
               {/* Step 3 */}
               <div className="grid grid-cols-[80px_1fr] gap-0">
                 <div className="flex flex-col items-center">
-                  <div className="w-[38px] h-[38px] rounded-full border border-[var(--lp-border-strong)] text-[var(--lp-ink-faint)] bg-[var(--lp-bg-soft)] font-mono text-[13px] flex items-center justify-center shrink-0 transition-all duration-400">3</div>
+                  <div className="w-[38px] h-[38px] rounded-full border border-[var(--lp-accent)] text-[#06140a] bg-[var(--lp-accent)] shadow-[0_0_0_6px_var(--lp-accent-dim)] font-mono text-[13px] flex items-center justify-center shrink-0 transition-all duration-400">3</div>
                 </div>
                 <Reveal className="pl-0 pb-[64px] pl-[28px] sm:pl-[28px]">
                   <h3 className="text-[20px] font-semibold text-[var(--lp-ink)] tracking-tight">Discuss inline, never lose context</h3>
@@ -561,9 +581,9 @@ export default function LandingPage() {
           <div className="mx-auto max-w-[1180px] px-5 sm:px-7">
             <div className="flex justify-between gap-[60px] flex-wrap pb-[48px] border-b border-[var(--lp-border)]">
               <div>
-                <a href="#" className="flex items-center gap-[9px] font-serif text-[19px] font-medium tracking-tight text-[var(--lp-ink)]">
-                  <span className="relative overflow-hidden w-[24px] h-[24px] rounded-[7px] flex items-center justify-center text-[#050607] font-mono font-bold text-[12px] bg-gradient-to-br from-[var(--lp-accent)] to-[#8fc92a]">F</span>
-                  Flowfoundry
+                <a href="#" className="flex items-center gap-[9px] text-[19px] font-semibold tracking-tight text-[var(--lp-ink)]">
+                  <Workflow className="w-[22px] h-[22px] text-[var(--lp-accent)]" />
+                  <span>Flow<span className="font-bold">foundry</span></span>
                 </a>
                 <p className="text-[13.5px] text-[var(--lp-ink-faint)] mt-[14px] max-w-[280px] leading-[1.6]">The open-source project management platform built for modern teams.</p>
               </div>
