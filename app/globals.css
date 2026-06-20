@@ -151,6 +151,35 @@ html {
   animation: slideDown 0.3s ease-out;
 }
 
+/* --- Auth form field helpers (brand-styled inputs on dark surfaces) --- */
+.landing-page .auth-input {
+  height: 3rem;
+  padding-left: 2.6rem;
+  background: rgba(255, 255, 255, 0.04);
+  border-color: var(--lp-border-strong);
+  color: var(--lp-ink);
+  border-radius: 0.75rem;
+}
+.landing-page .auth-input::placeholder {
+  color: var(--lp-ink-faint);
+}
+.landing-page .auth-input:focus-visible {
+  border-color: var(--lp-accent-line);
+  box-shadow: 0 0 0 3px var(--lp-accent-dim);
+  outline: none;
+}
+.landing-page .auth-field-icon {
+  position: absolute;
+  left: 0.85rem;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 1.05rem;
+  height: 1.05rem;
+  color: var(--lp-ink-faint);
+  pointer-events: none;
+  z-index: 1;
+}
+
 /* --- Landing Page Custom Variables & Animations --- */
 .landing-page {
   --lp-bg: #050607;
