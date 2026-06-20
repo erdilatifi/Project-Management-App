@@ -272,10 +272,10 @@ export default function MyTasksPage() {
         {/* Header */}
         <div className="mb-8 pt-15 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
           <div>
-            <h1 className="text-3xl sm:text-4xl font-bold text-foreground tracking-tight">
+            <h1 className="text-2xl sm:text-3xl font-semibold text-foreground tracking-tight">
               My Tasks
             </h1>
-            <p className="text-sm text-muted-foreground mt-1.5">
+            <p className="text-sm text-muted-foreground mt-0.5">
               {filtered.length} task{filtered.length !== 1 ? "s" : ""} assigned to you
             </p>
           </div>

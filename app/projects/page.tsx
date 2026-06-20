@@ -109,7 +109,7 @@ export default function ProjectsPage() {
   const Avatar = ({ name }: { name: string }) => {
     const initial = (name?.trim()?.[0] ?? "?").toUpperCase();
     return (
-      <div className="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-muted text-foreground shrink-0">
+      <div className="flex h-9 w-9 items-center justify-center rounded-xl border border-primary/20 bg-primary/10 text-sm font-semibold text-primary shrink-0">
         {initial}
       </div>
     );
@@ -211,7 +211,7 @@ export default function ProjectsPage() {
                 {items.map((p) => (
                   <Card
                     key={p.id}
-                    className="group overflow-hidden rounded-2xl border-border shadow-sm hover:shadow-md transition-all"
+                    className="group overflow-hidden rounded-2xl border-border shadow-sm hover:shadow-lg hover:border-border/70 hover:-translate-y-0.5 transition-all duration-200"
                   >
                     <div className="p-5 flex flex-col gap-3">
                       <div className="flex items-start justify-between gap-4">
