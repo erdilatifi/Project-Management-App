@@ -40,7 +40,7 @@ const ForgotPasswordPage = () => {
         setEmailSent(true)
         toast.success('Password reset email sent! Please check your inbox.')
       }
-    } catch (error) {
+    } catch {
       const errorMessage = 'Something went wrong. Please try again.'
       setError('root', { message: errorMessage })
       toast.error(errorMessage)
@@ -61,14 +61,14 @@ const ForgotPasswordPage = () => {
               Check your email
             </CardTitle>
             <CardDescription className="text-center">
-              We've sent you a password reset link. Please check your inbox and follow the instructions.
+              We&apos;ve sent you a password reset link. Please check your inbox and follow the instructions.
             </CardDescription>
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
               <div className="p-4 bg-muted/50 rounded-lg">
                 <p className="text-sm text-muted-foreground text-center">
-                  Didn't receive the email? Check your spam folder or try again in a few minutes.
+                  Didn&apos;t receive the email? Check your spam folder or try again in a few minutes.
                 </p>
               </div>
               <Link href="/login" className="block">
@@ -97,7 +97,7 @@ const ForgotPasswordPage = () => {
             Forgot password?
           </CardTitle>
           <CardDescription className="text-center">
-            Enter your email address and we'll send you a link to reset your password
+            Enter your email address and we&apos;ll send you a link to reset your password
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -129,7 +129,7 @@ const ForgotPasswordPage = () => {
             <Button type="submit" disabled={isSubmitting} className="w-full" size="lg">
               {isSubmitting ? (
                 <>
-                  <span className="animate-spin mr-2">⏳</span>
+                  <span className="animate-spin mr-2">...</span>
                   Sending...
                 </>
               ) : (

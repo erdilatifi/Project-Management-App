@@ -46,6 +46,15 @@ const normalize = (value?: string | null) => {
   return trimmed;
 };
 
+function getErrorMessage(error: unknown, fallback: string) {
+  if (error instanceof Error && error.message) return error.message;
+  if (typeof error === "object" && error && "message" in error) {
+    const message = (error as { message?: unknown }).message;
+    if (typeof message === "string" && message.trim()) return message;
+  }
+  return fallback;
+}
+
 const emailToHandle = (email?: string | null) => {
   const cleaned = normalize(email);
   if (!cleaned) return null;
@@ -53,10 +62,17 @@ const emailToHandle = (email?: string | null) => {
   return normalize(handle);
 };
 
+type TaskRecord = {
+  id: string;
+  title: string;
+  assignee_id?: string | null;
+  [key: string]: unknown;
+};
+
 type CreateTaskDialogProps = {
   projectId: string;
   workspaceId?: string;
-  onTaskCreated?: (task: any) => void;
+  onTaskCreated?: (task: TaskRecord) => void;
   trigger?: React.ReactNode;
 };
 
@@ -213,10 +229,10 @@ export function CreateTaskDialog({
   }, [filteredUsers, selectedAssignees]);
 
   const addAssignee = (user: User) => {
-    setSelectedAssignees((prev) => [...prev, user]);
+    setSelectedAssignees([user]);
     setSearchQuery("");
-    // Keep dropdown open for adding more users
-    setTimeout(() => setShowUserDropdown(true), 100);
+    // Close dropdown after choosing an assignee
+    setShowUserDropdown(false);
   };
 
   const removeAssignee = (userId: string) => {
@@ -241,9 +257,6 @@ export function CreateTaskDialog({
 
       const assigneeIds = selectedAssignees.map(a => a.id);
       const primaryAssignee = assigneeIds.length > 0 ? assigneeIds[0] : null;
-      
-      console.log('Creating task with assignee_id:', primaryAssignee, 'assignee_ids:', assigneeIds);
-      
       const { data: task, error: taskError } = await supabase
         .from("tasks")
         .insert({
@@ -252,11 +265,10 @@ export function CreateTaskDialog({
           title: title.trim(),
           description: description.trim() || null,
           priority,
-          due_at: dueISO,
+          due_date: dueISO,
           status: "todo",
-          created_by: userId,
+          creator_id: userId,
           assignee_id: primaryAssignee,
-          assignee_ids: assigneeIds,
         })
         .select()
         .single();
@@ -304,9 +316,9 @@ export function CreateTaskDialog({
       setQuickDue("");
       setSelectedAssignees([]);
       setOpen(false);
-    } catch (error: any) {
+    } catch (error) {
       console.error("Failed to create task:", error);
-      toast.error(error.message || "Failed to create task");
+      toast.error(getErrorMessage(error, "Failed to create task"));
     } finally {
       setLoading(false);
     }

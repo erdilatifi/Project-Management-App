@@ -31,7 +31,8 @@ export async function POST(req: Request) {
     }
     
     const { workspaceId } = bodyValidation.data
-    let { userId, email } = bodyValidation.data
+    let { userId } = bodyValidation.data
+    const { email } = bodyValidation.data
 
     const admin = createAdminClient()
 

@@ -55,7 +55,7 @@ export default function NotificationPreferences() {
       }
     };
     load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+
   }, []);
 
   // Apply theme immediately when preference changes
@@ -102,8 +102,6 @@ export default function NotificationPreferences() {
     }
   }, [prefs]);
 
- 
-
   return (
     <div className="space-y-6">
       <div>
@@ -129,7 +127,7 @@ export default function NotificationPreferences() {
             <SelectContent>
               {themes.map((t) => (
                 <SelectItem key={t} value={t}>
-                  {t === 'light' ? '☀️ Light' : t === 'dark' ? '🌙 Dark' : '💻 System'}
+                  {t === 'light' ? 'Light' : t === 'dark' ? 'Dark' : 'System'}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -140,7 +138,7 @@ export default function NotificationPreferences() {
 
       <div className="pt-4 border-t border-border">
         <p className="text-sm text-muted-foreground">
-          💡 <strong>Note:</strong> Theme preference is saved automatically. Additional notification settings will be available in future updates.
+          ðŸ’¡ <strong>Note:</strong> Theme preference is saved automatically. Additional notification settings will be available in future updates.
         </p>
       </div>
     </div>

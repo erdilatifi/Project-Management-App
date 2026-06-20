@@ -47,7 +47,6 @@ import {
   useSensors,
 } from "@dnd-kit/core";
 
-
 type Candidate = { id: string; label: string };
 
 const PLACEHOLDER_LABELS = new Set([
@@ -67,6 +66,15 @@ const normalize = (value?: string | null) => {
   if (PLACEHOLDER_LABELS.has(trimmed.toLowerCase())) return null;
   return trimmed;
 };
+
+function getErrorMessage(error: unknown, fallback: string) {
+  if (error instanceof Error && error.message) return error.message;
+  if (typeof error === "object" && error && "message" in error) {
+    const message = (error as { message?: unknown }).message;
+    if (typeof message === "string" && message.trim()) return message;
+  }
+  return fallback;
+}
 
 const emailToHandle = (email?: string | null) => {
   const cleaned = normalize(email);
@@ -107,7 +115,7 @@ function AssigneeSearchBar({
     }
     const match = candidates.find((c) => c.id === value);
     setQ(match?.label ?? "");
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+
   }, [value, candidates]);
 
   useEffect(() => {
@@ -335,6 +343,15 @@ const statusTint: Record<Status, string> = {
   done: "from-white to-emerald-50/50",
 };
 
+type TaskDbPatch = Omit<Partial<TaskRow>, "due_at"> & {
+  due_date?: string | null;
+};
+
+function toTaskDbPatch(patch: Partial<TaskRow>): TaskDbPatch {
+  const { due_at, ...rest } = patch;
+  return due_at === undefined ? rest : { ...rest, due_date: due_at };
+}
+
 const priorityClass = (p?: number | null) => {
   switch (p) {
     case 1:
@@ -474,17 +491,17 @@ export default function ProjectTasksBoardPage() {
       const { data, error } = await supabase
         .from("tasks")
         .select(
-          "id, project_id, workspace_id, title, description, status, priority, assignee_id, assignee_ids, due_at, created_by, created_at"
+          "id, project_id, workspace_id, title, description, status, priority, assignee_id, due_at:due_date, created_by:creator_id, created_at"
         )
         .eq("project_id", projectId)
         .order("created_at", { ascending: false });
 
       if (error) throw error;
-      
+
       setItems(sortTasks((data ?? []) as TaskRow[]));
     } catch (e: unknown) {
       toast.error(
-        (e instanceof Error ? e.message : String(e)) || "Failed to load tasks"
+        getErrorMessage(e, "Failed to load tasks")
       );
     } finally {
       setLoading(false);
@@ -612,7 +629,7 @@ export default function ProjectTasksBoardPage() {
           const type = payload.eventType;
           const row = type === "DELETE" ? (payload.old as TaskRow) : (payload.new as TaskRow);
           if (!row) return;
-          
+
           // For INSERT or UPDATE events, fetch profile data for new assignees before mutating local state.
           if (type === "INSERT" || type === "UPDATE") {
             const assigneeIds = new Set<string>();
@@ -620,12 +637,12 @@ export default function ProjectTasksBoardPage() {
             if (Array.isArray(row.assignee_ids)) {
               row.assignee_ids.forEach(id => assigneeIds.add(id));
             }
-            
+
             if (assigneeIds.size > 0) {
               await ensureAssigneeProfiles(Array.from(assigneeIds));
             }
           }
-          
+
           // Update the task list after profile data is ready.
           setItems((cur) => {
             if (type === "INSERT") {
@@ -653,7 +670,7 @@ export default function ProjectTasksBoardPage() {
   useEffect(() => {
     const fetchAssigneeProfiles = async () => {
       if (items.length === 0) return;
-      
+
       // Collect all unique assignee identifiers from the tasks.
       const assigneeIds = new Set<string>();
       items.forEach(task => {
@@ -662,12 +679,12 @@ export default function ProjectTasksBoardPage() {
           task.assignee_ids.forEach(id => assigneeIds.add(id));
         }
       });
-      
+
       if (assigneeIds.size === 0) return;
-      
+
       await ensureAssigneeProfiles(Array.from(assigneeIds));
     };
-    
+
     fetchAssigneeProfiles();
   }, [items, ensureAssigneeProfiles]);
 
@@ -677,10 +694,10 @@ export default function ProjectTasksBoardPage() {
       const prev = items.find((t) => t.id === id) || null;
       const { data, error } = await supabase
         .from("tasks")
-        .update(patch)
+        .update(toTaskDbPatch(patch))
         .eq("id", id)
         .select(
-          "id, project_id, workspace_id, title, description, status, priority, assignee_id, due_at, created_by, created_at"
+          "id, project_id, workspace_id, title, description, status, priority, assignee_id, due_at:due_date, created_by:creator_id, created_at"
         )
         .single<TaskRow>();
       if (error) throw error;
@@ -699,7 +716,7 @@ export default function ProjectTasksBoardPage() {
       }
     } catch (e: unknown) {
       const msg =
-        (e instanceof Error ? e.message : String(e)) || "Failed to update task";
+        getErrorMessage(e, "Failed to update task");
       if (
         msg.toLowerCase().includes("permission") ||
         msg.toLowerCase().includes("not allowed")
@@ -731,7 +748,7 @@ export default function ProjectTasksBoardPage() {
       toast.success("Task deleted");
     } catch (e: unknown) {
       const msg =
-        (e instanceof Error ? e.message : String(e)) || "Failed to delete task";
+        getErrorMessage(e, "Failed to delete task");
       if (
         msg.toLowerCase().includes("permission") ||
         msg.toLowerCase().includes("not allowed")
@@ -752,7 +769,7 @@ export default function ProjectTasksBoardPage() {
     const draggedId = evt.active.id as string;
     const t = items.find((x) => x.id === draggedId);
     if (!t) return;
-    
+
     const assignees = getAssigneeIds(t);
     const selfId = userId ?? null;
     const isAssignee = !!selfId && assignees.includes(selfId);
@@ -772,7 +789,7 @@ export default function ProjectTasksBoardPage() {
 
     const prev = items.find((t) => t.id === draggedId);
     if (!prev) return;
-    
+
     const assignees = getAssigneeIds(prev);
     const selfId = userId ?? null;
     const isAssignee = !!selfId && assignees.includes(selfId);
@@ -883,16 +900,16 @@ export default function ProjectTasksBoardPage() {
                   if (Array.isArray(taskRow.assignee_ids)) {
                     taskRow.assignee_ids.forEach(id => assigneeIds.add(id));
                   }
-                  
+
                   console.log('[onTaskCreated] Task created with assignees:', {
                     taskId: taskRow.id,
                     assigneeIds: Array.from(assigneeIds),
                   });
-                  
+
                   if (assigneeIds.size > 0) {
                     await ensureAssigneeProfiles(Array.from(assigneeIds));
                   }
-                  
+
                   // Optimistically add the task after profile enrichment.
                   setItems((cur) => sortTasks([...cur, taskRow]));
                 }

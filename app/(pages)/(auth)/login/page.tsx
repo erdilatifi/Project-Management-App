@@ -1,5 +1,5 @@
 'use client'
-import React, { useEffect, useState } from 'react'
+import React, { useEffect } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useForm } from 'react-hook-form'
@@ -53,7 +53,7 @@ const LoginPage = () => {
         router.push('/')
         router.refresh()
       }
-    } catch (error) {
+    } catch {
       const errorMessage = 'Something went wrong. Please try again.'
       setError('root', { message: errorMessage })
       toast.error(errorMessage)
@@ -68,7 +68,7 @@ const LoginPage = () => {
       } else if (result?.error) {
         toast.error(result.error)
       }
-    } catch (error) {
+    } catch {
       toast.error('Failed to sign in with Google')
     }
   }
@@ -132,7 +132,7 @@ const LoginPage = () => {
                 <Input
                   id="password"
                   {...register('password')}
-                  placeholder="••••••••"
+                  placeholder="********"
                   type="password"
                   className="pl-10"
                   aria-invalid={!!errors.password}
@@ -152,7 +152,7 @@ const LoginPage = () => {
             <Button type="submit" disabled={isSubmitting} className="w-full" size="lg">
               {isSubmitting ? (
                 <>
-                  <span className="animate-spin mr-2">⏳</span>
+                  <span className="animate-spin mr-2">...</span>
                   Logging in...
                 </>
               ) : (
@@ -204,7 +204,7 @@ const LoginPage = () => {
 
         <CardFooter className="flex flex-col space-y-4">
           <div className="text-sm text-center text-muted-foreground">
-            Don't have an account?{' '}
+            Don&apos;t have an account?{' '}
             <Link href="/register" className="text-primary hover:underline font-medium">
               Sign up
             </Link>

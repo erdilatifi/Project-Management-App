@@ -14,6 +14,17 @@ type Props = {
   onDeleted?: (id: string) => void;
 };
 
+type ProjectUpdate = {
+  id: string;
+  name: string;
+  description: string | null;
+  is_archived?: boolean | null;
+};
+
+function getErrorMessage(error: unknown, fallback: string) {
+  return error instanceof Error ? error.message : fallback;
+}
+
 export default function EditProjectMenu({ project, onUpdated, onDeleted }: Props) {
   const supabase = useMemo(() => createClient(), []);
   const [open, setOpen] = useState(false);
@@ -34,10 +45,10 @@ export default function EditProjectMenu({ project, onUpdated, onDeleted }: Props
         .single();
       if (error) throw error;
       toast.success("Project updated");
-      if (data && onUpdated) onUpdated(data as any);
+      if (data && onUpdated) onUpdated(data as ProjectUpdate);
       setOpen(false);
-    } catch (e: any) {
-      const msg = e?.message || 'Failed to update project'
+    } catch (e) {
+      const msg = getErrorMessage(e, 'Failed to update project')
       if (String(msg).toLowerCase().includes('permission') || String(msg).toLowerCase().includes('not allowed')) {
         toast.error('Not allowed')
       } else {
@@ -63,8 +74,8 @@ export default function EditProjectMenu({ project, onUpdated, onDeleted }: Props
       if (typeof onDeleted === "function") onDeleted(project.id);
       setDeleteOpen(false);
       setOpen(false);
-    } catch (e: any) {
-      const msg = e?.message || 'Failed to delete project'
+    } catch (e) {
+      const msg = getErrorMessage(e, 'Failed to delete project')
       if (String(msg).toLowerCase().includes('permission') || String(msg).toLowerCase().includes('not allowed')) {
         toast.error('Not allowed')
       } else {
@@ -100,7 +111,7 @@ export default function EditProjectMenu({ project, onUpdated, onDeleted }: Props
           <DialogFooter className="flex items-center justify-between gap-2">
             <Button onClick={onDelete} variant="outline">Delete</Button>
             <Button onClick={onRename} disabled={saving} variant="outline">
-              {saving ? "Saving…" : "Save"}
+              {saving ? "Saving..." : "Save"}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -112,13 +123,13 @@ export default function EditProjectMenu({ project, onUpdated, onDeleted }: Props
           <DialogHeader>
             <DialogTitle>Delete project</DialogTitle>
             <DialogDescription>
-              Are you sure you want to delete "{project.name}"? This action cannot be undone.
+              Are you sure you want to delete &quot;{project.name}&quot;? This action cannot be undone.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
             <Button variant="outline" onClick={() => setDeleteOpen(false)} disabled={deleting}>Cancel</Button>
             <Button variant="outline" onClick={onDeleteConfirmed} disabled={deleting}>
-              {deleting ? "Deleting�?�" : "Delete"}
+              {deleting ? "Deleting..." : "Delete"}
             </Button>
           </DialogFooter>
         </DialogContent>

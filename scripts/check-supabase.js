@@ -16,18 +16,18 @@ async function checkDatabase() {
   console.log('🔍 Checking database tables...');
   
   try {
-    // Check if users table exists
+    // Check if profiles table exists
     const { data: users, error: usersError } = await supabase
-      .from('users')
+      .from('profiles')
       .select('*')
       .limit(1);
       
     if (usersError) {
-      console.error('❌ Error accessing users table:', usersError.message);
+      console.error('❌ Error accessing profiles table:', usersError.message);
       console.log('\n💡 Make sure you have run the SQL migrations to create the required tables.');
       console.log('Check the supabase-schema.sql file for the table definitions.');
     } else {
-      console.log('✅ Users table is accessible');
+      console.log('✅ Profiles table is accessible');
     }
     
     // Check if user_preferences table exists

@@ -8,7 +8,7 @@ async function checkDBSchema() {
     
     // Check required tables
     const requiredTables = [
-      'users',
+      'profiles',
       'user_preferences',
       'oauth_connections',
       'user_sessions',
@@ -60,7 +60,7 @@ async function checkDBSchema() {
       console.error('❌ Error checking RLS policies:', rlsError.message)
     } else {
       const requiredPolicies = [
-        'users_policy',
+        'profiles_policy',
         'user_preferences_policy',
         'oauth_connections_policy',
         'user_sessions_policy',

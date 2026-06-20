@@ -1,841 +1,423 @@
-/**
- * Landing Page Component
- * 
- * Main marketing page featuring:
- * - Hero section with call-to-action
- * - Interactive Kanban board demo
- * - Feature showcase with animations
- * - Customer testimonials
- * - Comparison table
- * - FAQ section with infinite scroll
- * 
- * @component
- */
-'use client';
+"use client";
 
-import { useState, FormEvent, ReactNode } from 'react';
-import Link from 'next/link';
-import { motion } from 'framer-motion';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { Badge } from '@/components/ui/badge';
+import React, { useRef, useEffect, useState } from "react";
+import { motion, useInView } from "framer-motion";
+import Link from "next/link";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
 import {
-  Check, Mail, Workflow, Github, Twitter, Linkedin, Sparkles, ShieldCheck,
-  Clock, LayoutDashboard, Zap, Star, ArrowRight, Users,
-  TrendingUp, Globe, MessageSquare, CheckCircle2, X
-} from 'lucide-react';
+  Workflow, Star, ArrowRight,
+  LayoutDashboard, Users
+} from "lucide-react";
 
-function cn(...args: Array<string | false | null | undefined>) {
-  return args.filter(Boolean).join(' ');
-}
+/* Constants for Theme */
+const ACCENT = "#14B8A6";
+const BORDER = "rgba(255,255,255,0.08)";
+const BORDER_STRONG = "rgba(255,255,255,0.12)";
+const ACCENT_SOFT = "rgba(20,184,166,0.14)";
+const ACCENT_LINE = "rgba(20,184,166,0.26)";
 
-const vp = { once: false, amount: 0.35, margin: '-8% 0% -8% 0%' };
-
-const fadeOnly = {
-  initial: { opacity: 0 },
-  whileInView: { opacity: 1 },
-  transition: { duration: 0.7, ease: [0.22, 1, 0.36, 1] },
-  viewport: vp
-};
-
-const heroFade = {
-  initial: { opacity: 0, y: 20 },
-  animate: { opacity: 1, y: 0 },
-  transition: { duration: 1, ease: [0.22, 1, 0.36, 1] }
-};
-
-const heroStagger = {
-  animate: { transition: { staggerChildren: 0.15, delayChildren: 0.2 } }
-};
-
-const elevate = {
-  initial: { opacity: 0, y: 24, filter: 'blur(6px)' },
-  whileInView: { opacity: 1, y: 0, filter: 'blur(0px)' },
-  transition: { duration: 0.7, ease: [0.22, 1, 0.36, 1] },
-  viewport: vp
-};
-
-const slideLeft = {
-  initial: { opacity: 0, x: -36 },
-  whileInView: { opacity: 1, x: 0 },
-  transition: { duration: 0.75, ease: [0.22, 1, 0.36, 1] },
-  viewport: vp
-};
-
-const slideRight = {
-  initial: { opacity: 0, x: 36 },
-  whileInView: { opacity: 1, x: 0 },
-  transition: { duration: 0.75, ease: [0.22, 1, 0.36, 1] },
-  viewport: vp
-};
-
-const scalePop = {
-  initial: { opacity: 0, scale: 0.94 },
-  whileInView: { opacity: 1, scale: 1 },
-  transition: { duration: 0.65, ease: [0.22, 1, 0.36, 1] },
-  viewport: vp
-};
-
-const stagger = {
-  initial: {},
-  whileInView: { transition: { staggerChildren: 0.12, delayChildren: 0.05 } },
-  viewport: vp
-};
-
-const zoomIn = {
-  initial: { opacity: 0, scale: 0.9, y: 30 },
-  whileInView: { opacity: 1, scale: 1, y: 0 },
-  transition: { duration: 0.8, ease: [0.22, 1, 0.36, 1] },
-  viewport: vp
-};
-
-const rotateIn = {
-  initial: { opacity: 0, rotateX: -15, y: 20 },
-  whileInView: { opacity: 1, rotateX: 0, y: 0 },
-  transition: { duration: 0.85, ease: [0.22, 1, 0.36, 1] },
-  viewport: vp
-};
-
-const slideUp = {
-  initial: { opacity: 0, y: 50 },
-  whileInView: { opacity: 1, y: 0 },
-  transition: { duration: 0.8, ease: [0.22, 1, 0.36, 1] },
-  viewport: vp
-};
-
-const fadeScale = {
-  initial: { opacity: 0, scale: 0.92 },
-  whileInView: { opacity: 1, scale: 1 },
-  transition: { duration: 0.7, ease: [0.22, 1, 0.36, 1] },
-  viewport: vp
-};
-
-const staggerFast = {
-  initial: {},
-  whileInView: { transition: { staggerChildren: 0.08, delayChildren: 0.1 } },
-  viewport: vp
-};
-
-const staggerSlow = {
-  initial: {},
-  whileInView: { transition: { staggerChildren: 0.18, delayChildren: 0.15 } },
-  viewport: vp
-};
-
-function Container({ children, className }: { children: ReactNode; className?: string }) {
-  return <div className={cn('mx-auto max-w-7xl px-3 sm:px-6 lg:px-8', className)}>{children}</div>;
-}
-
-function Section({ children, className, id }: { children: ReactNode; className?: string; id?: string }) {
+// Common Reveal Component
+function Reveal({ children, className = "", delay = 0 }: { children: React.ReactNode; className?: string; delay?: number }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const inView = useInView(ref, { once: true, margin: "-80px" });
   return (
-    <section id={id} className={cn('py-20 sm:py-32', className)}>
+    <div
+      ref={ref}
+      className={className}
+      style={{
+        opacity: inView ? 1 : 0,
+        transform: inView ? "translateY(0)" : "translateY(32px)",
+        transition: `opacity 0.7s cubic-bezier(0.25,0.46,0.45,0.94) ${delay}s, transform 0.7s cubic-bezier(0.25,0.46,0.45,0.94) ${delay}s`,
+      }}
+    >
       {children}
-    </section>
+    </div>
   );
 }
 
-function SectionTitle({ eyebrow, title, subtitle, center = true }: { eyebrow?: string; title: string; subtitle?: string; center?: boolean }) {
+function SectionHeader({ title, subtitle }: { title: React.ReactNode; subtitle: string }) {
   return (
-    <motion.div className={cn('mb-16', center && 'text-center')} variants={elevate}>
-      {eyebrow && (
-        <div className="mx-auto mb-4 inline-flex items-center gap-2 rounded-full border bg-card/50 backdrop-blur-sm px-4 py-1.5 text-sm font-medium text-muted-foreground shadow-sm">
-          <Sparkles className="h-4 w-4 text-primary" />
-          <span>{eyebrow}</span>
-        </div>
-      )}
-      <h2 className="text-3xl font-bold tracking-tight sm:text-4xl lg:text-5xl bg-linear-to-br from-foreground to-foreground/70 bg-clip-text text-transparent">
+    <div className="mx-auto max-w-2xl text-center">
+      <h2
+        className="font-semibold text-white/90"
+        style={{ fontSize: "clamp(1.75rem,3.8vw,2.8rem)", lineHeight: 1.12, letterSpacing: "-0.03em" }}
+      >
         {title}
       </h2>
-      {subtitle && <p className="mx-auto mt-3 sm:mt-4 max-w-2xl text-base sm:text-lg text-muted-foreground px-2">{subtitle}</p>}
-    </motion.div>
+      <p className="mx-auto mt-4 max-w-lg text-[15px] leading-[1.65] text-zinc-500">
+        {subtitle}
+      </p>
+    </div>
   );
 }
 
-function EmailCapture() {
-  const [email, setEmail] = useState('');
-  const [submitted, setSubmitted] = useState(false);
-  const handleSubmit = (e: FormEvent) => {
-    e.preventDefault();
-    if (email) {
-      setSubmitted(true);
-      setTimeout(() => { setEmail(''); setSubmitted(false); }, 2200);
-    }
-  };
+function MiniField({ label, value, wide = false }: { label: string; value: string; wide?: boolean }) {
   return (
-    <form onSubmit={handleSubmit} className="mx-auto flex flex-col sm:flex-row max-w-md gap-2 px-3 sm:px-0">
-      <div className="relative flex-1">
-        <Mail className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-        <Input type="email" placeholder="Enter your email" value={email} onChange={(e) => setEmail(e.target.value)} required className="pl-10 h-11 bg-background/50 backdrop-blur-sm" disabled={submitted} aria-label="Email address" />
-      </div>
-      <Button type="submit" className="h-11 px-6 shadow-lg shadow-primary/25 hover:shadow-xl hover:shadow-primary/30 transition-all sm:w-auto w-full" disabled={submitted}>
-        {submitted ? 'Thanks!' : 'Get Started'}
-      </Button>
-    </form>
+    <div
+      className={`rounded-[16px] border px-3 py-2.5 ${wide ? "sm:col-span-2" : ""}`}
+      style={{ borderColor: BORDER, background: "rgba(255,255,255,0.03)" }}
+    >
+      <p className="text-[8px] font-semibold uppercase tracking-[0.18em] text-white/38">
+        {label}
+      </p>
+      <p className="mt-1 text-[11px] font-medium text-white/88">{value}</p>
+    </div>
   );
 }
 
-function Testimonial({ quote, author, role, company }: { quote: string; author: string; role: string; company?: string }) {
-  const initials = author.split(' ').map((n) => n[0]).join('').toUpperCase();
+function StepPreviewCard({
+  eyebrow, title, description, active, cardTransform, children, className = "",
+}: {
+  eyebrow: string; title: string; description: string; active: 1 | 2 | 3; cardTransform: string; children: React.ReactNode; className?: string;
+}) {
   return (
-    <motion.div className="h-full transition-all duration-300 hover:-translate-y-1" variants={scalePop}>
-      <Card className="h-full border-2 bg-card/50 backdrop-blur-sm hover:border-primary/30 hover:shadow-xl transition-all">
-        <CardContent className="p-6">
-          <div className="mb-4 flex gap-1">
-            {[...Array(5)].map((_, i) => <Star key={i} className="h-4 w-4 fill-primary text-primary" />)}
+    <div className={className}>
+      <div
+        className="overflow-hidden rounded-[28px] border p-4 sm:p-5"
+        style={{
+          transform: cardTransform,
+          transformOrigin: "center top",
+          borderColor: BORDER,
+          background: "rgba(10,12,16,0.96)",
+          boxShadow: "0 24px 72px rgba(0,0,0,0.34), inset 0 1px 0 rgba(255,255,255,0.03)",
+          backdropFilter: "blur(18px)",
+          willChange: "transform",
+        }}
+      >
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <p className="text-[10px] font-semibold uppercase tracking-[0.24em] text-teal-300/90">
+              {eyebrow}
+            </p>
+            <h3 className="mt-2 text-[21px] font-semibold tracking-[-0.05em] text-white sm:text-[24px]">
+              {title}
+            </h3>
           </div>
-          <p className="mb-6 text-base leading-relaxed text-muted-foreground">"{quote}"</p>
-          <div className="flex items-center gap-3">
-            <Avatar className="ring-2 ring-primary/20">
-              <AvatarFallback className="bg-primary text-primary-foreground font-semibold">{initials}</AvatarFallback>
-            </Avatar>
-            <div>
-              <p className="font-semibold">{author}</p>
-              <p className="text-sm text-muted-foreground">{role}{company && `, ${company}`}</p>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-    </motion.div>
-  );
-}
-
-function ComparisonRow({ feature, us, them }: { feature: string; us: boolean; them: boolean }) {
-  return (
-    <motion.div className="grid grid-cols-3 gap-4 border-b py-4 last:border-0" variants={elevate}>
-      <div className="text-sm font-medium">{feature}</div>
-      <div className="flex justify-center">{us ? <CheckCircle2 className="h-5 w-5 text-primary" /> : <X className="h-5 w-5 text-muted-foreground/30" />}</div>
-      <div className="flex justify-center">{them ? <CheckCircle2 className="h-5 w-5 text-muted-foreground/50" /> : <X className="h-5 w-5 text-muted-foreground/30" />}</div>
-    </motion.div>
-  );
-}
-
-/**
- * Interactive Kanban Board Demo
- * 
- * Lightweight drag-and-drop demo without animations for optimal performance.
- * Showcases task management capabilities with smooth CSS transitions.
- */
-function InteractiveDashboard() {
-  const [draggedCard, setDraggedCard] = useState<number | null>(null);
-  const [columns, setColumns] = useState({ 
-    todo: [0, 1], 
-    inProgress: [2, 3, 4], 
-    done: [5, 6] 
-  });
-  
-  // Sample task data for demo purposes
-  const taskData = [
-    { title: 'Design new landing page', priority: 'high', assignees: 2 },
-    { title: 'Update API documentation', priority: 'medium', assignees: 1 },
-    { title: 'Fix mobile navigation bug', priority: 'high', assignees: 2 },
-    { title: 'Implement dark mode', priority: 'medium', assignees: 3 },
-    { title: 'Add user authentication', priority: 'high', assignees: 2 },
-    { title: 'Write unit tests', priority: 'low', assignees: 1 },
-    { title: 'Deploy to production', priority: 'medium', assignees: 2 }
-  ];
-  
-  const priorityColors: Record<string, string> = { 
-    high: 'from-red-500/30 to-red-500/10', 
-    medium: 'from-yellow-500/30 to-yellow-500/10', 
-    low: 'from-green-500/30 to-green-500/10' 
-  };
-  
-  const handleDragStart = (cardId: number) => setDraggedCard(cardId);
-  const handleDragOver = (e: React.DragEvent) => e.preventDefault();
-  
-  const handleDrop = (columnKey: 'todo' | 'inProgress' | 'done') => {
-    if (draggedCard === null) return;
-    
-    setColumns(prev => {
-      const next = { ...prev };
-      // Remove card from all columns
-      Object.keys(next).forEach(key => {
-        next[key as keyof typeof next] = next[key as keyof typeof next].filter(id => id !== draggedCard);
-      });
-      // Add to target column
-      next[columnKey] = [...next[columnKey], draggedCard];
-      return next;
-    });
-    setDraggedCard(null);
-  };
-  
-  const columnNames = { todo: 'To Do', inProgress: 'In Progress', done: 'Done' };
-  
-  return (
-    <div className="grid flex-1 grid-cols-3 gap-3">
-      {(Object.keys(columns) as Array<keyof typeof columns>).map((colKey) => (
-        <div 
-          key={colKey} 
-          className="space-y-2 rounded-xl border border-border/50 bg-muted/20 p-3 backdrop-blur-sm transition-all" 
-          onDragOver={handleDragOver} 
-          onDrop={() => handleDrop(colKey)}
-        >
-          <div className="mb-3 flex items-center justify-between">
-            <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-              {columnNames[colKey]}
-            </span>
-            <span className="text-xs text-muted-foreground/60">{columns[colKey].length}</span>
-          </div>
-          {columns[colKey].map((cardId) => {
-            const task = taskData[cardId];
-            return (
-              <div 
-                key={cardId} 
-                draggable 
-                onDragStart={() => handleDragStart(cardId)} 
-                className="group cursor-move rounded-lg border border-border/50 bg-card p-2.5 shadow-sm transition-all duration-200 hover:border-primary/30 hover:shadow-md hover:-translate-y-0.5 active:scale-95" 
-                style={{ 
-                  opacity: draggedCard === cardId ? 0.5 : 1,
-                  transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)'
+          <div className="flex gap-1.5 pt-1">
+            {[1, 2, 3].map((item) => (
+              <span
+                key={item}
+                className="h-1.5 rounded-full"
+                style={{
+                  width: item === active ? 22 : 8,
+                  background: item <= active ? ACCENT : "rgba(255,255,255,0.12)",
                 }}
-              >
-                <div className={`mb-2 h-1 w-full rounded bg-gradient-to-r ${priorityColors[task.priority]}`} />
-                <div className="mb-1.5 text-[10px] font-medium text-foreground/90 leading-tight">
-                  {task.title}
-                </div>
-                <div className="flex items-center justify-between mt-2">
-                  <div className="flex -space-x-1">
-                    {[...Array(task.assignees)].map((_, i) => (
-                      <div 
-                        key={i} 
-                        className="h-3 w-3 rounded-full bg-gradient-to-br from-primary/60 to-primary/40 ring-1 ring-card" 
-                      />
-                    ))}
-                  </div>
-                  <div className="text-[8px] text-muted-foreground/60 uppercase tracking-wider">
-                    {task.priority}
-                  </div>
-                </div>
+              />
+            ))}
+          </div>
+        </div>
+        <p className="mt-2.5 max-w-90 text-[12px] leading-5 text-white/48">
+          {description}
+        </p>
+        <div className="mt-4">{children}</div>
+      </div>
+    </div>
+  );
+}
+
+function HeroFlow() {
+  const [activeStep, setActiveStep] = useState(0);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+
+    let fired = false;
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting && !fired) {
+          fired = true;
+          observer.disconnect();
+          const t1 = setTimeout(() => setActiveStep(1), 300);
+          const t2 = setTimeout(() => setActiveStep(2), 1600);
+          const t3 = setTimeout(() => setActiveStep(3), 2900);
+          return () => { clearTimeout(t1); clearTimeout(t2); clearTimeout(t3); };
+        }
+      },
+      { threshold: 0.55 },
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+
+  const stepOne = (
+    <StepPreviewCard
+      eyebrow="Step 1" title="Create a Workspace" description="Set up your team's environment in seconds."
+      active={1} cardTransform="perspective(1800px) rotateX(16deg) rotateY(-18deg) scale(0.82)"
+      className="w-full lg:w-86.25"
+    >
+      <div className="grid gap-3 sm:grid-cols-2">
+        <MiniField label="Workspace Name" value="Marketing Team" wide />
+        <MiniField label="URL Slug" value="flowfoundry.app/marketing" wide />
+      </div>
+      <div className="mt-3 rounded-[18px] border p-3.5" style={{ borderColor: BORDER, background: "rgba(255,255,255,0.03)" }}>
+        <p className="text-[9px] font-semibold uppercase tracking-[0.18em] text-white/38">Workspace Type</p>
+        <div className="mt-2 flex flex-wrap gap-2">
+          {["Development", "Marketing", "Design"].map((type) => (
+            <span key={type} className="rounded-full border px-2.5 py-1 text-[10px] text-white/72"
+              style={{
+                borderColor: type === "Marketing" ? ACCENT_LINE : BORDER,
+                background: type === "Marketing" ? ACCENT_SOFT : "rgba(255,255,255,0.02)",
+              }}>
+              {type}
+            </span>
+          ))}
+        </div>
+      </div>
+    </StepPreviewCard>
+  );
+
+  const stepTwo = (
+    <StepPreviewCard
+      eyebrow="Step 2" title="Organize Tasks" description="Visual Kanban boards make tracking progress effortless."
+      active={2} cardTransform="perspective(1800px) rotateX(12deg) rotateY(16deg) scale(0.78)"
+      className="w-full lg:w-97.5"
+    >
+      <div className="grid gap-3 sm:grid-cols-3">
+        <MiniField label="To Do" value="12 tasks" />
+        <MiniField label="In Progress" value="4 tasks" />
+        <MiniField label="Done" value="8 tasks" />
+      </div>
+      <div className="mt-3 rounded-[18px] border p-3" style={{ borderColor: BORDER, background: "rgba(255,255,255,0.03)" }}>
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <p className="text-[11px] font-semibold text-white/92">Active Sprint</p>
+            <p className="mt-1 text-[10px] text-white/42">March 20th - April 3rd</p>
+          </div>
+          <span className="rounded-full border px-2 py-1 text-[9px] uppercase tracking-[0.16em] text-white/40" style={{ borderColor: BORDER }}>
+            On Track
+          </span>
+        </div>
+        <div className="mt-2.5 grid gap-1.5 sm:grid-cols-2">
+          <MiniField label="Priority" value="High" />
+          <MiniField label="Assignees" value="3 Members" />
+        </div>
+      </div>
+    </StepPreviewCard>
+  );
+
+  const stepThree = (
+    <StepPreviewCard
+      eyebrow="Step 3" title="Invite the Team" description="Bring everyone together with role-based access."
+      active={3} cardTransform="perspective(1800px) rotateX(8deg) rotateY(0deg) scale(0.74)"
+      className="w-full lg:w-107.5"
+    >
+      <div>
+        <p className="text-[9px] font-semibold uppercase tracking-[0.18em] text-white/38">Member Roles</p>
+        <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3">
+          {["Owner", "Admin", "Member"].map((role) => {
+            const active = role === "Admin";
+            return (
+              <div key={role} className="rounded-[16px] border px-2.5 py-2.5"
+                style={{
+                  borderColor: active ? `${ACCENT}55` : BORDER,
+                  background: active ? `${ACCENT}14` : "rgba(255,255,255,0.02)",
+                  boxShadow: active ? `0 0 0 1px ${ACCENT}30 inset` : "none",
+                }}>
+                <p className="text-[11px] font-semibold text-white/92">{role}</p>
               </div>
             );
           })}
         </div>
-      ))}
-    </div>
+      </div>
+      <div className="mt-3 rounded-[16px] border px-3.5 py-2.5" style={{ borderColor: BORDER, background: "rgba(255,255,255,0.03)" }}>
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <p className="text-[11px] font-semibold text-white/92">Invite via link</p>
+            <p className="mt-1 text-[10px] text-white/42">Anyone with the link can join as a Member</p>
+          </div>
+        </div>
+      </div>
+      <div className="mt-3.5 flex items-center justify-between gap-3">
+        <button type="button" className="rounded-[15px] border px-3.5 py-2 text-[11px] font-medium text-white/72" style={{ borderColor: BORDER, background: "rgba(255,255,255,0.02)" }}>Back</button>
+        <Button asChild className="rounded-[15px] px-3.5 py-2 text-[11px] font-semibold h-8" style={{ background: ACCENT }}>
+          <Link href="/login">Go to Workspace</Link>
+        </Button>
+      </div>
+    </StepPreviewCard>
+  );
+
+  return (
+    <>
+      <div className="mt-8 space-y-3 lg:hidden">
+        <motion.div whileHover={{ y: -2 }}><div>{stepOne}</div></motion.div>
+        <motion.div whileHover={{ y: -2 }}><div>{stepTwo}</div></motion.div>
+        <motion.div whileHover={{ y: -2 }}><div>{stepThree}</div></motion.div>
+      </div>
+      <div id="hero-flow" ref={containerRef} className="relative mt-8 hidden h-140 lg:block">
+        <div className="absolute -top-6 left-1/2 flex -translate-x-1/2 items-center gap-2">
+          {[1, 2, 3].map((n) => (
+            <motion.div key={n} className="h-0.5 rounded-full"
+              animate={{
+                width: activeStep >= n ? 28 : 8,
+                background: activeStep >= n ? "rgba(20,184,166,0.9)" : "rgba(255,255,255,0.12)",
+                opacity: activeStep >= n ? 1 : 0.5,
+              }}
+              transition={{ duration: 0.4, ease: "easeOut" }}
+            />
+          ))}
+        </div>
+        {activeStep >= 1 && (
+          <motion.div key="card1" className="absolute right-[8%] top-6 z-10"
+            style={{ willChange: "transform, opacity" }}
+            initial={{ opacity: 0, x: 48, y: -16, scale: 0.94 }}
+            animate={{ opacity: 1, x: 0, y: 0, scale: 1 }}
+            transition={{ duration: 0.65, ease: [0.16, 1, 0.3, 1] }} whileHover={{ y: -5 }}>
+            {stepOne}
+          </motion.div>
+        )}
+        {activeStep >= 2 && (
+          <motion.div key="card2" className="absolute left-[6%] top-23 z-20"
+            style={{ willChange: "transform, opacity" }}
+            initial={{ opacity: 0, x: -48, y: 16, scale: 0.94 }}
+            animate={{ opacity: 1, x: 0, y: 0, scale: 1 }}
+            transition={{ duration: 0.65, ease: [0.16, 1, 0.3, 1] }} whileHover={{ y: -5 }}>
+            {stepTwo}
+          </motion.div>
+        )}
+        {activeStep >= 3 && (
+          <motion.div key="card3" className="absolute left-1/2 top-33 z-30 -translate-x-1/2"
+            style={{ willChange: "transform, opacity" }}
+            initial={{ opacity: 0, y: 40, scale: 0.94 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            transition={{ duration: 0.65, ease: [0.16, 1, 0.3, 1] }} whileHover={{ y: -5 }}>
+            {stepThree}
+          </motion.div>
+        )}
+      </div>
+    </>
+  );
+}
+
+const FAQ_ITEMS = [
+  { q: "Is Flowfoundry really free?", a: "Yes. Our core features including unlimited workspaces and team members are completely free forever." },
+  { q: "Do you have mobile apps?", a: "Flowfoundry is fully responsive and works beautifully on all mobile browsers as a progressive web app." },
+  { q: "Can I export my data?", a: "Yes. You can export all your workspace data, tasks, and conversations at any time." },
+  { q: "How secure is my data?", a: "We use enterprise-grade encryption for data at rest and in transit. Your data is backed up daily." },
+];
+
+function FAQItem({ q, a, index }: { q: string; a: string; index: number }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <Reveal delay={index * 0.05}>
+      <motion.div className="group border-b" style={{ borderColor: "rgba(255,255,255,0.06)" }}>
+        <button type="button" onClick={() => setOpen((o) => !o)} className="flex w-full items-start justify-between gap-6 py-5 text-left">
+          <span className="text-[14.5px] font-semibold text-white/90 leading-snug">{q}</span>
+          <motion.span animate={{ rotate: open ? 45 : 0 }} transition={{ duration: 0.25 }}
+            className="mt-0.5 shrink-0 flex h-5 w-5 items-center justify-center rounded-full text-teal-400"
+            style={{ background: open ? "rgba(20,184,166,0.15)" : "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)" }}>
+            <svg viewBox="0 0 10 10" className="h-2.5 w-2.5" fill="none">
+              <path d="M5 1v8M1 5h8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+            </svg>
+          </motion.span>
+        </button>
+        <motion.div initial={false} animate={{ height: open ? "auto" : 0, opacity: open ? 1 : 0 }} transition={{ duration: 0.3, ease: "easeInOut" }} className="overflow-hidden">
+          <p className="pb-5 text-[13.5px] leading-6 text-zinc-400">{a}</p>
+        </motion.div>
+      </motion.div>
+    </Reveal>
+  );
+}
+
+function FAQSection() {
+  return (
+    <section id="faq" className="relative overflow-hidden py-20 lg:py-32" style={{ background: "#08090d" }}>
+      <div className="pointer-events-none absolute inset-0 opacity-[0.03]" style={{
+        backgroundImage: "radial-gradient(rgba(255,255,255,0.9) 0.65px, transparent 0.65px)",
+        backgroundSize: "26px 26px",
+        maskImage: "radial-gradient(ellipse 80% 70% at 50% 50%, rgba(0,0,0,0.9) 0%, transparent 100%)",
+      }} />
+      <div className="relative z-10 mx-auto max-w-2xl px-5 lg:px-8">
+        <Reveal>
+          <SectionHeader
+            title={<>Questions <span style={{ backgroundImage: "linear-gradient(90deg,#5eead4,#14b8a6)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text" }}>answered clearly.</span></>}
+            subtitle="Everything you need to know about Flowfoundry."
+          />
+        </Reveal>
+        <div className="mt-14">
+          {FAQ_ITEMS.map(({ q, a }, i) => (
+            <FAQItem key={q} q={q} a={a} index={i} />
+          ))}
+        </div>
+      </div>
+    </section>
   );
 }
 
 export default function Page() {
   return (
-    <div className="relative bg-background text-foreground overflow-hidden">
-      <div className="pointer-events-none fixed inset-0 -z-10">
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,var(--tw-gradient-stops))] from-primary/10 via-background to-background" />
-        <div className="absolute inset-0 bg-grid-slate-100/[0.02] mask-[radial-gradient(ellipse_at_center,black_50%,transparent_85%)]" />
-      </div>
-
-      <header className="relative border-b">
-        <Container className="py-24 sm:py-32 lg:py-40">
-          <motion.div className="mx-auto max-w-4xl text-center" initial="initial" animate="animate" variants={heroStagger}>
-            <motion.div className="mx-auto mb-6 inline-flex items-center gap-2 rounded-full border bg-card/50 backdrop-blur-sm px-4 py-1.5 text-sm font-medium shadow-lg" variants={heroFade}>
-              <Sparkles className="h-4 w-4 text-primary" />
-              <span className="text-muted-foreground">Trusted by 10,000+ teams worldwide</span>
-            </motion.div>
-            <motion.h1 className="text-balance text-5xl font-bold tracking-tight sm:text-7xl bg-linear-to-br from-foreground via-foreground to-foreground/70 bg-clip-text text-transparent leading-tight" variants={heroFade}>
-              Ship projects 2× faster.
-              <br />
-              <span className="bg-linear-to-r from-primary to-primary/60 bg-clip-text text-transparent">Zero learning curve.</span>
-            </motion.h1>
-            <motion.p className="mx-auto mt-6 max-w-2xl text-balance text-lg leading-relaxed text-muted-foreground" variants={heroFade}>
-              The project management tool your team will actually love. Real-time collaboration, beautiful design, and powerful features that stay out of your way.
-            </motion.p>
-            <motion.div className="mt-10 flex flex-col items-center justify-center gap-4 sm:flex-row" variants={heroFade}>
-              <Button asChild size="lg" className="h-12 px-8 text-base shadow-xl shadow-primary/25 hover:shadow-2xl hover:shadow-primary/30 transition-all">
-                <Link href="/workspaces">
-                  Start for free <ArrowRight className="ml-2 h-5 w-5" />
-                </Link>
-              </Button>
-              <Button asChild variant="outline" size="lg" className="h-12 px-8 text-base border-2 hover:bg-accent/50">
-                <Link href="#features">See how it works</Link>
-              </Button>
-            </motion.div>
-            <motion.div className="mt-8 flex flex-wrap items-center justify-center gap-6 text-sm text-muted-foreground" variants={heroFade}>
-              <div className="flex items-center gap-2">
-                <CheckCircle2 className="h-4 w-4 text-primary" />
-                <span>Free forever</span>
+    <div className="relative text-foreground overflow-hidden" style={{ background: "#08090d", minHeight: "100vh" }}>
+      
+      {/* Dynamic Hero Section */}
+      <header className="relative pt-24 pb-10 sm:pt-32 lg:pt-40 lg:pb-20 border-b" style={{ borderColor: BORDER }}>
+        <div className="mx-auto max-w-7xl px-5 lg:px-8">
+          <div className="mx-auto max-w-4xl text-center">
+            <Reveal>
+              <div className="mx-auto mb-6 inline-flex items-center gap-2 rounded-full border px-4 py-1.5 text-sm font-medium shadow-lg"
+                style={{ borderColor: BORDER, background: "rgba(255,255,255,0.03)" }}>
+                <Star className="h-4 w-4" style={{ color: ACCENT }} />
+                <span className="text-zinc-400">Trusted by 10,000+ teams worldwide</span>
               </div>
-              <div className="flex items-center gap-2">
-                <CheckCircle2 className="h-4 w-4 text-primary" />
-                <span>Unlimited workspaces</span>
+              <h1 className="text-balance text-5xl font-bold tracking-tight sm:text-7xl leading-tight text-white/90">
+                Ship projects 2× faster.
+                <br />
+                <span style={{ backgroundImage: "linear-gradient(90deg,#5eead4,#14b8a6)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text" }}>
+                  Zero learning curve.
+                </span>
+              </h1>
+              <p className="mx-auto mt-6 max-w-2xl text-balance text-lg leading-relaxed text-zinc-400">
+                The project management tool your team will actually love. Real-time collaboration, beautiful design, and powerful features that stay out of your way.
+              </p>
+              <div className="mt-10 flex flex-col items-center justify-center gap-4 sm:flex-row">
+                <Button asChild size="lg" className="h-12 px-8 text-base shadow-xl border-0 text-slate-950 font-semibold" style={{ background: ACCENT }}>
+                  <Link href="/login">Start for free <ArrowRight className="ml-2 h-5 w-5" /></Link>
+                </Button>
               </div>
-              <div className="flex items-center gap-2">
-                <CheckCircle2 className="h-4 w-4 text-primary" />
-                <span>Setup in 5 minutes</span>
-              </div>
-            </motion.div>
-          </motion.div>
-
-          <motion.div variants={fadeOnly} initial="initial" whileInView="whileInView" className="mt-20">
-            <div className="relative mx-auto max-w-6xl">
-              <div className="absolute -inset-4 bg-gradient-to-r from-primary/30 via-primary/20 to-primary/30 blur-3xl" />
-              <div className="relative overflow-hidden rounded-3xl border-2 border-primary/20 bg-gradient-to-br from-card via-card/95 to-card/90 shadow-2xl ring-1 ring-primary/10">
-                <div className="flex items-center gap-2 border-b border-border/50 bg-muted/30 px-4 py-3">
-                  <div className="flex gap-1.5">
-                    <div className="h-3 w-3 rounded-full bg-red-500/80" />
-                    <div className="h-3 w-3 rounded-full bg-yellow-500/80" />
-                    <div className="h-3 w-3 rounded-full bg-green-500/80" />
-                  </div>
-                  <div className="ml-4 flex-1 rounded-md bg-background/50 px-3 py-1 text-xs text-muted-foreground">flowfoundry.app/workspace</div>
-                </div>
-                <div className="w-full bg-gradient-to-br from-background via-background to-muted/20 p-4" style={{ height: '500px' }}>
-                  <div className="grid h-full grid-cols-12 gap-3">
-                    <div className="hidden md:block col-span-3 space-y-2">
-                      <div className="rounded-xl border-2 border-primary/30 bg-gradient-to-br from-primary/10 to-primary/5 p-2.5 shadow-lg">
-                        <div className="flex items-center gap-2 mb-1">
-                          <div className="h-5 w-5 rounded-lg bg-primary/40" />
-                          <div className="flex-1">
-                            <div className="text-[9px] font-semibold text-primary/80">Marketing Team</div>
-                            <div className="text-[7px] text-primary/60">12 members</div>
-                          </div>
-                        </div>
-                      </div>
-                      {[
-                        { icon: '📊', label: 'Dashboard', count: null },
-                        { icon: '📁', label: 'Projects', count: '8' },
-                        { icon: '✓', label: 'Tasks', count: '24' },
-                        { icon: '👥', label: 'Team', count: '12' }
-                      ].map((item, i) => (
-                        <div key={i} className="group rounded-lg border border-border/50 bg-card/50 p-2 backdrop-blur-sm transition-all hover:border-primary/30 hover:shadow-md cursor-pointer">
-                          <div className="flex items-center gap-2">
-                            <span className="text-xs">{item.icon}</span>
-                            <span className="text-[9px] font-medium text-foreground/80 group-hover:text-primary transition-colors flex-1">{item.label}</span>
-                            {item.count && <span className="text-[8px] text-muted-foreground/60">{item.count}</span>}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                    <div className="col-span-12 md:col-span-9 space-y-3">
-                      <div className="grid grid-cols-3 gap-2">
-                        {[
-                          { label: 'Total Tasks', value: '24', trend: '+12%' },
-                          { label: 'In Progress', value: '8', trend: '+5%' },
-                          { label: 'Completed', value: '16', trend: '+8%' }
-                        ].map((stat, i) => (
-                          <div key={i} className="group rounded-lg border border-border/50 bg-gradient-to-br from-card to-card/80 p-2.5 backdrop-blur-sm transition-all hover:border-primary/30 hover:shadow-lg hover:-translate-y-0.5">
-                            <div className="text-[8px] text-muted-foreground/70 uppercase tracking-wide mb-1">{stat.label}</div>
-                            <div className="flex items-end justify-between">
-                              <div className="text-lg font-bold text-foreground">{stat.value}</div>
-                              <div className="text-[8px] text-green-500 font-medium">{stat.trend}</div>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                      <InteractiveDashboard />
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </motion.div>
-        </Container>
+            </Reveal>
+            <HeroFlow />
+          </div>
+        </div>
       </header>
 
-      <Section className="relative w-full border-y bg-gradient-to-br from-muted/50 via-background to-muted/30 py-20 sm:py-28 overflow-hidden">
-        <div className="absolute inset-0 -z-10">
-          <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-primary/5 rounded-full blur-3xl" />
-          <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-primary/5 rounded-full blur-3xl" />
-        </div>
-        <Container>
-          <motion.div className="grid gap-8 sm:grid-cols-3" initial="initial" whileInView="whileInView" variants={staggerFast}>
+      {/* Feature Highlight Cards */}
+      <section className="py-20 lg:py-32 relative">
+        <div className="mx-auto max-w-7xl px-5 lg:px-8">
+          <Reveal>
+            <SectionHeader title="Built for speed, designed for clarity" subtitle="Powerful features that stay out of your way." />
+          </Reveal>
+          <div className="mt-14 grid gap-6 md:grid-cols-3">
             {[
-              { icon: Users, value: '50K+', label: 'Active Users', sub: 'Growing daily' },
-              { icon: TrendingUp, value: '1M+', label: 'Projects Shipped', sub: 'And counting' },
-              { icon: Globe, value: '99.9%', label: 'Uptime SLA', sub: 'Always reliable' }
-            ].map((s, i) => (
-              <motion.div key={i} className="group relative" variants={scalePop}>
-                <div className="absolute -inset-1 bg-gradient-to-r from-primary/20 to-primary/5 rounded-3xl blur-lg opacity-0 group-hover:opacity-100 transition-all duration-500" />
-                <div className="relative rounded-3xl border-2 bg-gradient-to-br from-card via-card/95 to-card/90 backdrop-blur-sm p-8 text-center transition-all duration-500 hover:border-primary/50 hover:shadow-2xl hover:shadow-primary/10 hover:-translate-y-2">
-                  <div className="mb-4 inline-flex rounded-2xl bg-gradient-to-br from-primary/20 to-primary/10 p-4 ring-2 ring-primary/20 group-hover:ring-primary/40 group-hover:scale-110 transition-all duration-500">
-                    <s.icon className="h-8 w-8 text-primary" />
-                  </div>
-                  <p className="text-5xl font-bold tracking-tight bg-gradient-to-br from-foreground via-foreground to-foreground/70 bg-clip-text text-transparent mb-2">{s.value}</p>
-                  <p className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">{s.label}</p>
-                  <p className="mt-2 text-xs text-muted-foreground/70">{s.sub}</p>
-                </div>
-              </motion.div>
+              { icon: Workflow, title: "Workspace Management", desc: "Create unlimited workspaces for different teams. Organize projects and invite members effortlessly." },
+              { icon: LayoutDashboard, title: "Project Boards", desc: "Visual kanban boards with drag-and-drop task management. Track progress at a glance." },
+              { icon: Users, title: "Team Collaboration", desc: "Invite team members, assign roles, and collaborate in real-time across workspaces." }
+            ].map((f, i) => (
+              <Reveal key={i} delay={i * 0.1}>
+                <Card className="h-full border bg-card/50 backdrop-blur-sm" style={{ borderColor: BORDER, background: "rgba(255,255,255,0.02)" }}>
+                  <CardContent className="p-6 h-full flex flex-col">
+                    <div className="mb-4 inline-flex rounded-2xl p-3" style={{ background: ACCENT_SOFT, border: `1px solid ${ACCENT_LINE}` }}>
+                      <f.icon className="h-6 w-6" style={{ color: ACCENT }} />
+                    </div>
+                    <h3 className="mb-2 text-xl font-semibold text-white/90">{f.title}</h3>
+                    <p className="text-sm leading-relaxed text-zinc-400">{f.desc}</p>
+                  </CardContent>
+                </Card>
+              </Reveal>
             ))}
-          </motion.div>
-        </Container>
-      </Section>
-
-      <Section id="features">
-        <Container>
-          <SectionTitle eyebrow="Everything you need" title="Built for speed, designed for clarity" subtitle="Powerful features that stay out of your way. No bloat, no complexity—just what you need to ship faster." />
-          <motion.div className="grid gap-6 auto-rows-fr" initial="initial" whileInView="whileInView" variants={staggerSlow}>
-            <motion.div className="grid gap-6 md:grid-cols-3" variants={fadeScale}>
-              <motion.div className="md:col-span-2 group relative overflow-hidden transition-all duration-500 hover:-translate-y-2" variants={rotateIn}>
-                <Card className="h-full border-2 transition-all duration-500 hover:border-primary/50 hover:shadow-2xl hover:shadow-primary/10 bg-gradient-to-br from-card/50 to-card/30 backdrop-blur-sm">
-                  <CardContent className="p-8 h-full flex flex-col justify-between">
-                    <div>
-                      <div className="mb-6 inline-flex rounded-2xl bg-primary/10 p-4 ring-1 ring-primary/20 group-hover:ring-primary/40 group-hover:scale-110 transition-all duration-500">
-                        <Workflow className="h-8 w-8 text-primary" />
-                      </div>
-                      <h3 className="mb-3 text-2xl font-bold">Workspace Management</h3>
-                      <p className="text-base leading-relaxed text-muted-foreground">Create unlimited workspaces for different teams. Organize projects, invite members, and manage permissions with role-based access control.</p>
-                    </div>
-                    <Badge className="mt-6 w-fit">Most Popular</Badge>
-                  </CardContent>
-                </Card>
-              </motion.div>
-              <motion.div className="group relative transition-all duration-500 hover:-translate-y-2" variants={zoomIn}>
-                <Card className="h-full border-2 transition-all duration-500 hover:border-primary/50 hover:shadow-2xl hover:shadow-primary/10 bg-card/50 backdrop-blur-sm">
-                  <CardContent className="p-6 h-full flex flex-col">
-                    <div className="mb-4 inline-flex rounded-2xl bg-primary/10 p-3 ring-1 ring-primary/20 group-hover:ring-primary/40 group-hover:scale-110 transition-all duration-500">
-                      <LayoutDashboard className="h-6 w-6 text-primary" />
-                    </div>
-                    <h3 className="mb-2 text-xl font-semibold">Project Boards</h3>
-                    <p className="text-sm leading-relaxed text-muted-foreground">Visual kanban boards with drag-and-drop task management. Track progress at a glance.</p>
-                  </CardContent>
-                </Card>
-              </motion.div>
-            </motion.div>
-            <motion.div className="grid gap-6 md:grid-cols-3" variants={fadeScale}>
-              {[
-                { icon: Users, title: 'Team Collaboration', desc: 'Invite team members, assign roles, and collaborate in real-time across workspaces.' },
-                { icon: MessageSquare, title: 'Workspace Chat', desc: 'Built-in messaging for each workspace. Keep conversations organized and contextual.' },
-                { icon: Clock, title: 'Task Management', desc: 'Create, assign, and track tasks with deadlines, priorities, and status updates.' }
-              ].map((f, i) => (
-                <motion.div key={i} className="group relative transition-all duration-500 hover:-translate-y-2" variants={slideUp}>
-                  <Card className="h-full border-2 transition-all duration-500 hover:border-primary/50 hover:shadow-2xl hover:shadow-primary/10 bg-card/50 backdrop-blur-sm">
-                    <CardContent className="p-6 h-full flex flex-col">
-                      <div className="mb-4 inline-flex rounded-2xl bg-primary/10 p-3 ring-1 ring-primary/20 group-hover:ring-primary/40 group-hover:scale-110 transition-all duration-500">
-                        <f.icon className="h-6 w-6 text-primary" />
-                      </div>
-                      <h3 className="mb-2 text-xl font-semibold">{f.title}</h3>
-                      <p className="text-sm leading-relaxed text-muted-foreground">{f.desc}</p>
-                    </CardContent>
-                  </Card>
-                </motion.div>
-              ))}
-            </motion.div>
-            <motion.div className="grid gap-6 md:grid-cols-3" variants={fadeScale}>
-              <motion.div className="group relative transition-all duration-500 hover:-translate-y-2" variants={scalePop}>
-                <Card className="h-full border-2 transition-all duration-500 hover:border-primary/50 hover:shadow-2xl hover:shadow-primary/10 bg-card/50 backdrop-blur-sm">
-                  <CardContent className="p-6 h-full flex flex-col">
-                    <div className="mb-4 inline-flex rounded-2xl bg-primary/10 p-3 ring-1 ring-primary/20 group-hover:ring-primary/40 group-hover:scale-110 transition-all duration-500">
-                      <ShieldCheck className="h-6 w-6 text-primary" />
-                    </div>
-                    <h3 className="mb-2 text-xl font-semibold">Secure Access</h3>
-                    <p className="text-sm leading-relaxed text-muted-foreground">Role-based permissions with owner, admin, member, and viewer roles.</p>
-                  </CardContent>
-                </Card>
-              </motion.div>
-              <motion.div className="md:col-span-2 group relative overflow-hidden transition-all duration-500 hover:-translate-y-2" variants={rotateIn}>
-                <Card className="h-full border-2 transition-all duration-500 hover:border-primary/50 hover:shadow-2xl hover:shadow-primary/10 bg-gradient-to-br from-card/50 to-card/30 backdrop-blur-sm">
-                  <CardContent className="p-8 h-full flex flex-col justify-between">
-                    <div>
-                      <div className="mb-6 inline-flex rounded-2xl bg-primary/10 p-4 ring-1 ring-primary/20 group-hover:ring-primary/40 group-hover:scale-110 transition-all duration-500">
-                        <Zap className="h-8 w-8 text-primary" />
-                      </div>
-                      <h3 className="mb-3 text-2xl font-bold">Real-time Notifications</h3>
-                      <p className="text-base leading-relaxed text-muted-foreground">Stay updated with instant notifications for task assignments, mentions, and workspace activities. Never miss important updates.</p>
-                    </div>
-                  </CardContent>
-                </Card>
-              </motion.div>
-            </motion.div>
-          </motion.div>
-        </Container>
-      </Section>
-
-      <Section className="w-full bg-muted/30">
-        <Container>
-          <SectionTitle eyebrow="Why choose us" title="Flowfoundry vs. the rest" subtitle="See how we stack up against traditional project management tools." />
-          <motion.div initial="initial" whileInView="whileInView" variants={zoomIn}>
-            <Card className="mx-auto max-w-3xl border-2 bg-card/50 backdrop-blur-sm">
-              <CardContent className="p-8">
-                <div className="grid grid-cols-3 gap-4 border-b-2 pb-4 mb-4">
-                  <div className="text-sm font-semibold">Feature</div>
-                  <div className="text-center text-sm font-semibold text-primary">Flowfoundry</div>
-                  <div className="text-center text-sm font-semibold text-muted-foreground">Others</div>
-                </div>
-                <ComparisonRow feature="Quick setup (5 min)" us={true} them={false} />
-                <ComparisonRow feature="Real-time collaboration" us={true} them={false} />
-                <ComparisonRow feature="100% free forever" us={true} them={false} />
-                <ComparisonRow feature="Unlimited workspaces" us={true} them={false} />
-                <ComparisonRow feature="Beautiful UI" us={true} them={false} />
-                <ComparisonRow feature="Mobile responsive" us={true} them={true} />
-                <ComparisonRow feature="Dark mode" us={true} them={false} />
-                <ComparisonRow feature="Built-in messaging" us={true} them={false} />
-              </CardContent>
-            </Card>
-          </motion.div>
-        </Container>
-      </Section>
-
-      <Section id="testimonials">
-        <Container>
-          <SectionTitle eyebrow="Customer love" title="Trusted by fast-moving teams" subtitle="Join thousands of teams who've transformed their workflow with Flowfoundry." />
-          <motion.div className="grid gap-8 md:grid-cols-3" initial="initial" whileInView="whileInView" variants={staggerFast}>
-            <Testimonial quote="We cut our sprint planning time in half. The real-time board is incredibly smooth and the UI is gorgeous." author="Sarah Chen" role="Engineering Lead" company="TechCorp" />
-            <Testimonial quote="Finally, a PM tool that doesn't get in the way. Setup took 5 minutes and our team was productive immediately." author="Marcus Johnson" role="Product Manager" company="StartupXYZ" />
-            <Testimonial quote="The best investment we made this year. Our team velocity doubled and everyone actually enjoys using it." author="Emily Rodriguez" role="CTO" company="InnovateLabs" />
-          </motion.div>
-        </Container>
-      </Section>
-
-      <Section className="w-full bg-linear-to-br from-primary/5 via-background to-background border-y" id="get-started">
-        <Container>
-          <motion.div className="mx-auto max-w-4xl text-center" initial="initial" whileInView="whileInView" variants={fadeScale}>
-            <Badge className="mb-6 shadow-lg">100% Free Forever</Badge>
-            <h2 className="text-4xl font-bold tracking-tight sm:text-5xl mb-4">Start managing projects today</h2>
-            <p className="text-lg text-muted-foreground mb-8 max-w-2xl mx-auto">Join thousands of teams using Flowfoundry. Completely free with unlimited workspaces, projects, and team members.</p>
-            <div className="flex flex-col sm:flex-row gap-4 justify-center mb-8">
-              <Button asChild size="lg" className="h-14 px-10 text-lg shadow-xl shadow-primary/25">
-                <Link href="/workspaces">Get Started Free</Link>
-              </Button>
-              <Button asChild variant="outline" size="lg" className="h-14 px-10 text-lg border-2">
-                <Link href="#features">Explore Features</Link>
-              </Button>
-            </div>
-            <div className="flex flex-wrap items-center justify-center gap-6 text-sm text-muted-foreground">
-              <div className="flex items-center gap-2">
-                <CheckCircle2 className="h-4 w-4 text-primary" />
-                <span>No credit card required</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <CheckCircle2 className="h-4 w-4 text-primary" />
-                <span>Unlimited everything</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <CheckCircle2 className="h-4 w-4 text-primary" />
-                <span>Always free</span>
-              </div>
-            </div>
-          </motion.div>
-        </Container>
-      </Section>
-
-      <Section id="faq" className="overflow-hidden">
-        <Container>
-          <SectionTitle title="Frequently asked questions" subtitle="Everything you need to know about Flowfoundry." />
-        </Container>
-        
-        <div className="space-y-6">
-          {/* Row 1 - Scrolls Right */}
-          <div className="relative group/row">
-            <div className="absolute left-0 top-0 bottom-0 w-32 bg-gradient-to-r from-background to-transparent z-10 pointer-events-none" />
-            <div className="absolute right-0 top-0 bottom-0 w-32 bg-gradient-to-l from-background to-transparent z-10 pointer-events-none" />
-            <motion.div
-              className="flex gap-6"
-              animate={{ x: [0, -1000] }}
-              transition={{
-                duration: 30,
-                repeat: Infinity,
-                ease: "linear",
-                repeatType: "loop"
-              }}
-              style={{ willChange: "transform" }}
-              whileHover={{ x: [0, -1000], transition: { duration: 30, repeat: Infinity, ease: "linear", repeatType: "loop" } }}
-              onHoverStart={(e) => { if (e.currentTarget) (e.currentTarget as HTMLElement).style.animationPlayState = 'paused'; }}
-              onHoverEnd={(e) => { if (e.currentTarget) (e.currentTarget as HTMLElement).style.animationPlayState = 'running'; }}
-            >
-              {[...Array(3)].map((_, setIndex) => (
-                <div key={setIndex} className="flex gap-6 shrink-0">
-                  <Card className="w-[500px] shrink-0 group border-2 bg-gradient-to-br from-card/50 to-card/30 backdrop-blur-sm hover:border-primary/30 hover:shadow-2xl transition-all duration-500">
-                    <CardHeader>
-                      <CardTitle className="text-lg group-hover:text-primary transition-colors">How do I create a workspace?</CardTitle>
-                    </CardHeader>
-                    <CardContent className="pt-0 text-sm text-muted-foreground leading-relaxed">
-                      Sign up and click "Create Workspace" from your dashboard. Give it a name, invite members, and start projects instantly.
-                    </CardContent>
-                  </Card>
-                  <Card className="w-[350px] shrink-0 group border-2 bg-card/50 backdrop-blur-sm hover:border-primary/30 hover:shadow-xl transition-all duration-500">
-                    <CardHeader>
-                      <CardTitle className="text-base group-hover:text-primary transition-colors">Multiple workspaces?</CardTitle>
-                    </CardHeader>
-                    <CardContent className="pt-0 text-sm text-muted-foreground leading-relaxed">
-                      Yes—create unlimited workspaces for different teams or clients.
-                    </CardContent>
-                  </Card>
-                  <Card className="w-[400px] shrink-0 group border-2 bg-card/50 backdrop-blur-sm hover:border-primary/30 hover:shadow-xl transition-all duration-500">
-                    <CardHeader>
-                      <CardTitle className="text-base group-hover:text-primary transition-colors">Is it free?</CardTitle>
-                    </CardHeader>
-                    <CardContent className="pt-0 text-sm text-muted-foreground leading-relaxed">
-                      Flowfoundry has a generous free plan for small teams.
-                    </CardContent>
-                  </Card>
-                </div>
-              ))}
-            </motion.div>
-          </div>
-
-          {/* Row 2 - Scrolls Left */}
-          <div className="relative group/row">
-            <div className="absolute left-0 top-0 bottom-0 w-32 bg-gradient-to-r from-background to-transparent z-10 pointer-events-none" />
-            <div className="absolute right-0 top-0 bottom-0 w-32 bg-gradient-to-l from-background to-transparent z-10 pointer-events-none" />
-            <motion.div
-              className="flex gap-6"
-              animate={{ x: [-1000, 0] }}
-              transition={{
-                duration: 35,
-                repeat: Infinity,
-                ease: "linear",
-                repeatType: "loop"
-              }}
-              style={{ willChange: "transform" }}
-            >
-              {[...Array(3)].map((_, setIndex) => (
-                <div key={setIndex} className="flex gap-6 shrink-0">
-                  <Card className="w-[400px] shrink-0 group border-2 bg-card/50 backdrop-blur-sm hover:border-primary/30 hover:shadow-xl transition-all duration-500">
-                    <CardHeader>
-                      <CardTitle className="text-base group-hover:text-primary transition-colors">What are the different roles?</CardTitle>
-                    </CardHeader>
-                    <CardContent className="pt-0 text-sm text-muted-foreground leading-relaxed">
-                      Owner, Admin, Member, and Viewer roles to match your team's needs.
-                    </CardContent>
-                  </Card>
-                  <Card className="w-[450px] shrink-0 group border-2 bg-card/50 backdrop-blur-sm hover:border-primary/30 hover:shadow-xl transition-all duration-500">
-                    <CardHeader>
-                      <CardTitle className="text-base group-hover:text-primary transition-colors">How does task management work?</CardTitle>
-                    </CardHeader>
-                    <CardContent className="pt-0 text-sm text-muted-foreground leading-relaxed">
-                      Create projects, add tasks, assign members, set due dates, and track visually.
-                    </CardContent>
-                  </Card>
-                  <Card className="w-[380px] shrink-0 group border-2 bg-card/50 backdrop-blur-sm hover:border-primary/30 hover:shadow-xl transition-all duration-500">
-                    <CardHeader>
-                      <CardTitle className="text-base group-hover:text-primary transition-colors">Real-time updates?</CardTitle>
-                    </CardHeader>
-                    <CardContent className="pt-0 text-sm text-muted-foreground leading-relaxed">
-                      All changes sync instantly across your team.
-                    </CardContent>
-                  </Card>
-                </div>
-              ))}
-            </motion.div>
-          </div>
-
-          {/* Row 3 - Scrolls Right (Faster) */}
-          <div className="relative group/row">
-            <div className="absolute left-0 top-0 bottom-0 w-32 bg-gradient-to-r from-background to-transparent z-10 pointer-events-none" />
-            <div className="absolute right-0 top-0 bottom-0 w-32 bg-gradient-to-l from-background to-transparent z-10 pointer-events-none" />
-            <motion.div
-              className="flex gap-6"
-              animate={{ x: [0, -1000] }}
-              transition={{
-                duration: 25,
-                repeat: Infinity,
-                ease: "linear",
-                repeatType: "loop"
-              }}
-              style={{ willChange: "transform" }}
-            >
-              {[...Array(3)].map((_, setIndex) => (
-                <div key={setIndex} className="flex gap-6 shrink-0">
-                  <Card className="w-[350px] shrink-0 group border-2 bg-card/50 backdrop-blur-sm hover:border-primary/30 hover:shadow-xl transition-all duration-500">
-                    <CardHeader>
-                      <CardTitle className="text-base group-hover:text-primary transition-colors">Mobile friendly?</CardTitle>
-                    </CardHeader>
-                    <CardContent className="pt-0 text-sm text-muted-foreground leading-relaxed">
-                      Fully responsive on all devices. Works perfectly on mobile browsers.
-                    </CardContent>
-                  </Card>
-                  <Card className="w-[500px] shrink-0 group border-2 bg-gradient-to-br from-card/50 to-card/30 backdrop-blur-sm hover:border-primary/30 hover:shadow-2xl transition-all duration-500">
-                    <CardHeader>
-                      <CardTitle className="text-lg group-hover:text-primary transition-colors">How do I invite team members?</CardTitle>
-                    </CardHeader>
-                    <CardContent className="pt-0 text-sm text-muted-foreground leading-relaxed">
-                      Go to your workspace's People page, enter their email address, and send an invitation. They'll receive instant notifications to join your workspace.
-                    </CardContent>
-                  </Card>
-                  <Card className="w-[400px] shrink-0 group border-2 bg-card/50 backdrop-blur-sm hover:border-primary/30 hover:shadow-xl transition-all duration-500">
-                    <CardHeader>
-                      <CardTitle className="text-base group-hover:text-primary transition-colors">Can I export data?</CardTitle>
-                    </CardHeader>
-                    <CardContent className="pt-0 text-sm text-muted-foreground leading-relaxed">
-                      Yes, you can export your workspace data anytime in multiple formats.
-                    </CardContent>
-                  </Card>
-                </div>
-              ))}
-            </motion.div>
           </div>
         </div>
-      </Section>
+      </section>
 
-      <motion.footer className="w-full border-t bg-muted/30" initial="initial" whileInView="whileInView" variants={staggerSlow} viewport={vp}>
-        <Container>
-          <motion.div className="py-16" variants={fadeScale}>
-            <div className="grid grid-cols-2 gap-12 md:grid-cols-4">
-              <motion.div className="col-span-2 md:col-span-1" variants={slideUp}>
-                <Link href="/" className="flex items-center space-x-2 mb-4">
-                  <Workflow className="h-7 w-7 text-primary" />
-                  <span className="text-xl font-bold">Flowfoundry</span>
-                </Link>
-                <p className="text-sm text-muted-foreground leading-relaxed mb-4">Ship work faster. Keep everyone aligned. Built for modern teams.</p>
-                <div className="flex space-x-3">
-                  {[
-                    { icon: Twitter, href: '#', label: 'Twitter' },
-                    { icon: Github, href: '#', label: 'GitHub' },
-                    { icon: Linkedin, href: '#', label: 'LinkedIn' }
-                  ].map((social) => (
-                    <a key={social.label} href={social.href} className="flex h-9 w-9 items-center justify-center rounded-lg border bg-background/50 text-muted-foreground transition-all hover:border-primary/50 hover:text-foreground hover:shadow-lg" aria-label={social.label}>
-                      <social.icon className="h-4 w-4" />
-                    </a>
-                  ))}
-                </div>
-              </motion.div>
-              <motion.div variants={slideUp}>
-                <h3 className="mb-4 text-sm font-semibold">Product</h3>
-                <ul className="space-y-3">
-                  {[
-                    { label: 'Features', href: '#features' },
-                    { label: 'Get Started', href: '#get-started' },
-                    { label: 'FAQ', href: '#faq' },
-                    { label: 'Testimonials', href: '#testimonials' }
-                  ].map((link) => (
-                    <li key={link.label}>
-                      <Link href={link.href} className="text-sm text-muted-foreground transition-colors hover:text-foreground">{link.label}</Link>
-                    </li>
-                  ))}
-                </ul>
-              </motion.div>
-              <motion.div variants={slideUp}>
-                <h3 className="mb-4 text-sm font-semibold">Company</h3>
-                <ul className="space-y-3">
-                  {[
-                    { label: 'About', href: '#' },
-                    { label: 'Blog', href: '#' },
-                    { label: 'Careers', href: '#' },
-                    { label: 'Contact', href: '#' }
-                  ].map((link) => (
-                    <li key={link.label}>
-                      <Link href={link.href} className="text-sm text-muted-foreground transition-colors hover:text-foreground">{link.label}</Link>
-                    </li>
-                  ))}
-                </ul>
-              </motion.div>
-              <motion.div variants={slideUp}>
-                <h3 className="mb-4 text-sm font-semibold">Legal</h3>
-                <ul className="space-y-3">
-                  {[
-                    { label: 'Privacy', href: '/privacy' },
-                    { label: 'Terms', href: '/terms' },
-                    { label: 'Security', href: '#' },
-                    { label: 'Status', href: '#' }
-                  ].map((link) => (
-                    <li key={link.label}>
-                      <Link href={link.href} className="text-sm text-muted-foreground transition-colors hover:text-foreground">{link.label}</Link>
-                    </li>
-                  ))}
-                </ul>
-              </motion.div>
-            </div>
-            <motion.div className="mt-12 flex flex-col items-center justify-between gap-4 border-t pt-8 md:flex-row" variants={fadeOnly}>
-              <p className="text-sm text-muted-foreground">&copy; {new Date().getFullYear()} Flowfoundry. All rights reserved.</p>
-              <div className="flex items-center gap-4 text-xs text-muted-foreground">
-                <span className="flex items-center gap-1.5">
-                  <div className="h-2 w-2 rounded-full bg-green-500" />
-                  All systems operational
-                </span>
-              </div>
-            </motion.div>
-          </motion.div>
-        </Container>
-      </motion.footer>
+      {/* FAQ Section */}
+      <FAQSection />
+
+      {/* Footer */}
+      <footer className="w-full border-t py-12" style={{ borderColor: BORDER, background: "#0a0c10" }}>
+        <div className="mx-auto max-w-7xl px-5 lg:px-8 text-center text-sm text-zinc-500">
+          <p>© {new Date().getFullYear()} Flowfoundry. All rights reserved.</p>
+        </div>
+      </footer>
     </div>
   );
 }

@@ -55,7 +55,7 @@ export default function CreateProjectDialog({ workspaceId, onCreated }: Props) {
       }
     };
     load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+
   }, [open, workspaceId, supabase]);
 
   const onSubmit = async () => {
@@ -130,7 +130,7 @@ export default function CreateProjectDialog({ workspaceId, onCreated }: Props) {
                 disabled={loadingWs || workspaces.length === 0}
               >
                 <SelectTrigger className="h-10 rounded-xl border-border bg-background">
-                  <SelectValue placeholder={loadingWs ? "Loading…" : workspaces.length ? "Select a workspace" : "No workspaces available"} />
+                  <SelectValue placeholder={loadingWs ? "Loading..." : workspaces.length ? "Select a workspace" : "No workspaces available"} />
                 </SelectTrigger>
                 <SelectContent className="rounded-xl">
                   {workspaces.map((w) => (
@@ -149,7 +149,7 @@ export default function CreateProjectDialog({ workspaceId, onCreated }: Props) {
                     className="h-10 rounded-xl border-border bg-background"
                   />
                   <Button onClick={onCreateWorkspace} disabled={creatingWs} variant="outline" className="w-full rounded-xl">
-                    {creatingWs ? "Creating…" : "Create Workspace"}
+                    {creatingWs ? "Creating..." : "Create Workspace"}
                   </Button>
                 </div>
               )}
@@ -177,11 +177,10 @@ export default function CreateProjectDialog({ workspaceId, onCreated }: Props) {
         </div>
         <DialogFooter>
           <Button onClick={onSubmit} disabled={submitting} className="rounded-xl px-6">
-            {submitting ? "Creating…" : "Create"}
+            {submitting ? "Creating..." : "Create"}
           </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
   );
 }
-

@@ -107,7 +107,7 @@ export function useProjects(initial: Partial<LoadParams> = {}) {
 
   useEffect(() => {
     load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+
   }, [workspaceId, search, page, pageSize]);
 
   useEffect(() => {

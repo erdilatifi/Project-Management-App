@@ -130,9 +130,9 @@ export async function createTask(projectId: string, title: string) : Promise<Tas
       .insert({
         project_id: projectId,
         title: title.trim(),
-        created_by: userId,
+        creator_id: userId,
       })
-      .select("id, project_id, workspace_id, title, description, status, priority, assignee_id, due_at, created_by, created_at")
+      .select("id, project_id, workspace_id, title, description, status, priority, assignee_id, due_at:due_date, created_by:creator_id, created_at")
       .single<TaskRow>();
 
     if (error) throw error;

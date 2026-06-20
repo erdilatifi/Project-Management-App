@@ -42,7 +42,7 @@ export default function InvitationsPage() {
 
   useEffect(() => {
     load()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+
   }, [user?.email])
 
   const accept = async (row: InviteRow) => {
@@ -83,7 +83,7 @@ export default function InvitationsPage() {
       <p className="text-sm text-neutral-500">Pending invitations for {user?.email ?? 'your account'}.</p>
       <div className="mt-4 space-y-3">
         {loading ? (
-          <Card className="p-4">Loading…</Card>
+          <Card className="p-4">Loading...</Card>
         ) : items.length === 0 ? (
           <Card className="p-4">No pending invitations.</Card>
         ) : (
@@ -104,4 +104,3 @@ export default function InvitationsPage() {
     </div>
   )
 }
-

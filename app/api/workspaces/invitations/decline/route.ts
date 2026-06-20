@@ -21,7 +21,8 @@ export async function POST(req: Request) {
       return bodyValidation.response
     }
     
-    let { workspaceId, notificationId } = bodyValidation.data as { workspaceId?: string; notificationId?: string }
+    let { workspaceId } = bodyValidation.data as { workspaceId?: string; notificationId?: string }
+    const { notificationId } = bodyValidation.data as { workspaceId?: string; notificationId?: string }
 
     // If workspaceId missing, try resolving from notification
     if (!workspaceId && notificationId) {

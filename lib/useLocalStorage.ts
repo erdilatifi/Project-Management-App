@@ -26,7 +26,7 @@ export function useLocalStorageState<T>(key: string, schema: z.ZodType<T>, initi
     } finally {
       setLoaded(true);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+
   }, [key]);
 
   useEffect(() => {
@@ -40,4 +40,3 @@ export function useLocalStorageState<T>(key: string, schema: z.ZodType<T>, initi
 
   return [state, setState, loaded] as const;
 }
-

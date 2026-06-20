@@ -82,7 +82,7 @@ const Navbar = () => {
   useEffect(() => {
     if (user?.id) fetchProfile(user.id);
     else { setProfile(null); }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+
   }, [user?.id]);
 
   // Subscribe to real-time profile and user updates
@@ -159,7 +159,6 @@ useEffect(() => {
     return () => window.removeEventListener('profile-updated', onProfileUpdated as EventListener);
   }, [user?.id]);
 
-
   // Handle user sign out and redirect to login
   const handleSignOut = async () => {
     setIsSigningOut(true);
@@ -230,7 +229,7 @@ useEffect(() => {
   const AvatarChip = () => (
     <div className="flex items-center gap-3 text-foreground">
       {profile?.avatar_url ? (
-        // eslint-disable-next-line @next/next/no-img-element
+
         <img
           src={`${profile.avatar_url}${profile.avatar_url.includes('?') ? '&' : '?'}t=${avatarSalt}`}
           alt="Avatar"
@@ -350,7 +349,7 @@ useEffect(() => {
                   <div className="flex flex-col gap-3">
                     <div className="flex items-center justify-center gap-3 text-foreground">
                       {profile?.avatar_url ? (
-                        // eslint-disable-next-line @next/next/no-img-element
+
                         <img
                           src={`${profile.avatar_url}${profile.avatar_url.includes('?') ? '&' : '?'}t=${avatarSalt}`}
                           alt="Avatar"

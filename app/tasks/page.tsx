@@ -22,7 +22,6 @@ type TaskRow = {
   status: Status;
   priority?: number | null;
   assignee_id?: string | null;
-  assignee_ids?: string[] | null;
   due_at?: string | null;
   created_by: string | null;
   created_at: string;
@@ -31,6 +30,15 @@ type TaskRow = {
 type ProjectRow = { id: string; name: string | null };
 
 const priorityLabel = (p?: number | null) => (p ? `P${p}` : "None");
+
+function getErrorMessage(error: unknown, fallback: string) {
+  if (error instanceof Error && error.message) return error.message;
+  if (typeof error === "object" && error && "message" in error) {
+    const message = (error as { message?: unknown }).message;
+    if (typeof message === "string" && message.trim()) return message;
+  }
+  return fallback;
+}
 
 // Due-date helpers to match the project tasks page
 type DueCategory = "overdue" | "today" | "nextweek" | "none";
@@ -113,16 +121,12 @@ export default function MyTasksPage() {
       let query = supabase
         .from("tasks")
         .select(
-          "id, project_id, workspace_id, title, description, status, priority, assignee_id, assignee_ids, due_at, created_by, created_at",
+          "id, project_id, workspace_id, title, description, status, priority, assignee_id, due_at:due_date, created_by:creator_id, created_at",
           { count: "exact" }
         )
         .order("created_at", { ascending: false })
         .range(from, to);
-
-      if (userId) {
-        const orFilter = `assignee_id.eq.${userId},assignee_ids.cs.{"${userId}"}`;
-        query = query.or(orFilter);
-      }
+      query = query.eq("assignee_id", userId);
 
       const { data, error, count } = await query;
       
@@ -154,7 +158,7 @@ export default function MyTasksPage() {
 
       // No extra member data needed here
     } catch (e: unknown) {
-      toast.error((e instanceof Error ? e.message : String(e)) || "Failed to load tasks");
+      toast.error(getErrorMessage(e, "Failed to load tasks"));
     } finally {
       if (append) {
         setLoadingMore(false);

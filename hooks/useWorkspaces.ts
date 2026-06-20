@@ -75,7 +75,7 @@ export function useWorkspaces(initial: Partial<LoadParams> = {}) {
 
         const { data, error, count } = await query.range(from, to);
         if (error) throw error;
-        
+
         const rows = (data ?? []).map((w: any) => ({
           id: w.id,
           name: w.name,
@@ -84,7 +84,7 @@ export function useWorkspaces(initial: Partial<LoadParams> = {}) {
           owner_id: w.owner_id,
           created_at: w.created_at,
         })) as WorkspaceRow[];
-        
+
         setItems(rows);
         setTotal(count ?? 0);
       } catch (e: any) {
@@ -98,7 +98,7 @@ export function useWorkspaces(initial: Partial<LoadParams> = {}) {
 
   useEffect(() => {
     load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+
   }, [search, page, pageSize]);
 
   useEffect(() => {

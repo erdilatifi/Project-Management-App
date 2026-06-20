@@ -56,13 +56,13 @@ export default function NotificationBell() {
    */
   const load = useCallback(async () => {
     if (!user?.id) return
-    
+
     try {
       const res = await fetch(`/api/notifications?limit=15`, { cache: 'no-store' })
       const json = await res.json()
-      
+
       if (!res.ok) throw new Error(json?.error || 'Failed to load notifications')
-      
+
       // Validate and normalize notification IDs
       const validItems: Item[] = (json.items || [])
         .map((item: any) => ({
@@ -74,7 +74,7 @@ export default function NotificationBell() {
           ...item,
           id: item.id,
         }))
-      
+
       setItems(validItems)
       setCursor(json.nextCursor)
       setHasMore(!!json.nextCursor)
@@ -90,13 +90,13 @@ export default function NotificationBell() {
       const res = await fetch(`/api/notifications?limit=15&cursor=${encodeURIComponent(cursor)}`, { cache: 'no-store' })
       const json = await res.json()
       if (!res.ok) throw new Error(json?.error || 'Failed to load more notifications')
-      
+
       // Filter out invalid notifications and convert ID to string if needed
       const validItems: Item[] = (json.items as Item[]).map((item: any) => ({
         ...item,
         id: String(item?.id ?? '').trim(),
       })).filter((item: any) => item && typeof item.id === 'string' && item.id.length > 0)
-      
+
       setItems((prev) => [...prev, ...validItems])
       setCursor(json.nextCursor)
       setHasMore(!!json.nextCursor)
@@ -117,18 +117,18 @@ export default function NotificationBell() {
   // Polling fallback - refresh notifications every 10 seconds when bell is open
   useEffect(() => {
     if (!open || !user?.id) return
-    
+
     console.log('[notification-bell] Starting polling (bell is open)')
-    
+
     // Immediate load when opening
     load()
-    
+
     // Poll every 10 seconds
     const interval = setInterval(() => {
       console.log('[notification-bell] Polling for new notifications')
       load()
     }, 10000)
-    
+
     return () => {
       console.log('[notification-bell] Stopping polling (bell closed)')
       clearInterval(interval)
@@ -179,9 +179,9 @@ export default function NotificationBell() {
 
   useEffect(() => {
     if (!user?.id || subscribed.current) return
-    
+
     console.log('[notification-bell] Setting up real-time subscription for user', user.id)
-    
+
     const unsubscribe = subscribeToNotifications(supabase as any, user.id, (p) => {
       if (!p) {
         console.error('[real-time-notification] Payload missing', p)
@@ -229,10 +229,10 @@ export default function NotificationBell() {
         return updated
       })
     })
-    
+
     subscribed.current = true
     console.log('[notification-bell] Real-time subscription active')
-    
+
     return () => {
       console.log('[notification-bell] Cleaning up real-time subscription')
       unsubscribe()
@@ -241,7 +241,6 @@ export default function NotificationBell() {
   }, [supabase, user?.id])
 
   const unread = items.filter((i) => !i.is_read).length
-
 
   const markAll = async () => {
     if (!user?.id || unread === 0) return
@@ -321,7 +320,7 @@ export default function NotificationBell() {
 
     // Mark as read (with validation inside)
     await markRead(n.id)
-    
+
     try {
       switch (n.type) {
         case 'message':
@@ -330,7 +329,7 @@ export default function NotificationBell() {
           // Try multiple fields to find the thread ID (ref_id, thread_id)
           const threadId = n.ref_id || n.thread_id
           const workspaceId = n.workspace_id
-          
+
           // Validate required fields for message notifications
           if (workspaceId && typeof workspaceId === 'string' && workspaceId.trim() &&
               threadId && typeof threadId === 'string' && threadId.trim()) {
@@ -351,7 +350,7 @@ export default function NotificationBell() {
           const taskWorkspaceId = n.workspace_id
           const taskProjectId = n.project_id
           const taskId = n.task_id || n.ref_id
-          
+
           if (taskProjectId && taskId) {
             const params = new URLSearchParams()
             params.set('task', taskId)
@@ -380,7 +379,7 @@ export default function NotificationBell() {
       console.error('[notification-click] Navigation error', error)
       toast.error('Failed to open notification')
     }
-    
+
     setOpen(false)
   }
 
@@ -490,18 +489,18 @@ export default function NotificationBell() {
                               try {
                                 // Build payload - only include fields with valid values
                                 const payload: Record<string, string> = {}
-                                
+
                                 // Always include notificationId if available
                                 if (n.id && typeof n.id === 'string' && n.id.trim()) {
                                   payload.notificationId = n.id
                                 }
-                                
+
                                 // Include workspaceId if available
                                 const wsId = n.workspace_id || n.ref_id
                                 if (wsId && typeof wsId === 'string' && wsId.trim()) {
                                   payload.workspaceId = wsId
                                 }
-                                
+
                                 const res = await fetch('/api/workspaces/invitations/accept', {
                                   method: 'POST',
                                   headers: { 'Content-Type': 'application/json' },
@@ -510,7 +509,7 @@ export default function NotificationBell() {
                                 const json = await res.json()
                                 if (!res.ok) {
                                   // Surface server error in console for debugging
-                                  // eslint-disable-next-line no-console
+
                                   console.error('[accept-invite] client error', { status: res.status, json })
                                   throw new Error(json?.error || 'Failed to accept invitation')
                                 }
@@ -522,7 +521,7 @@ export default function NotificationBell() {
                                   router.refresh()
                                 }, 500)
                               } catch (err: any) {
-                                // eslint-disable-next-line no-console
+
                                 console.error('[accept-invite] client catch', err)
                                 toast.error(err?.message ?? 'Failed to accept invitation')
                               }
@@ -539,18 +538,18 @@ export default function NotificationBell() {
                               try {
                                 // Build payload - only include fields with valid values
                                 const payload2: Record<string, string> = {}
-                                
+
                                 // Always include notificationId if available
                                 if (n.id && typeof n.id === 'string' && n.id.trim()) {
                                   payload2.notificationId = n.id
                                 }
-                                
+
                                 // Include workspaceId if available
                                 const wsId2 = n.workspace_id || n.ref_id
                                 if (wsId2 && typeof wsId2 === 'string' && wsId2.trim()) {
                                   payload2.workspaceId = wsId2
                                 }
-                                
+
                                 const res = await fetch('/api/workspaces/invitations/decline', {
                                   method: 'POST',
                                   headers: { 'Content-Type': 'application/json' },
@@ -558,7 +557,7 @@ export default function NotificationBell() {
                                 })
                                 const json = await res.json()
                                 if (!res.ok) {
-                                  // eslint-disable-next-line no-console
+
                                   console.error('[decline-invite] client error', { status: res.status, json })
                                   throw new Error(json?.error || 'Failed to decline invitation')
                                 }
@@ -566,7 +565,7 @@ export default function NotificationBell() {
                                 setItems((prev) => prev.filter((item) => item.id !== n.id))
                                 toast.success('Invitation declined')
                               } catch (err: any) {
-                                // eslint-disable-next-line no-console
+
                                 console.error('[decline-invite] client catch', err)
                                 toast.error(err?.message ?? 'Failed to decline invitation')
                               }
