@@ -109,11 +109,7 @@ export default function ProjectsPage() {
   const Avatar = ({ name }: { name: string }) => {
     const initial = (name?.trim()?.[0] ?? "?").toUpperCase();
     return (
-<<<<<<< HEAD
-      <div className="flex h-9 w-9 items-center justify-center rounded-xl border border-primary/20 bg-primary/10 text-sm font-semibold text-primary shrink-0">
-=======
       <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-brand-accent/12 text-brand-accent ring-1 ring-brand-accent/20 font-semibold shrink-0">
->>>>>>> origin/polish-protected-routes
         {initial}
       </div>
     );
