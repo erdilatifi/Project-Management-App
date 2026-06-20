@@ -10,14 +10,25 @@ import { Workflow } from "lucide-react";
 function Reveal({ children, className = "", delay = 0, style = {}, spotlight = false }: { children: React.ReactNode; className?: string; delay?: number; style?: React.CSSProperties; spotlight?: boolean }) {
   const ref = useRef<HTMLDivElement>(null);
   const inView = useInView(ref, { once: true, margin: "-40px" });
+  // pos = cursor position in px; norm = cursor position normalized to -0.5..0.5 for tilt
   const [pos, setPos] = useState({ x: 50, y: 50 });
+  const [norm, setNorm] = useState({ x: 0, y: 0 });
   const [hovered, setHovered] = useState(false);
 
-  const transform = inView
-    ? spotlight && hovered
-      ? "translateY(-5px)"
-      : "translateY(0)"
-    : "translateY(28px)";
+  // Reveal-on-scroll transform
+  let transform: string;
+  if (!inView) {
+    transform = "translateY(28px)";
+  } else if (spotlight && hovered) {
+    // Cursor-following 3D tilt + lift for a premium, tactile feel
+    const rotX = (-norm.y * 9).toFixed(2);
+    const rotY = (norm.x * 9).toFixed(2);
+    transform = `perspective(900px) rotateX(${rotX}deg) rotateY(${rotY}deg) translateY(-6px) scale(1.012)`;
+  } else if (spotlight) {
+    transform = "perspective(900px) rotateX(0deg) rotateY(0deg) translateY(0)";
+  } else {
+    transform = "translateY(0)";
+  }
 
   return (
     <div
@@ -26,30 +37,62 @@ function Reveal({ children, className = "", delay = 0, style = {}, spotlight = f
       onMouseMove={spotlight ? (e) => {
         const rect = e.currentTarget.getBoundingClientRect();
         setPos({ x: e.clientX - rect.left, y: e.clientY - rect.top });
+        setNorm({
+          x: (e.clientX - rect.left) / rect.width - 0.5,
+          y: (e.clientY - rect.top) / rect.height - 0.5,
+        });
       } : undefined}
       onMouseEnter={spotlight ? () => setHovered(true) : undefined}
-      onMouseLeave={spotlight ? () => setHovered(false) : undefined}
+      onMouseLeave={spotlight ? () => { setHovered(false); setNorm({ x: 0, y: 0 }); } : undefined}
       style={{
         opacity: inView ? 1 : 0,
         transform,
+        transformStyle: spotlight ? "preserve-3d" : undefined,
         transition: spotlight
-          ? `opacity 0.8s cubic-bezier(.16,1,.3,1) ${delay}s, transform 0.4s cubic-bezier(.16,1,.3,1), box-shadow 0.4s ease`
+          ? `opacity 0.8s cubic-bezier(.16,1,.3,1) ${delay}s, transform 0.25s cubic-bezier(.16,1,.3,1), box-shadow 0.4s ease`
           : `opacity 0.8s cubic-bezier(.16,1,.3,1) ${delay}s, transform 0.8s cubic-bezier(.16,1,.3,1) ${delay}s`,
-        boxShadow: spotlight && hovered ? "0 26px 60px -22px rgba(201,255,61,0.28)" : undefined,
+        boxShadow: spotlight && hovered
+          ? "0 34px 80px -28px rgba(201,255,61,0.4), 0 0 0 1px rgba(201,255,61,0.35)"
+          : undefined,
         ...style
       }}
     >
       {spotlight && (
-        <div
-          aria-hidden
-          className="pointer-events-none absolute inset-0 z-0 transition-opacity duration-300"
-          style={{
-            opacity: hovered ? 1 : 0,
-            background: `radial-gradient(440px circle at ${pos.x}px ${pos.y}px, rgba(201,255,61,0.16), rgba(139,124,246,0.07) 38%, transparent 60%)`,
-          }}
-        />
+        <>
+          {/* Animated gradient sheen border that lights up on hover */}
+          <div
+            aria-hidden
+            className="pointer-events-none absolute -inset-px rounded-[inherit] z-0 transition-opacity duration-300"
+            style={{
+              opacity: hovered ? 1 : 0,
+              padding: "1px",
+              background: `conic-gradient(from ${pos.x + pos.y}deg at ${pos.x}px ${pos.y}px, rgba(201,255,61,0.7), rgba(139,124,246,0.6), rgba(201,255,61,0.0) 55%, rgba(139,124,246,0.6))`,
+              WebkitMask: "linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0)",
+              WebkitMaskComposite: "xor",
+              maskComposite: "exclude",
+            }}
+          />
+          {/* Cursor-following spotlight glow */}
+          <div
+            aria-hidden
+            className="pointer-events-none absolute inset-0 z-0 transition-opacity duration-300"
+            style={{
+              opacity: hovered ? 1 : 0,
+              background: `radial-gradient(440px circle at ${pos.x}px ${pos.y}px, rgba(201,255,61,0.18), rgba(139,124,246,0.08) 38%, transparent 60%)`,
+            }}
+          />
+          {/* Specular highlight that tracks the cursor for a glassy sheen */}
+          <div
+            aria-hidden
+            className="pointer-events-none absolute inset-0 z-0 transition-opacity duration-300"
+            style={{
+              opacity: hovered ? 1 : 0,
+              background: `radial-gradient(160px circle at ${pos.x}px ${pos.y}px, rgba(255,255,255,0.07), transparent 70%)`,
+            }}
+          />
+        </>
       )}
-      {spotlight ? <div className="relative z-10">{children}</div> : children}
+      {spotlight ? <div className="relative z-10" style={{ transform: "translateZ(40px)" }}>{children}</div> : children}
     </div>
   );
 }
@@ -106,7 +149,6 @@ export default function LandingPage() {
             <Link href="/" className="flex items-center gap-[9px] text-[16px] sm:text-[19px] font-semibold tracking-tight text-[var(--lp-ink)]">
               <Workflow className="w-[22px] h-[22px] text-[var(--lp-accent)]" />
               <span>Flow<span className="font-bold">foundry</span></span>
-              <span className="hidden sm:inline-block font-mono text-[10.5px] text-[var(--lp-accent)] border border-[var(--lp-accent-line)] bg-[var(--lp-accent-dim)] px-2 py-[3px] rounded-full ml-1.5 tracking-wider">FREE</span>
             </Link>
             <div className="hidden md:flex items-center gap-9 text-[13.5px] text-[var(--lp-ink-dim)]">
               <a href="#problem" className="hover:text-[var(--lp-ink)] transition-colors">Why Flowfoundry</a>
@@ -116,7 +158,7 @@ export default function LandingPage() {
             </div>
             <div className="flex items-center gap-3 sm:gap-[18px]">
               <Link href="/login" className="hidden sm:inline-flex items-center gap-2 px-4 py-[9px] sm:px-[20px] sm:py-[10px] rounded-[9px] text-[12.5px] sm:text-[13.5px] font-semibold text-[var(--lp-ink-dim)] border border-[var(--lp-border)] bg-white/5 hover:bg-white/10 hover:text-[var(--lp-ink)] hover:border-[var(--lp-border-strong)] transition-all">Sign in</Link>
-              <Link href="/register" className="inline-flex items-center gap-2 px-4 py-[9px] sm:px-[20px] sm:py-[10px] rounded-[9px] text-[12.5px] sm:text-[13.5px] font-semibold text-[#06140a] bg-[var(--lp-accent)] hover:-translate-y-[2px] hover:shadow-[0_8px_28px_rgba(201,255,61,0.28)] transition-all">Start for free</Link>
+              <Link href="/register" className="inline-flex items-center gap-2 px-4 py-[9px] sm:px-[20px] sm:py-[10px] rounded-[9px] text-[12.5px] sm:text-[13.5px] font-semibold text-[#06140a] bg-[var(--lp-accent)] hover:-translate-y-[2px] hover:shadow-[0_8px_28px_rgba(201,255,61,0.28)] transition-all">Get started</Link>
             </div>
           </div>
         </nav>
@@ -126,26 +168,26 @@ export default function LandingPage() {
           <div className="mx-auto max-w-[1180px] px-5 sm:px-7">
             <Reveal className="max-w-[760px] mx-auto text-center">
               <h1 className="font-serif font-normal text-[clamp(2.6rem,6vw,4.6rem)] leading-[1.04] tracking-tight mt-0 mb-[26px] text-[var(--lp-ink)]">
-                Project management,<br/>
+                Every project,<br/>
                 <em className="not-italic font-light text-transparent bg-clip-text animate-[gradient-flow_6s_ease-in-out_infinite]" style={{
                   backgroundImage: "linear-gradient(100deg, var(--lp-accent) 10%, #eaffb0 50%, var(--lp-accent) 90%)",
                   backgroundSize: "200% auto"
-                }}>without the catch.</em>
+                }}>under one roof.</em>
               </h1>
               <p className="text-[17px] leading-[1.65] text-[var(--lp-ink-dim)] max-w-[540px] mx-auto">
-                Plan projects, move work across real-time boards, and keep every conversation in one place. Your whole team, perfectly in sync — with no per-seat pricing and no limits.
+                Create a workspace, build boards, assign the work, and talk it through — all in one place. Drag a task and your whole team watches it move in real time, so everyone always knows exactly what&apos;s happening.
               </p>
               <div className="flex flex-col sm:flex-row items-center justify-center gap-[14px] mt-[38px] px-1 sm:px-0">
-                <Link href="/register" className="w-full sm:w-auto inline-flex justify-center items-center gap-2 px-[26px] py-[14px] rounded-[10px] text-[14.5px] font-semibold text-[#06140a] bg-[var(--lp-accent)] hover:-translate-y-[2px] hover:shadow-[0_8px_28px_rgba(201,255,61,0.28)] transition-all">Start for free <span className="opacity-70">→</span></Link>
-                <a href="#how" className="w-full sm:w-auto inline-flex justify-center items-center gap-2 px-[26px] py-[14px] rounded-[10px] text-[14.5px] font-semibold text-[var(--lp-ink-dim)] border border-[var(--lp-border)] bg-white/5 hover:bg-white/10 hover:text-[var(--lp-ink)] hover:border-[var(--lp-border-strong)] transition-all">Watch the demo</a>
+                <Link href="/register" className="w-full sm:w-auto inline-flex justify-center items-center gap-2 px-[26px] py-[14px] rounded-[10px] text-[14.5px] font-semibold text-[#06140a] bg-[var(--lp-accent)] hover:-translate-y-[2px] hover:shadow-[0_8px_28px_rgba(201,255,61,0.28)] transition-all">Get started <span className="opacity-70">→</span></Link>
+                <a href="#how" className="w-full sm:w-auto inline-flex justify-center items-center gap-2 px-[26px] py-[14px] rounded-[10px] text-[14.5px] font-semibold text-[var(--lp-ink-dim)] border border-[var(--lp-border)] bg-white/5 hover:bg-white/10 hover:text-[var(--lp-ink)] hover:border-[var(--lp-border-strong)] transition-all">See how it works</a>
               </div>
               <div className="flex items-center justify-center gap-2.5 mt-[22px] text-[12.5px] text-[var(--lp-ink-faint)] font-mono flex-wrap">
                 <span className="text-[var(--lp-accent)] tracking-widest">★★★★★</span>
                 <span>Loved by modern teams</span>
                 <span className="opacity-40">·</span>
-                <span>No credit card</span>
+                <span>Real-time boards</span>
                 <span className="opacity-40">·</span>
-                <span>Unlimited workspaces</span>
+                <span>Built-in chat</span>
               </div>
             </Reveal>
           </div>
@@ -255,7 +297,7 @@ export default function LandingPage() {
                   <div className="min-h-[300px] rounded-[14px] border border-dashed border-[var(--lp-border)] p-[8px] flex flex-col gap-[8px] bg-white/5">
                     <div className="border border-[var(--lp-border)] rounded-[11px] bg-[#14171b]/90 p-[12px_13px] hover:border-[var(--lp-border-strong)] transition-colors cursor-grab">
                       <div className="flex items-center justify-between gap-[8px]"><span className="font-mono text-[9.5px] font-semibold px-[6px] py-[2px] rounded-[5px] tracking-wider text-[#ffb84d] bg-[#ffb84d]/10">P2</span></div>
-                      <div className="text-[12.5px] text-[var(--lp-ink)] mt-[9px] leading-[1.4] font-medium">Build kanban drag-and-drop</div>
+                      <div className="text-[12.5px] text-[var(--lp-ink)] mt-[9px] leading-[1.4] font-medium">Design the new homepage</div>
                       <div className="flex items-center justify-between mt-[11px]">
                         <div className="flex"><div className="w-[19px] h-[19px] rounded-full border-[1.5px] border-[#14171b] bg-gradient-to-br from-[var(--lp-accent)] to-[#8fc92a]"></div></div>
                         <span className="font-mono text-[9.5px] text-[var(--lp-amber)] flex items-center gap-[4px]">Due today</span>
@@ -264,7 +306,7 @@ export default function LandingPage() {
                     <div className="h-0 opacity-0 border border-dashed border-[var(--lp-border-strong)] rounded-[11px] bg-[var(--lp-accent)]/5 transition-all duration-300"></div>
                     <div className="border border-[var(--lp-border)] rounded-[11px] bg-[#14171b]/90 p-[12px_13px] hover:border-[var(--lp-border-strong)] transition-colors cursor-grab">
                       <div className="flex items-center justify-between gap-[8px]"><span className="font-mono text-[9.5px] font-semibold px-[6px] py-[2px] rounded-[5px] tracking-wider text-[var(--lp-violet)] bg-[var(--lp-violet-dim)]">P3</span></div>
-                      <div className="text-[12.5px] text-[var(--lp-ink)] mt-[9px] leading-[1.4] font-medium">Set up real-time subscriptions</div>
+                      <div className="text-[12.5px] text-[var(--lp-ink)] mt-[9px] leading-[1.4] font-medium">Draft the client proposal</div>
                       <div className="flex items-center justify-between mt-[11px]">
                         <div className="flex"><div className="w-[19px] h-[19px] rounded-full border-[1.5px] border-[#14171b] bg-gradient-to-br from-[var(--lp-amber)] to-[#e0962b]"></div></div>
                         <span className="font-mono text-[9.5px] text-[var(--lp-ink-faint)] flex items-center gap-[4px]">Next week</span>
@@ -284,7 +326,7 @@ export default function LandingPage() {
                   <div className="min-h-[300px] rounded-[14px] border border-dashed border-[var(--lp-border)] p-[8px] flex flex-col gap-[8px] bg-white/5">
                     <div className="border border-[var(--lp-border)] rounded-[11px] bg-[#14171b]/90 p-[12px_13px] hover:border-[var(--lp-border-strong)] transition-colors cursor-grab">
                       <div className="flex items-center justify-between gap-[8px]"><span className="font-mono text-[9.5px] font-semibold px-[6px] py-[2px] rounded-[5px] tracking-wider text-[var(--lp-violet)] bg-[var(--lp-violet-dim)]">P3</span></div>
-                      <div className="text-[12.5px] text-[var(--lp-ink)] mt-[9px] leading-[1.4] font-medium">Supabase auth integration</div>
+                      <div className="text-[12.5px] text-[var(--lp-ink)] mt-[9px] leading-[1.4] font-medium">Send kickoff deck to client</div>
                       <div className="flex items-center justify-between mt-[11px]">
                         <div className="flex"><div className="w-[19px] h-[19px] rounded-full border-[1.5px] border-[#14171b] bg-gradient-to-br from-[var(--lp-violet)] to-[#5a4fc4]"></div></div>
                         <span className="font-mono text-[9.5px] text-[var(--lp-ink-faint)] flex items-center gap-[4px]">Completed</span>
@@ -326,8 +368,8 @@ export default function LandingPage() {
           <div className="mx-auto max-w-[1180px] px-5 sm:px-7">
             <Reveal className="max-w-[600px]">
               <span className="inline-flex items-center gap-[8px] font-mono text-[12px] text-[var(--lp-accent)] tracking-widest uppercase before:content-[''] before:w-[14px] before:h-[1px] before:bg-[var(--lp-accent)]">The problem</span>
-              <h2 className="font-serif font-normal text-[clamp(2rem,4vw,3rem)] leading-[1.1] tracking-tight mt-[18px]">Your team's work lives in eight tabs. Your focus lives in none.</h2>
-              <p className="text-[16px] leading-[1.7] text-[var(--lp-ink-dim)] mt-[18px] max-w-[480px]">Tasks in one app, chat in another, files somewhere else, and a paid seat for every tool. Stitching it together isn't project management — it's tab management.</p>
+              <h2 className="font-serif font-normal text-[clamp(2rem,4vw,3rem)] leading-[1.1] tracking-tight mt-[18px]">Your team&apos;s work lives in eight tabs. Your focus lives in none.</h2>
+              <p className="text-[16px] leading-[1.7] text-[var(--lp-ink-dim)] mt-[18px] max-w-[480px]">Tasks in one app, chat in another, files somewhere else, and a status nobody can find. Stitching it together isn&apos;t project management — it&apos;s tab management.</p>
             </Reveal>
 
             <div className="grid grid-cols-1 md:grid-cols-[1.1fr_1fr] gap-12 md:gap-[60px] items-center mt-[70px]">
@@ -337,8 +379,8 @@ export default function LandingPage() {
                     {/* fade the inner end of every line so it appears to start at the ring, not the center */}
                     <radialGradient id="problem-line-fade" cx="50%" cy="50%" r="50%">
                       <stop offset="0%" stopColor="rgba(255,93,74,0)" />
-                      <stop offset="14%" stopColor="rgba(255,93,74,0)" />
-                      <stop offset="22%" stopColor="rgba(255,93,74,0.35)" />
+                      <stop offset="26%" stopColor="rgba(255,93,74,0)" />
+                      <stop offset="36%" stopColor="rgba(255,93,74,0.4)" />
                       <stop offset="100%" stopColor="rgba(255,93,74,0.12)" />
                     </radialGradient>
                   </defs>
@@ -364,7 +406,7 @@ export default function LandingPage() {
                   ))}
                 </svg>
                 {/* Center hub — opaque disc so the lines visually terminate at the outer ring */}
-                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[78px] h-[78px] rounded-full z-10 flex items-center justify-center animate-[center-pulse_3s_ease-in-out_infinite]" style={{ background: "radial-gradient(circle at center, #161013 0%, var(--lp-bg) 70%)", boxShadow: "0 0 0 1px rgba(255,93,74,0.25), 0 0 40px rgba(255,93,74,0.18)" }}>
+                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[90px] h-[90px] rounded-full z-10 flex items-center justify-center animate-[center-pulse_3s_ease-in-out_infinite]" style={{ background: "var(--lp-bg)", boxShadow: "0 0 0 1px rgba(255,93,74,0.25), 0 0 40px rgba(255,93,74,0.18)" }}>
                   <div className="w-[58px] h-[58px] rounded-full border border-dashed border-[#ff5d4a]/40 flex items-center justify-center">
                     <span className="font-serif italic text-[24px] text-[#ff5d4a] opacity-70 leading-none">?</span>
                   </div>
@@ -384,7 +426,7 @@ export default function LandingPage() {
                 </div>
                 <div className="flex gap-[18px] py-[22px] border-t border-[var(--lp-border)]">
                   <div className="font-mono text-[13px] text-[var(--lp-ink-faint)] pt-[2px]">02</div>
-                  <div><h4 className="text-[15.5px] font-semibold text-[var(--lp-ink)]">Per-seat pricing</h4><p className="text-[14px] text-[var(--lp-ink-dim)] mt-[6px] leading-[1.6]">Every new teammate is another line item, until "growing the team" starts to feel like a cost center.</p></div>
+                  <div><h4 className="text-[15.5px] font-semibold text-[var(--lp-ink)]">Clients left guessing</h4><p className="text-[14px] text-[var(--lp-ink-dim)] mt-[6px] leading-[1.6]">When progress is buried across tools, &quot;where are we at?&quot; turns into another meeting instead of a quick glance at the board.</p></div>
                 </div>
                 <div className="flex gap-[18px] py-[22px] border-y border-[var(--lp-border)]">
                   <div className="font-mono text-[13px] text-[var(--lp-ink-faint)] pt-[2px]">03</div>
@@ -401,7 +443,7 @@ export default function LandingPage() {
             <Reveal className="max-w-[600px]">
               <span className="inline-flex items-center gap-[8px] font-mono text-[12px] text-[var(--lp-accent)] tracking-widest uppercase before:content-[''] before:w-[14px] before:h-[1px] before:bg-[var(--lp-accent)]">The platform</span>
               <h2 className="font-serif font-normal text-[clamp(2rem,4vw,3rem)] leading-[1.1] tracking-tight mt-[18px]">One workspace. Everything in sync.</h2>
-              <p className="text-[16px] leading-[1.7] text-[var(--lp-ink-dim)] mt-[18px] max-w-[480px]">Flowfoundry brings boards, chat, and notifications into a single real-time workspace — and keeps it free, no matter how big your team gets.</p>
+              <p className="text-[16px] leading-[1.7] text-[var(--lp-ink-dim)] mt-[18px] max-w-[480px]">Flowfoundry brings boards, chat, and notifications into a single real-time workspace — so your team plans, delivers, and keeps clients in the loop without ever leaving the app.</p>
             </Reveal>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-6 gap-[18px] mt-[64px]">
@@ -523,7 +565,7 @@ export default function LandingPage() {
                 </div>
                 <Reveal className="pl-0 pb-[64px] pl-[28px] sm:pl-[28px]">
                   <h3 className="text-[20px] font-semibold text-[var(--lp-ink)] tracking-tight">Create a workspace, invite your team</h3>
-                  <p className="text-[14.5px] text-[var(--lp-ink-dim)] mt-[10px] leading-[1.7] max-w-[480px]">Spin up an unlimited workspace in seconds. Invite teammates by email — no seat limits, no approval queue, no card on file.</p>
+                  <p className="text-[14.5px] text-[var(--lp-ink-dim)] mt-[10px] leading-[1.7] max-w-[480px]">Spin up a workspace in seconds and invite your team by email. Everyone lands in the same place, ready to start the moment they accept.</p>
                   <div className="mt-[20px] border border-[var(--lp-border)] rounded-[14px] p-[16px] bg-white/5 max-w-[480px]">
                     <div className="flex items-center gap-[10px] flex-wrap">
                       <span className="flex items-center gap-[7px] font-mono text-[11.5px] text-[var(--lp-ink-dim)] border border-[var(--lp-border)] rounded-full px-[12px] py-[6px]"><span className="w-[6px] h-[6px] rounded-full bg-[var(--lp-accent)]"></span>maya@studio.co</span>
@@ -565,13 +607,13 @@ export default function LandingPage() {
             <Reveal>
               <div className="font-serif italic text-[80px] text-[var(--lp-accent)] opacity-50 leading-[0.5] h-[40px]">"</div>
               <blockquote className="font-serif font-normal italic text-[clamp(1.5rem,3.2vw,2.3rem)] leading-[1.35] tracking-tight text-[var(--lp-ink)] max-w-[780px]">
-                I spent a week trying to convince my team to pay $12/user for another tool. Then we found Flowfoundry. It does exactly what we need, faster, and for free. We moved everything over the same day.
+                Our boards, our conversations, and every client update finally live in one place. Status meetings basically disappeared — people just open the board and see exactly where things stand.
               </blockquote>
               <div className="mt-[28px] flex items-center justify-center gap-[12px]">
                 <div className="w-[38px] h-[38px] rounded-full bg-gradient-to-br from-[var(--lp-accent)] to-[#6b8a1f]"></div>
                 <div className="text-left">
                   <div className="text-[14px] font-semibold text-[var(--lp-ink)]">David K.</div>
-                  <div className="text-[12.5px] text-[var(--lp-ink-faint)] mt-[1px]">Lead Developer at Studio42</div>
+                  <div className="text-[12.5px] text-[var(--lp-ink-faint)] mt-[1px]">Studio Lead at Studio42</div>
                 </div>
               </div>
             </Reveal>
@@ -587,10 +629,10 @@ export default function LandingPage() {
             
             <div className="w-full max-w-[760px] mt-[60px]">
               {[
-                { q: "Is Flowfoundry really free?", a: "Yes. Unlimited workspaces, unlimited projects, and unlimited team members are completely free — no per-seat pricing and no credit card required." },
+                { q: "How does Flowfoundry actually work?", a: "Create a workspace, invite your team, then build projects and boards. Add tasks, assign owners, set due dates, and drag cards across To Do, In Progress, and Done. Everything updates live, and conversations stay in built-in workspace chat right next to the work." },
                 { q: "Does it work on mobile?", a: "Flowfoundry is fully responsive and works beautifully in any mobile browser, so your team can stay in sync from anywhere." },
                 { q: "Can I export my data?", a: "Absolutely. You own your data and can export all of your workspaces, tasks, and conversations at any time." },
-                { q: "How secure is my data?", a: "Your data is protected with enterprise-grade encryption in transit and at rest, with automatic daily backups and strict per-workspace access controls." }
+                { q: "How secure is my data?", a: "Your data is protected with encryption in transit and at rest, with automatic backups and strict per-workspace access controls." }
               ].map((faq, i) => (
                 <FAQItem key={i} q={faq.q} a={faq.a} index={i} />
               ))}
@@ -603,14 +645,14 @@ export default function LandingPage() {
           <div className="absolute left-1/2 top-0 -translate-x-1/2 w-[600px] h-[600px] bg-[radial-gradient(circle,rgba(201,255,61,0.1),transparent_70%)] z-0 animate-[cta-pulse_4s_ease-in-out_infinite]"></div>
           <Reveal className="relative z-10 px-5">
             <h2 className="font-serif font-normal text-[clamp(2.2rem,5vw,3.6rem)] tracking-tight leading-[1.08]">Ready to find your flow?</h2>
-            <p className="text-[16px] text-[var(--lp-ink-dim)] mt-[20px] mx-auto max-w-[440px]">Join thousands of teams managing their projects without limits.</p>
+            <p className="text-[16px] text-[var(--lp-ink-dim)] mt-[20px] mx-auto max-w-[440px]">Bring your team, your boards, and every client update into one calm, real-time workspace.</p>
             <div className="flex flex-col sm:flex-row items-center justify-center gap-[14px] mt-[38px]">
-              <Link href="/register" className="w-full sm:w-auto inline-flex justify-center items-center gap-2 px-[26px] py-[14px] rounded-[10px] text-[14.5px] font-semibold text-[#06140a] bg-[var(--lp-accent)] hover:-translate-y-[2px] hover:shadow-[0_8px_28px_rgba(201,255,61,0.28)] transition-all">Start for free <span className="opacity-70">→</span></Link>
+              <Link href="/register" className="w-full sm:w-auto inline-flex justify-center items-center gap-2 px-[26px] py-[14px] rounded-[10px] text-[14.5px] font-semibold text-[#06140a] bg-[var(--lp-accent)] hover:-translate-y-[2px] hover:shadow-[0_8px_28px_rgba(201,255,61,0.28)] transition-all">Get started <span className="opacity-70">→</span></Link>
             </div>
             <div className="flex items-center justify-center gap-[22px] mt-[30px] flex-wrap">
-              <span className="flex items-center gap-[7px] text-[12.5px] text-[var(--lp-ink-faint)] font-mono"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" className="text-[var(--lp-accent)]"><path d="M20 6L9 17l-5-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg> No credit card required</span>
-              <span className="flex items-center gap-[7px] text-[12.5px] text-[var(--lp-ink-faint)] font-mono"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" className="text-[var(--lp-accent)]"><path d="M20 6L9 17l-5-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg> Unlimited workspaces</span>
-              <span className="flex items-center gap-[7px] text-[12.5px] text-[var(--lp-ink-faint)] font-mono"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" className="text-[var(--lp-accent)]"><path d="M20 6L9 17l-5-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg> Cancel anytime</span>
+              <span className="flex items-center gap-[7px] text-[12.5px] text-[var(--lp-ink-faint)] font-mono"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" className="text-[var(--lp-accent)]"><path d="M20 6L9 17l-5-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg> Real-time boards</span>
+              <span className="flex items-center gap-[7px] text-[12.5px] text-[var(--lp-ink-faint)] font-mono"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" className="text-[var(--lp-accent)]"><path d="M20 6L9 17l-5-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg> Built-in workspace chat</span>
+              <span className="flex items-center gap-[7px] text-[12.5px] text-[var(--lp-ink-faint)] font-mono"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" className="text-[var(--lp-accent)]"><path d="M20 6L9 17l-5-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg> Live for the whole team</span>
             </div>
           </Reveal>
         </section>
