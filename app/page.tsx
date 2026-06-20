@@ -241,12 +241,11 @@ function TestimonialCarousel() {
           ))}
         </div>
 
-        {/* author info */}
         <div className="mt-[32px] flex items-center justify-center gap-[12px] relative" style={{ minHeight: "42px" }}>
           {TESTIMONIALS.map((t, i) => (
             <div
               key={i}
-              className="absolute inset-0 flex items-center justify-center gap-[12px] transition-all duration-500"
+              className="absolute top-0 left-1/2 -translate-x-1/2 w-max flex items-center justify-center gap-[12px] transition-all duration-500"
               style={{
                 opacity: active === i ? 1 : 0,
                 transform: active === i ? "translateY(0)" : "translateY(8px)",
@@ -350,7 +349,7 @@ export default function LandingPage() {
         </nav>
 
         {/* HERO */}
-        <header className="relative pt-[160px] overflow-hidden">
+        <header className="relative pt-[120px] pb-[40px] lg:pt-[160px] lg:pb-[40px] overflow-hidden">
           <div className="mx-auto max-w-[1180px] px-5 sm:px-7">
             <Reveal className="max-w-[760px] mx-auto text-center">
               <h1 className="font-serif font-normal text-[clamp(2.6rem,6vw,4.6rem)] leading-[1.04] tracking-tight mt-0 mb-[26px] text-[var(--lp-ink)]">
@@ -541,7 +540,7 @@ export default function LandingPage() {
 
 
         {/* PROBLEM */}
-        <section id="problem" className="relative py-[130px]">
+        <section id="problem" className="relative pt-[60px] pb-[130px]">
           <div className="mx-auto max-w-[1180px] px-5 sm:px-7">
             <Reveal className="max-w-[600px]">
               <span className="inline-flex items-center gap-[8px] font-mono text-[12px] text-[var(--lp-accent)] tracking-widest uppercase before:content-[''] before:w-[14px] before:h-[1px] before:bg-[var(--lp-accent)]">The problem</span>
@@ -749,80 +748,24 @@ export default function LandingPage() {
             </Reveal>
 
             <div className="mt-[80px]">
-              {/* Step 1 */}
-              <Reveal spotlight className="grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-12 items-center border border-[var(--lp-border)] rounded-[24px] bg-white/[0.02] p-6 md:p-10 relative overflow-hidden mb-[24px] hover:bg-white/[0.04] transition-colors duration-300">
-                <div className="flex flex-col items-start relative z-10">
-                  <div className="w-[38px] h-[38px] rounded-[10px] border border-[var(--lp-accent-line)] bg-[var(--lp-accent-dim)] text-[var(--lp-accent)] font-mono text-[14px] flex items-center justify-center mb-6 shadow-[0_0_15px_rgba(201,255,61,0.15)]">1</div>
-                  <h3 className="text-[22px] font-semibold text-[var(--lp-ink)] tracking-tight">Create a workspace, invite your team</h3>
-                  <p className="text-[15px] text-[var(--lp-ink-dim)] mt-[10px] leading-[1.7]">Spin up a workspace in seconds and invite your team by email. Everyone lands in the same place, ready to start the moment they accept.</p>
-                </div>
-                <div className="relative h-[220px] border border-[var(--lp-border-strong)] rounded-[16px] bg-[#0b0d10] flex flex-col justify-center p-6 shadow-xl overflow-hidden z-10">
-                  <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,rgba(201,255,61,0.08),transparent_50%)]"></div>
-                  <div className="text-[13px] text-[var(--lp-ink-dim)] mb-3 relative z-10">Invite team members</div>
-                  <div className="flex bg-[#14171b] border border-[var(--lp-border)] rounded-[10px] overflow-hidden mb-4 relative z-10">
-                    <div className="px-3 py-2 text-[12px] text-[var(--lp-ink-faint)] flex-1">maya@studio.co</div>
-                    <div className="px-4 py-2 bg-[var(--lp-accent)] text-[#06140a] text-[12px] font-semibold cursor-pointer hover:bg-[#b0e62a]">Invite</div>
-                  </div>
-                  <div className="flex gap-2 items-center relative z-10">
-                    <span className="flex items-center gap-[6px] text-[11px] text-[var(--lp-ink-dim)] border border-[var(--lp-border)] rounded-full px-[10px] py-[4px] bg-white/5"><span className="w-[5px] h-[5px] rounded-full bg-[var(--lp-accent)]"></span>maya@studio.co</span>
-                    <span className="flex items-center gap-[6px] text-[11px] text-[var(--lp-ink-dim)] border border-[var(--lp-border)] rounded-full px-[10px] py-[4px] bg-white/5"><span className="w-[5px] h-[5px] rounded-full bg-[var(--lp-accent)]"></span>theo@studio.co</span>
-                  </div>
-                </div>
-              </Reveal>
-
-              {/* Step 2 */}
-              <Reveal spotlight delay={0.1} className="grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-12 items-center border border-[var(--lp-border)] rounded-[24px] bg-white/[0.02] p-6 md:p-10 relative overflow-hidden mb-[24px] hover:bg-white/[0.04] transition-colors duration-300">
-                <div className="flex flex-col items-start relative z-10 md:order-2">
-                  <div className="w-[38px] h-[38px] rounded-[10px] border border-[var(--lp-violet-line)] bg-[var(--lp-violet-dim)] text-[var(--lp-violet)] font-mono text-[14px] flex items-center justify-center mb-6 shadow-[0_0_15px_rgba(139,124,246,0.15)]">2</div>
-                  <h3 className="text-[22px] font-semibold text-[var(--lp-ink)] tracking-tight">Build the board, assign the work</h3>
-                  <p className="text-[15px] text-[var(--lp-ink-dim)] mt-[10px] leading-[1.7]">Create projects, add tasks, set due dates, and assign them out. Everyone sees the same board, updating in real-time.</p>
-                </div>
-                <div className="relative h-[220px] border border-[var(--lp-border-strong)] rounded-[16px] bg-[#0b0d10] flex gap-3 p-5 shadow-xl overflow-hidden z-10 md:order-1">
-                  <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_bottom_left,rgba(139,124,246,0.08),transparent_50%)]"></div>
-                  <div className="flex-1 flex flex-col gap-2 relative z-10">
-                    <div className="flex items-center gap-2 mb-1"><span className="w-[6px] h-[6px] rounded-full bg-[var(--lp-ink-faint)]"></span><span className="text-[10px] text-[var(--lp-ink-faint)] uppercase tracking-wider">To Do</span></div>
-                    <div className="h-[46px] rounded-[8px] bg-[#14171b] border border-[var(--lp-border)] flex items-center px-3"><div className="w-[60%] h-[4px] rounded-full bg-[var(--lp-ink-faint)]/20"></div></div>
-                    <div className="h-[46px] rounded-[8px] bg-[#14171b] border border-[var(--lp-border)] flex items-center px-3"><div className="w-[45%] h-[4px] rounded-full bg-[var(--lp-ink-faint)]/20"></div></div>
-                  </div>
-                  <div className="flex-1 flex flex-col gap-2 relative z-10">
-                    <div className="flex items-center gap-2 mb-1"><span className="w-[6px] h-[6px] rounded-full bg-[var(--lp-violet)]"></span><span className="text-[10px] text-[var(--lp-ink-faint)] uppercase tracking-wider">In Progress</span></div>
-                    <div className="h-[54px] rounded-[8px] bg-[#1a1e23] border border-[var(--lp-accent-line)] shadow-[0_10px_20px_rgba(0,0,0,0.5)] transform -rotate-2 -translate-y-1 relative z-10 p-3 flex flex-col justify-between hover:-translate-y-2 hover:-rotate-3 transition-transform cursor-grab">
-                      <div className="w-[70%] h-[4px] rounded-full bg-[var(--lp-ink)]/80"></div>
-                      <div className="flex justify-between items-center">
-                        <div className="w-[30%] h-[4px] rounded-full bg-[var(--lp-ink-faint)]/40"></div>
-                        <div className="w-[14px] h-[14px] rounded-full bg-gradient-to-br from-[var(--lp-violet)] to-[#5a4fc4]"></div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </Reveal>
-
-              {/* Step 3 */}
-              <Reveal spotlight delay={0.2} className="grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-12 items-center border border-[var(--lp-border)] rounded-[24px] bg-white/[0.02] p-6 md:p-10 relative overflow-hidden hover:bg-white/[0.04] transition-colors duration-300">
-                <div className="flex flex-col items-start relative z-10">
-                  <div className="w-[38px] h-[38px] rounded-[10px] border border-[#ffb84d]/30 bg-[#ffb84d]/10 text-[#ffb84d] font-mono text-[14px] flex items-center justify-center mb-6 shadow-[0_0_15px_rgba(255,184,77,0.1)]">3</div>
-                  <h3 className="text-[22px] font-semibold text-[var(--lp-ink)] tracking-tight">Discuss inline, never lose context</h3>
-                  <p className="text-[15px] text-[var(--lp-ink-dim)] mt-[10px] leading-[1.7]">Use the built-in workspace chat to discuss features, share links, and celebrate wins without ever tabbing over to Slack.</p>
-                </div>
-                <div className="relative h-[220px] border border-[var(--lp-border-strong)] rounded-[16px] bg-[#0b0d10] flex flex-col justify-end p-5 shadow-xl overflow-hidden z-10">
-                  <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_left,rgba(255,184,77,0.06),transparent_50%)]"></div>
-                  <div className="flex flex-col gap-4 relative z-10">
-                    <div className="flex gap-2 items-end">
-                      <div className="w-[22px] h-[22px] rounded-full bg-gradient-to-br from-[var(--lp-violet)] to-[#5a4fc4] shrink-0 border border-[#0b0d10]"></div>
-                      <div className="bg-[#14171b] border border-[var(--lp-border)] rounded-[12px] rounded-bl-[4px] p-2 px-3 text-[11.5px] text-[var(--lp-ink-dim)] max-w-[80%] shadow-sm">Did we finalize the copy?</div>
-                    </div>
-                    <div className="flex gap-2 items-end self-end flex-row-reverse">
-                      <div className="w-[22px] h-[22px] rounded-full bg-gradient-to-br from-[var(--lp-accent)] to-[#8fc92a] shrink-0 border border-[#0b0d10]"></div>
-                      <div className="bg-[#1a1e23] border border-[var(--lp-accent-line)] rounded-[12px] rounded-br-[4px] p-2 px-3 text-[11.5px] text-[var(--lp-ink)] max-w-[80%] shadow-sm">Yep, it's attached to the card above 🚀</div>
-                    </div>
-                    <div className="mt-1 relative">
-                      <div className="h-[32px] rounded-full bg-[#14171b] border border-[var(--lp-border)] flex items-center px-4">
-                        <span className="text-[10.5px] text-[var(--lp-ink-faint)] animate-pulse">Reply to thread...</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </Reveal>
+              {/* Vertical Timeline */}
+              <div className="max-w-[500px] mt-[60px]">
+                <Reveal className="relative border-l border-[var(--lp-border-strong)] pl-[40px] ml-[10px] pb-[50px]">
+                  <div className="absolute left-[calc(-4px-4px)] top-[6px] w-[17px] h-[17px] rounded-full bg-[var(--lp-bg)] border-[4px] border-[var(--lp-border-strong)] -translate-x-1/2"></div>
+                  <h3 className="text-[20px] font-semibold text-[var(--lp-ink)] tracking-tight">Invite your team</h3>
+                  <p className="text-[15.5px] text-[var(--lp-ink-dim)] mt-[8px] leading-[1.6]">Create a workspace, send out invites, and get everyone into the same environment.</p>
+                </Reveal>
+                <Reveal className="relative border-l border-[var(--lp-border-strong)] pl-[40px] ml-[10px] pb-[50px]" delay={0.1}>
+                  <div className="absolute left-[calc(-4px-4px)] top-[6px] w-[17px] h-[17px] rounded-full bg-[var(--lp-bg)] border-[4px] border-[var(--lp-accent)] -translate-x-1/2"></div>
+                  <h3 className="text-[20px] font-semibold text-[var(--lp-ink)] tracking-tight">Build the board, assign the work</h3>
+                  <p className="text-[15.5px] text-[var(--lp-ink-dim)] mt-[8px] leading-[1.6]">Create projects, add tasks, set due dates, and assign them out. Everyone sees the same board, updating in real-time.</p>
+                </Reveal>
+                <Reveal className="relative border-l border-transparent pl-[40px] ml-[10px]" delay={0.2}>
+                  <div className="absolute left-[calc(-4px-4px)] top-[6px] w-[17px] h-[17px] rounded-full bg-[var(--lp-bg)] border-[4px] border-[var(--lp-border-strong)] -translate-x-1/2"></div>
+                  <h3 className="text-[20px] font-semibold text-[var(--lp-ink)] tracking-tight">Discuss inline, never lose context</h3>
+                  <p className="text-[15.5px] text-[var(--lp-ink-dim)] mt-[8px] leading-[1.6]">Use the built-in workspace chat to discuss features, share links, and celebrate wins without ever tabbing over to Slack.</p>
+                </Reveal>
+              </div>
             </div>
           </div>
         </section>
