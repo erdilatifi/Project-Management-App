@@ -112,7 +112,7 @@ export async function POST(req: Request) {
       const { data: profile, error: profileErr } = await db
         .from('profiles')
         .select('id, email')
-        .eq('email', targetEmail)
+        .ilike('email', targetEmail)
         .maybeSingle()
 
       if (profileErr) {

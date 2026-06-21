@@ -28,7 +28,7 @@ export default function InvitationsPage() {
       const { data, error } = await supabase
         .from('workspace_invitations')
         .select('id, workspace_id, email, status, created_at')
-        .eq('email', user.email)
+        .ilike('email', user.email.toLowerCase())
         .eq('status', 'pending')
         .order('created_at', { ascending: false })
       if (error) throw error
