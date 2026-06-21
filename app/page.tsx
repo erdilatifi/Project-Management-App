@@ -439,8 +439,14 @@ export default function LandingPage() {
       <div className="relative z-10">
         
         {/* NAV */}
-        <nav className={`fixed top-0 left-0 right-0 z-[100] transition-all duration-500 border-b ${scrolled ? "bg-[#050607]/80 backdrop-blur-md border-[var(--lp-border)]" : "border-transparent bg-transparent"}`}>
-          <div className="mx-auto max-w-[1180px] px-4 sm:px-7 py-3 sm:py-[18px] flex items-center justify-between">
+        <nav
+          className={`fixed z-[100] transition-all duration-500 ease-[cubic-bezier(0.25,0.1,0.25,1)] ${
+            scrolled
+              ? "top-[14px] left-[5%] right-[5%] bg-[#050607]/75 backdrop-blur-xl border border-[var(--lp-border-strong)] rounded-[16px] shadow-[0_8px_32px_rgba(0,0,0,0.4),0_0_0_1px_rgba(255,255,255,0.04)]"
+              : "top-0 left-0 right-0 bg-transparent border-b border-transparent"
+          }`}
+        >
+          <div className={`mx-auto max-w-[1180px] px-4 sm:px-7 flex items-center justify-between transition-[padding] duration-500 ${scrolled ? "py-[12px] sm:py-[14px]" : "py-3 sm:py-[18px]"}`}>
             <Link href="/" className="flex items-center gap-[9px] text-[16px] sm:text-[19px] font-semibold tracking-tight text-[var(--lp-ink)]">
               <Workflow className="w-[22px] h-[22px] text-[var(--lp-accent)]" />
               <span>Flow<span className="font-bold">foundry</span></span>
@@ -533,8 +539,8 @@ export default function LandingPage() {
               <div className="relative grid grid-cols-1 md:grid-cols-3 gap-[16px] p-[22px]">
                 
                 {/* Floating Animated Card that drags across columns */}
-                <div className="absolute top-[58px] left-[22px] w-[calc((100%-76px)/3)] z-50 animate-[hero-kanban-drag_7s_cubic-bezier(.65,0,.35,1)_infinite] pointer-events-none hidden md:block">
-                  <div className="border border-[var(--lp-accent-line)] rounded-[11px] bg-[#1a1e23] p-[12px_13px] shadow-[0_20px_40px_-10px_rgba(0,0,0,0.8)]">
+                <div className="absolute top-[58px] left-[30px] w-[calc((100%-76px)/3-16px)] h-[96px] z-50 animate-[hero-kanban-drag_7s_cubic-bezier(.65,0,.35,1)_infinite] pointer-events-none hidden md:block">
+                  <div className="border border-[var(--lp-accent-line)] rounded-[11px] bg-[#14171b] p-[12px_13px] shadow-[0_20px_40px_-10px_rgba(0,0,0,0.9)] h-full box-border">
                     <div className="flex items-center justify-between gap-[8px]"><span className="font-mono text-[9.5px] font-semibold px-[6px] py-[2px] rounded-[5px] tracking-wider text-[#ff8a7a] bg-[#ff5d4a]/10">P1</span></div>
                     <div className="text-[12.5px] text-[var(--lp-ink)] mt-[9px] leading-[1.4] font-medium">Fix mobile nav overflow</div>
                     <div className="flex items-center justify-between mt-[11px]">
