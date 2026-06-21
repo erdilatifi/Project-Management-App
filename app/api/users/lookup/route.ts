@@ -22,7 +22,7 @@ export async function POST(req: Request) {
     const { data, error } = await supabase
       .from('profiles')
       .select('id, email')
-      .eq('email', email.toLowerCase())
+      .ilike('email', email.toLowerCase())
       .maybeSingle()
 
     if (error || !data || !data.id) {
@@ -43,4 +43,3 @@ export async function POST(req: Request) {
     )
   }
 }
-

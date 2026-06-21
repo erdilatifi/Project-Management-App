@@ -1,6 +1,7 @@
 import { createClient } from '@/utils/supabase/server'
 import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/utils/supabase/admin'
+import { sanitizeEmail } from '@/lib/validation/sanitize'
 
 function sanitizeUsername(input: string): string {
   const base = (input || '').toLowerCase().trim().replace(/[^a-z0-9_.-]/g, '');
@@ -33,66 +34,54 @@ function deriveDisplayName(user: any): string | null {
   return null;
 }
 
+function getNormalizedUserEmail(user: any): string | null {
+  const meta = (user as any)?.user_metadata || {}
+  const candidates = [user?.email, meta.email, meta.email_address]
+  for (const candidate of candidates) {
+    if (typeof candidate === 'string') {
+      const email = sanitizeEmail(candidate)
+      if (email) return email
+    }
+  }
+  return null
+}
+
 async function ensureUsername(supabase: Awaited<ReturnType<typeof createClient>>) {
-  // Best-effort: derive and persist username if missing
+  // Best-effort: ensure OAuth/email-confirmed users have a profile row, email, and username.
   try {
     const { data: auth } = await supabase.auth.getUser();
     const user = auth.user;
     if (!user) return;
     const uid = user.id;
+    const db = process.env.SUPABASE_SERVICE_ROLE_KEY ? createAdminClient() : supabase;
 
-    const admin = createAdminClient();
-
-    // Fetch existing values (do not overwrite if already set)
     let existingProfileUsername: string | null = null;
+    let existingProfileEmail: string | null = null;
+    let existingProfileFullName: string | null = null;
     let hasProfileRow = false;
     const meta = (user as any).user_metadata || {};
-    const email: string | null = (user.email as string | null) ?? (meta.email as string | null) ?? null;
-    try {
-      const { data: prow } = await supabase
-        .from('profiles')
-        .select('id, username, email, full_name')
-        .eq('id', uid)
-        .maybeSingle<any>();
-      existingProfileUsername = (prow?.username as string | null) ?? null;
-      hasProfileRow = !!prow;
-    } catch {}
+    const email = getNormalizedUserEmail(user);
+    const displayName = deriveDisplayName(user);
 
-    // Ensure a profile row exists for this auth user (non-destructive)
-    // Also ensure email is saved to profiles.email
-    if (!hasProfileRow) {
-      try {
-        await supabase
-          .from('profiles')
-          .upsert({ 
-            id: uid,
-            email: email ? email.toLowerCase() : null
-          } as any, { onConflict: 'id' });
-        hasProfileRow = true;
-      } catch {}
-    } else if (email) {
-      // Update email if profile exists but email is missing
-      try {
-        const { data: existingProfile } = await supabase
-          .from('profiles')
-          .select('email')
-          .eq('id', uid)
-          .maybeSingle();
-        if (!existingProfile?.email) {
-          await supabase
-            .from('profiles')
-            .update({ email: email.toLowerCase() } as any)
-            .eq('id', uid);
-        }
-      } catch {}
+    const { data: prow, error: profileReadError } = await db
+      .from('profiles')
+      .select('id, username, email, full_name')
+      .eq('id', uid)
+      .maybeSingle<any>();
+
+    if (profileReadError) {
+      console.warn('[auth-callback] Failed to read profile for OAuth user', profileReadError);
+    } else {
+      existingProfileUsername = (prow?.username as string | null) ?? null;
+      existingProfileEmail = (prow?.email as string | null) ?? null;
+      existingProfileFullName = (prow?.full_name as string | null) ?? null;
+      hasProfileRow = !!prow;
     }
 
-    // Use profile username if it exists
     let finalUsername: string | null = existingProfileUsername;
 
-    // Otherwise, compute it from metadata (SignUp provided value or provider info)
     if (!finalUsername) {
-      const emailForUsername: string | undefined = user.email || meta.email;
+      const emailForUsername: string | undefined = email ?? user.email ?? meta.email;
       const preferred: string | undefined = meta.preferred_username || meta.user_name || meta.username;
       const name: string | undefined = meta.name || meta.full_name;
 
@@ -105,32 +94,48 @@ async function ensureUsername(supabase: Awaited<ReturnType<typeof createClient>>
       if (candidate.length < 3) candidate = `${candidate}${Math.random().toString(36).slice(2, 6)}`;
       candidate = sanitizeUsername(candidate);
 
-      // If we stashed a desired username at signup, prefer that (email/password flow)
       if (meta && typeof meta.username === 'string') {
         const desired = sanitizeUsername(meta.username);
         if (desired.length >= 3) candidate = desired;
       }
 
-      // Ensure uniqueness: append suffix until unique
       let unique = candidate;
       for (let i = 0; i < 10; i++) {
-        const { data: clash, error } = await supabase
+        const { data: clash, error } = await db
           .from('profiles')
           .select('id')
           .eq('username', unique)
           .maybeSingle<any>();
-        if (error) break; // do not hard fail
+        if (error) break;
         if (!clash || clash.id === uid) break;
         unique = `${candidate}${i + 2}`.slice(0, 32);
       }
       finalUsername = unique;
     }
 
-    // Persist only where missing
-    if (!existingProfileUsername && finalUsername) {
-      try { await supabase.from('profiles').update({ username: finalUsername } as any).eq('id', uid); } catch {}
+    const updates: Record<string, string> = {};
+    if (email && sanitizeEmail(existingProfileEmail ?? '') !== email) updates.email = email;
+    if (!existingProfileFullName && displayName) updates.full_name = displayName;
+    if (!existingProfileUsername && finalUsername) updates.username = finalUsername;
+
+    if (hasProfileRow) {
+      if (Object.keys(updates).length) {
+        const { error: updateError } = await db.from('profiles').update(updates as any).eq('id', uid);
+        if (updateError) console.warn('[auth-callback] Failed to update profile for OAuth user', updateError);
+      }
+    } else {
+      const payload = {
+        id: uid,
+        email,
+        full_name: displayName,
+        username: finalUsername,
+      };
+      const { error: upsertError } = await db.from('profiles').upsert(payload as any, { onConflict: 'id' });
+      if (upsertError) console.warn('[auth-callback] Failed to create profile for OAuth user', upsertError);
     }
-  } catch {}
+  } catch (error) {
+    console.warn('[auth-callback] Failed to ensure OAuth profile fields', error);
+  }
 }
 
 export async function GET(request: Request) {
@@ -142,7 +147,7 @@ export async function GET(request: Request) {
     const supabase = await createClient()
     const { error } = await supabase.auth.exchangeCodeForSession(code)
     if (!error) {
-      // Best-effort populate username after OAuth/email confirmation
+      // Best-effort populate username/email after OAuth/email confirmation.
       await ensureUsername(supabase)
       const forwardedHost = request.headers.get('x-forwarded-host')
       const isLocalEnv = process.env.NODE_ENV === 'development'
