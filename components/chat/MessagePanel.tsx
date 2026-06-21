@@ -26,6 +26,21 @@ type Props = { threadId: string; workspaceId: string; title?: string | null; isC
 type UserLite = { id: string; email: string | null };
 type UserMeta = { label: string | null; email: string | null; avatar_url: string | null };
 
+function withThreadTitle(old: any, threadId: string, nextTitle: string | null) {
+  const updateThread = (thread: any) =>
+    thread?.id === threadId ? { ...thread, title: nextTitle } : thread;
+
+  if (!old) return old;
+  if (Array.isArray(old)) return old.map(updateThread);
+  if (old.pages && Array.isArray(old.pages)) {
+    return {
+      ...old,
+      pages: old.pages.map((page: any) => (Array.isArray(page) ? page.map(updateThread) : page)),
+    };
+  }
+  return old;
+}
+
 export default function MessagePanel({ threadId, workspaceId, title: titleProp, isCreator: isCreatorProp, onTitleUpdated }: Props) {
   const supabase = useMemo(() => createClient(), []);
   const queryClient = useQueryClient();
@@ -66,7 +81,7 @@ export default function MessagePanel({ threadId, workspaceId, title: titleProp, 
       try {
         const { data: profs } = await supabase
           .from("profiles")
-          .select("id, email, avatar_url, full_name")
+          .select("id, email, avatar_url, full_name, username")
           .in("id", unique);
         const meta: Record<string, UserMeta> = {};
         ((profs ?? []) as any[]).forEach((row) => {
@@ -93,14 +108,15 @@ export default function MessagePanel({ threadId, workspaceId, title: titleProp, 
       } catch {
         const { data: profs } = await supabase
           .from("profiles")
-          .select("id, email, avatar_url")
+          .select("id, email, avatar_url, username")
           .in("id", unique);
         const meta: Record<string, UserMeta> = {};
         (profs ?? []).forEach((row: any) => {
           const id = String(row.id);
           const email = (row.email as string | null) ?? null;
+          const username = (row.username as string | null) ?? null;
           meta[id] = {
-            label: getUserDisplayName({ email, id }),
+            label: getUserDisplayName({ username, email, id }),
             email: email?.trim() ?? null,
             avatar_url: (row.avatar_url as string | null) ?? null,
           };
@@ -113,10 +129,10 @@ export default function MessagePanel({ threadId, workspaceId, title: titleProp, 
             const query = encodeURIComponent(missingIds.join(','))
             const res = await fetch(`/api/users/by-ids?ids=${query}`, { cache: 'no-store' })
             if (res.ok) {
-              const data: Array<{ id: string; email: string; full_name?: string }> = await res.json()
+              const data: Array<{ id: string; email: string; full_name?: string; username?: string }> = await res.json()
               data.forEach((entry) => {
                 meta[entry.id] = {
-                  label: getUserDisplayName({ full_name: entry.full_name, email: entry.email, id: entry.id }),
+                  label: getUserDisplayName({ full_name: entry.full_name, username: entry.username, email: entry.email, id: entry.id }),
                   email: entry.email,
                   avatar_url: null,
                 }
@@ -149,7 +165,7 @@ export default function MessagePanel({ threadId, workspaceId, title: titleProp, 
       await queryClient.cancelQueries({ queryKey: ["threads", workspaceId] });
       
       // Snapshot previous values
-      const previousThreads = queryClient.getQueryData(["threads", workspaceId]);
+      const previousThreadQueries = queryClient.getQueriesData({ queryKey: ["threads", workspaceId] });
       const previousTitle = threadTitle;
       
       // Optimistically update local state
@@ -158,28 +174,10 @@ export default function MessagePanel({ threadId, workspaceId, title: titleProp, 
       
       queryClient.setQueriesData(
         { queryKey: ["threads", workspaceId] },
-        (old: any) => {
-          if (!old) return old;
-          if (old.pages && Array.isArray(old.pages)) {
-            return {
-              ...old,
-              pages: old.pages.map((page: any) =>
-                page.map((thread: any) =>
-                  thread.id === threadId ? { ...thread, title: nextTitle } : thread
-                )
-              ),
-            };
-          }
-          if (Array.isArray(old)) {
-            return old.map((thread: any) =>
-              thread.id === threadId ? { ...thread, title: nextTitle } : thread
-            );
-          }
-          return old;
-        }
+        (old: any) => withThreadTitle(old, threadId, nextTitle)
       );
       
-      return { previousThreads, previousTitle };
+      return { previousThreadQueries, previousTitle };
     },
     onError: (e: any, _nextTitle, context) => {
       // Rollback on error
@@ -187,8 +185,10 @@ export default function MessagePanel({ threadId, workspaceId, title: titleProp, 
         setThreadTitle(context.previousTitle);
         onTitleUpdated?.(context.previousTitle);
       }
-      if (context?.previousThreads) {
-        queryClient.setQueryData(["threads", workspaceId], context.previousThreads);
+      if (context?.previousThreadQueries) {
+        context.previousThreadQueries.forEach(([queryKey, data]: any) => {
+          queryClient.setQueryData(queryKey, data);
+        });
       }
       toast.error(e?.message ?? "Failed to update title");
     },

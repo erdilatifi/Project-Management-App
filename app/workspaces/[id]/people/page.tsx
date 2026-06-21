@@ -14,6 +14,7 @@ import { getWorkspaceRole } from '@/utils/permissions'
 import { useRouter } from 'next/navigation'
 import { Search, X, UserMinus, Loader2, ArrowLeft, Users } from 'lucide-react'
 import { getProfileRoleTitle, PROFILE_ROLE_COLUMN } from '@/lib/profileFields'
+import { getUserDisplayName } from '@/utils/userDisplay'
 
 export default function WorkspacePeoplePage() {
   const { id } = useParams<{ id: string }>()
@@ -69,19 +70,19 @@ export default function WorkspacePeoplePage() {
       const ids = (members ?? []).map((m: any) => m.user_id)
       let profileMap: Record<
         string,
-        { email: string | null; avatar_url: string | null; username: string | null; full_name: string | null; job_title: string | null }
+        { email: string | null; avatar_url: string | null; full_name: string | null; username: string | null; job_title: string | null }
       > = {}
       if (ids.length) {
         // Try to select role_title first (actual column name), fall back without it
         const profsRes = await supabase
           .from('profiles')
-          .select(`id, email, avatar_url, full_name, ${PROFILE_ROLE_COLUMN}`)
+          .select(`id, email, avatar_url, full_name, username, ${PROFILE_ROLE_COLUMN}`)
           .in('id', ids)
         if (profsRes.error) {
           // If the column doesn't exist, try without it
           const fallbackRes = await supabase
             .from('profiles')
-            .select('id, email, avatar_url, full_name')
+            .select('id, email, avatar_url, full_name, username')
             .in('id', ids)
           if (!fallbackRes.error) {
             const profs = fallbackRes?.data as any[] | null
@@ -91,8 +92,8 @@ export default function WorkspacePeoplePage() {
                 {
                   email: (p.email as string | null) ?? null,
                   avatar_url: (p.avatar_url as string | null) ?? null,
-                  username: (p.username as string | null) ?? null,
                   full_name: (p.full_name as string | null) ?? null,
+                  username: (p.username as string | null) ?? null,
                   job_title: null,
                 },
               ])
@@ -108,8 +109,8 @@ export default function WorkspacePeoplePage() {
               {
                 email: (p.email as string | null) ?? null,
                 avatar_url: (p.avatar_url as string | null) ?? null,
-                username: (p.username as string | null) ?? null,
                 full_name: (p.full_name as string | null) ?? null,
+                username: (p.username as string | null) ?? null,
                 job_title: getProfileRoleTitle(p) || null,
               },
             ])
@@ -123,12 +124,13 @@ export default function WorkspacePeoplePage() {
             const query = encodeURIComponent(missingIds.join(','))
             const res = await fetch(`/api/users/by-ids?ids=${query}`, { cache: 'no-store' })
             if (res.ok) {
-              const data: Array<{ id: string; email: string; full_name?: string }> = await res.json()
+              const data: Array<{ id: string; email: string; full_name?: string; username?: string }> = await res.json()
               data.forEach((entry) => {
                 profileMap[entry.id] = {
                   email: entry.email,
                   avatar_url: null,
                   full_name: entry.full_name ?? null,
+                  username: entry.username ?? null,
                   job_title: null,
                 }
               })
@@ -139,17 +141,19 @@ export default function WorkspacePeoplePage() {
       const newRows = (members ?? []).map((m: any) => {
           const id = m.user_id
           const profile = profileMap[id]
-          const fullName = profile?.full_name ? profile.full_name.trim() : null
-          const username = profile?.username ? profile.username.trim() : null
-          // Use profile email for display name
           const email = profile?.email ?? null
-          const nameCandidate = fullName || username || null
-          const displayName = nameCandidate || (email ? email.split('@')[0] : 'Team Member')
+          const displayName = getUserDisplayName({
+            full_name: profile?.full_name ?? null,
+            username: profile?.username ?? null,
+            email,
+            id,
+          })
           return {
             workspace_id: m.workspace_id,
             user_id: id,
             role: m.role,
             name: displayName,
+            username: profile?.username ?? null,
             email,
             avatar_url: profile?.avatar_url ?? null,
             job_title: profile?.job_title ?? null,
@@ -266,9 +270,10 @@ export default function WorkspacePeoplePage() {
     return rows.filter((m) => {
       const nameMatch = m.name ? m.name.toLowerCase().includes(query) : false
       const emailMatch = m.email ? m.email.toLowerCase().includes(query) : false
+      const usernameMatch = m.username ? m.username.toLowerCase().includes(query) : false
       const jobMatch = m.job_title ? m.job_title.toLowerCase().includes(query) : false
       const roleMatch = m.role ? m.role.toLowerCase().includes(query) : false
-      return nameMatch || emailMatch || jobMatch || roleMatch
+      return nameMatch || usernameMatch || emailMatch || jobMatch || roleMatch
     })
   }, [rows, searchQuery])
 
