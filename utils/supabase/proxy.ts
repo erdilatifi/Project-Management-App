@@ -2,6 +2,19 @@ import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
 export async function updateSession(request: NextRequest) {
+  // If an OAuth/PKCE `code` lands on a non-callback path (e.g. Supabase's
+  // configured Site URL points at "/"), forward it to the callback route so the
+  // code is exchanged for a session and the user is sent to their workspace.
+  const oauthCode = request.nextUrl.searchParams.get('code')
+  if (oauthCode && !request.nextUrl.pathname.startsWith('/auth/callback')) {
+    const callbackUrl = request.nextUrl.clone()
+    callbackUrl.pathname = '/auth/callback'
+    if (!callbackUrl.searchParams.get('next')) {
+      callbackUrl.searchParams.set('next', '/workspaces')
+    }
+    return NextResponse.redirect(callbackUrl)
+  }
+
   let supabaseResponse = NextResponse.next({
     request,
   })
