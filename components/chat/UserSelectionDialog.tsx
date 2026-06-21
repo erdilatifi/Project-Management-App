@@ -53,21 +53,26 @@ export default function UserSelectionDialog({
 
   // Fetch workspace members
   useEffect(() => {
-    if (!open || !workspaceId || !currentUserId) return
+    if (!open || !workspaceId) return
 
     const fetchUsers = async () => {
       setLoading(true)
       try {
-        // Get workspace members (excluding current user)
-        const { data: members, error } = await supabase
+        // Get workspace members (excluding current user if known)
+        let query = supabase
           .from('workspace_members')
           .select('user_id')
           .eq('workspace_id', workspaceId)
-          .neq('user_id', currentUserId)
+
+        if (currentUserId) {
+          query = query.neq('user_id', currentUserId)
+        }
+
+        const { data: members, error } = await query
 
         if (error) throw error
 
-        const userIds = members?.map(m => m.user_id) || []
+        const userIds = (members ?? []).map((m: any) => m.user_id as string)
         
         if (userIds.length === 0) {
           setUsers([])
@@ -80,22 +85,44 @@ export default function UserSelectionDialog({
           .select('id, email, username, full_name, avatar_url')
           .in('id', userIds)
 
-        const merged: User[] = (profiles ?? []).map((row: any) => {
+        // Build a map of profiles by id for quick lookup
+        const profileMap = new Map(
+          (profiles ?? []).map((p: any) => [p.id as string, p])
+        )
+
+        // For members who have no profile row, try to fetch their email via the admin API
+        const missingIds = userIds.filter((uid) => !profileMap.has(uid))
+        if (missingIds.length) {
+          try {
+            const query = encodeURIComponent(missingIds.join(','))
+            const res = await fetch(`/api/users/by-ids?ids=${query}`, { cache: 'no-store' })
+            if (res.ok) {
+              const data: Array<{ id: string; email: string }> = await res.json()
+              data.forEach((entry) => {
+                profileMap.set(entry.id, { id: entry.id, email: entry.email, username: null, full_name: null, avatar_url: null })
+              })
+            }
+          } catch {}
+        }
+
+        // Merge: every member gets an entry, even without a profile
+        const merged: User[] = userIds.map((uid) => {
+          const row = profileMap.get(uid)
           const displayName = getUserDisplayName({
-            full_name: row.full_name,
-            username: row.username,
-            email: row.email,
-            id: row.id,
-          });
-          
+            full_name: row?.full_name ?? null,
+            username: row?.username ?? null,
+            email: row?.email ?? null,
+            id: uid,
+          })
+
           return {
-            id: row.id,
-            email: (row.email as string | null) ?? null,
-            username: (row.username as string | null) ?? null,
-            full_name: (row.full_name as string | null) ?? null,
-            avatar_url: (row.avatar_url as string | null) ?? null,
+            id: uid,
+            email: row?.email ?? null,
+            username: row?.username ?? null,
+            full_name: row?.full_name ?? null,
+            avatar_url: row?.avatar_url ?? null,
             display_name: displayName,
-          };
+          }
         })
 
         setUsers(merged)

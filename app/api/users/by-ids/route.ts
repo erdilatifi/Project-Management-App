@@ -28,12 +28,36 @@ export async function GET(req: Request) {
       return NextResponse.json({ error: 'Lookup failed' }, { status: 500 })
     }
 
-    const out = ((data ?? []) as Array<{ id: string; email: string | null }>)
+    const out: Array<{ id: string; email: string }> = ((data ?? []) as Array<{ id: string; email: string | null }>)
       .filter((u) => !!u.email && !!u.id)
       .map((u) => ({ id: u.id, email: u.email! }))
+
+    // For IDs that didn't have a profile entry, try looking up via auth admin API
+    const foundIds = new Set(out.map((u) => u.id))
+    const missingIds = ids.filter((id) => !foundIds.has(id))
+
+    if (missingIds.length && process.env.SUPABASE_SERVICE_ROLE_KEY) {
+      try {
+        const adminClient = createAdminClient()
+        // Fetch each missing user individually from auth
+        const authUserResults = await Promise.allSettled(
+          missingIds.map((id) => adminClient.auth.admin.getUserById(id))
+        )
+        authUserResults.forEach((result) => {
+          if (result.status === 'fulfilled') {
+            const { data: userData } = result.value
+            const user = userData?.user
+            if (user?.id && user?.email) {
+              out.push({ id: user.id, email: user.email })
+            }
+          }
+        })
+      } catch {}
+    }
 
     return NextResponse.json(out)
   } catch (e) {
     return NextResponse.json({ error: 'Lookup failed' }, { status: 500 })
   }
 }
+
