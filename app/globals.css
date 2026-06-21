@@ -253,14 +253,14 @@ html {
 @keyframes hero-kanban-drag {
   0%   { transform: translateX(0) translateY(0) rotate(0deg) scale(0.98); opacity: 0; }
   6%   { transform: translateX(0) translateY(0) rotate(0deg) scale(1); opacity: 1; }
-  16%  { transform: translateX(0) translateY(-8px) rotate(-2deg) scale(1.02); opacity: 1; box-shadow: 0 20px 40px -10px rgba(0,0,0,0.8); z-index: 50; }
-  36%  { transform: translateX(calc(100% + 16px)) translateY(-8px) rotate(-2deg) scale(1.02); opacity: 1; box-shadow: 0 20px 40px -10px rgba(0,0,0,0.8); z-index: 50; }
-  44%  { transform: translateX(calc(100% + 16px)) translateY(0) rotate(0deg) scale(1); opacity: 1; box-shadow: none; z-index: 10; }
-  56%  { transform: translateX(calc(100% + 16px)) translateY(0) rotate(0deg) scale(1); opacity: 1; box-shadow: none; z-index: 10; }
-  64%  { transform: translateX(calc(100% + 16px)) translateY(-8px) rotate(2deg) scale(1.02); opacity: 1; box-shadow: 0 20px 40px -10px rgba(0,0,0,0.8); z-index: 50; }
-  84%  { transform: translateX(calc(200% + 32px)) translateY(-8px) rotate(2deg) scale(1.02); opacity: 1; box-shadow: 0 20px 40px -10px rgba(0,0,0,0.8); z-index: 50; }
-  92%  { transform: translateX(calc(200% + 32px)) translateY(0) rotate(0deg) scale(1); opacity: 1; box-shadow: none; z-index: 10; }
-  100% { transform: translateX(calc(200% + 32px)) translateY(0) rotate(0deg) scale(1); opacity: 0; box-shadow: none; z-index: 10; }
+  16%  { transform: translateX(0) translateY(-8px) rotate(-1.5deg) scale(1.01); opacity: 1; box-shadow: 0 20px 40px -10px rgba(0,0,0,0.9); }
+  36%  { transform: translateX(calc(100% + 32px)) translateY(-8px) rotate(-1.5deg) scale(1.01); opacity: 1; box-shadow: 0 20px 40px -10px rgba(0,0,0,0.9); }
+  44%  { transform: translateX(calc(100% + 32px)) translateY(0) rotate(0deg) scale(1); opacity: 1; box-shadow: none; }
+  56%  { transform: translateX(calc(100% + 32px)) translateY(0) rotate(0deg) scale(1); opacity: 1; box-shadow: none; }
+  64%  { transform: translateX(calc(100% + 32px)) translateY(-8px) rotate(1.5deg) scale(1.01); opacity: 1; box-shadow: 0 20px 40px -10px rgba(0,0,0,0.9); }
+  84%  { transform: translateX(calc(200% + 64px)) translateY(-8px) rotate(1.5deg) scale(1.01); opacity: 1; box-shadow: 0 20px 40px -10px rgba(0,0,0,0.9); }
+  92%  { transform: translateX(calc(200% + 64px)) translateY(0) rotate(0deg) scale(1); opacity: 1; box-shadow: none; }
+  100% { transform: translateX(calc(200% + 64px)) translateY(0) rotate(0deg) scale(1); opacity: 0; box-shadow: none; }
 }
 @keyframes feed-item-in {
   from { opacity: 0; transform: translateY(10px); }
