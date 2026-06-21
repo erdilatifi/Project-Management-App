@@ -117,26 +117,21 @@ export default function NotificationBell() {
     if (user?.id) load()
   }, [user?.id, load])
 
-  // Polling fallback - refresh notifications every 10 seconds when bell is open
+  // Polling fallback - refresh notifications every 15 seconds to ensure we catch anything missed by realtime
   useEffect(() => {
-    if (!open || !user?.id) return
+    if (!user?.id) return
 
-    console.log('[notification-bell] Starting polling (bell is open)')
-
-    // Immediate load when opening
-    load()
-
-    // Poll every 10 seconds
+    // We don't need immediate load here if it's already done by the other useEffect
+    // when user.id changes. This just sets up the continuous background check.
     const interval = setInterval(() => {
-      console.log('[notification-bell] Polling for new notifications')
-      load()
-    }, 10000)
+      // Don't poll if we're currently loading more or if the user is scrolling back through history
+      if (!loadingMore) {
+        load()
+      }
+    }, 15000)
 
-    return () => {
-      console.log('[notification-bell] Stopping polling (bell closed)')
-      clearInterval(interval)
-    }
-  }, [open, user?.id, load])
+    return () => clearInterval(interval)
+  }, [user?.id, loadingMore, load])
 
   // Infinite scroll observer
   useEffect(() => {
