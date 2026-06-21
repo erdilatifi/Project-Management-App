@@ -50,6 +50,7 @@ export type Member = {
   user_id: string
   role: MemberRole
   name?: string | null
+  username?: string | null
   email?: string | null
   avatar_url?: string | null
   job_title?: string | null

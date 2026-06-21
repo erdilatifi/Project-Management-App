@@ -141,19 +141,19 @@ export function CreateTaskDialog({
           })
         );
         // Fetch profile data
-        let profilesMap: Record<string, { username: string | null; full_name: string | null; email: string | null }> = {};
+        let profilesMap: Record<string, { full_name: string | null; username: string | null; email: string | null }> = {};
         try {
           if (ids.length) {
             const { data: profs } = await supabase
               .from("profiles")
-              .select("id, full_name, email")
+              .select("id, full_name, username, email")
               .in("id", ids);
             profilesMap = Object.fromEntries(
               (profs ?? []).map((p: any) => [
                 String(p.id),
                 {
-                  username: (p.username as string | null) ?? null,
                   full_name: (p.full_name as string | null) ?? null,
+                  username: (p.username as string | null) ?? null,
                   email: (p.email as string | null) ?? null,
                 },
               ])
@@ -166,9 +166,9 @@ export function CreateTaskDialog({
                 const query = encodeURIComponent(missingIds.join(','));
                 const res = await fetch(`/api/users/by-ids?ids=${query}`, { cache: 'no-store' });
                 if (res.ok) {
-                  const data: Array<{ id: string; email: string; full_name?: string }> = await res.json();
+                  const data: Array<{ id: string; email: string; full_name?: string; username?: string }> = await res.json();
                   data.forEach((entry) => {
-                    profilesMap[entry.id] = { full_name: entry.full_name ?? null, email: entry.email };
+                    profilesMap[entry.id] = { full_name: entry.full_name ?? null, username: entry.username ?? null, email: entry.email };
                   });
                 }
               } catch {}
