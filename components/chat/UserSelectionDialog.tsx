@@ -82,7 +82,7 @@ export default function UserSelectionDialog({
         // Get user details from profiles table
         const { data: profiles } = await supabase
           .from('profiles')
-          .select('id, email, username, full_name, avatar_url')
+          .select('id, email, full_name, avatar_url')
           .in('id', userIds)
 
         // Build a map of profiles by id for quick lookup
@@ -97,9 +97,9 @@ export default function UserSelectionDialog({
             const query = encodeURIComponent(missingIds.join(','))
             const res = await fetch(`/api/users/by-ids?ids=${query}`, { cache: 'no-store' })
             if (res.ok) {
-              const data: Array<{ id: string; email: string }> = await res.json()
+              const data: Array<{ id: string; email: string; full_name?: string }> = await res.json()
               data.forEach((entry) => {
-                profileMap.set(entry.id, { id: entry.id, email: entry.email, username: null, full_name: null, avatar_url: null })
+                profileMap.set(entry.id, { id: entry.id, email: entry.email, full_name: entry.full_name ?? null, avatar_url: null })
               })
             }
           } catch {}

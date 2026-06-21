@@ -65,7 +65,7 @@ async function ensureUsername(supabase: Awaited<ReturnType<typeof createClient>>
 
     const { data: prow, error: profileReadError } = await db
       .from('profiles')
-      .select('id, username, email, full_name')
+      .select('id, email, full_name')
       .eq('id', uid)
       .maybeSingle<any>();
 
@@ -98,25 +98,12 @@ async function ensureUsername(supabase: Awaited<ReturnType<typeof createClient>>
         const desired = sanitizeUsername(meta.username);
         if (desired.length >= 3) candidate = desired;
       }
-
-      let unique = candidate;
-      for (let i = 0; i < 10; i++) {
-        const { data: clash, error } = await db
-          .from('profiles')
-          .select('id')
-          .eq('username', unique)
-          .maybeSingle<any>();
-        if (error) break;
-        if (!clash || clash.id === uid) break;
-        unique = `${candidate}${i + 2}`.slice(0, 32);
-      }
-      finalUsername = unique;
+      finalUsername = candidate;
     }
 
     const updates: Record<string, string> = {};
     if (email && sanitizeEmail(existingProfileEmail ?? '') !== email) updates.email = email;
     if (!existingProfileFullName && displayName) updates.full_name = displayName;
-    if (!existingProfileUsername && finalUsername) updates.username = finalUsername;
 
     if (hasProfileRow) {
       if (Object.keys(updates).length) {
@@ -128,7 +115,6 @@ async function ensureUsername(supabase: Awaited<ReturnType<typeof createClient>>
         id: uid,
         email,
         full_name: displayName,
-        username: finalUsername,
       };
       const { error: upsertError } = await db.from('profiles').upsert(payload as any, { onConflict: 'id' });
       if (upsertError) console.warn('[auth-callback] Failed to create profile for OAuth user', upsertError);

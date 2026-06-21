@@ -66,7 +66,7 @@ export default function MessagePanel({ threadId, workspaceId, title: titleProp, 
       try {
         const { data: profs } = await supabase
           .from("profiles")
-          .select("id, email, avatar_url, username, full_name")
+          .select("id, email, avatar_url, full_name")
           .in("id", unique);
         const meta: Record<string, UserMeta> = {};
         ((profs ?? []) as any[]).forEach((row) => {
@@ -98,14 +98,36 @@ export default function MessagePanel({ threadId, workspaceId, title: titleProp, 
         const meta: Record<string, UserMeta> = {};
         (profs ?? []).forEach((row: any) => {
           const id = String(row.id);
+          const email = (row.email as string | null) ?? null;
           meta[id] = {
-            label: (row.email as string | null) ?? null,
-            email: (row.email as string | null) ?? null,
+            label: getUserDisplayName({ email, id }),
+            email: email?.trim() ?? null,
             avatar_url: (row.avatar_url as string | null) ?? null,
           };
         });
+        
+        // Use auth metadata fallback for missing profiles
+        const missingIds = unique.filter((uid) => !meta[uid])
+        if (missingIds.length) {
+          try {
+            const query = encodeURIComponent(missingIds.join(','))
+            const res = await fetch(`/api/users/by-ids?ids=${query}`, { cache: 'no-store' })
+            if (res.ok) {
+              const data: Array<{ id: string; email: string; full_name?: string }> = await res.json()
+              data.forEach((entry) => {
+                meta[entry.id] = {
+                  label: getUserDisplayName({ full_name: entry.full_name, email: entry.email, id: entry.id }),
+                  email: entry.email,
+                  avatar_url: null,
+                }
+              })
+            }
+          } catch {}
+        }
+        
         return meta;
       }
+
     },
     [supabase]
   );
@@ -134,14 +156,26 @@ export default function MessagePanel({ threadId, workspaceId, title: titleProp, 
       setThreadTitle(nextTitle);
       onTitleUpdated?.(nextTitle ?? null);
       
-      // Optimistically update thread list cache
       queryClient.setQueriesData(
         { queryKey: ["threads", workspaceId] },
         (old: any) => {
           if (!old) return old;
-          return old.map((thread: any) =>
-            thread.id === threadId ? { ...thread, title: nextTitle } : thread
-          );
+          if (old.pages && Array.isArray(old.pages)) {
+            return {
+              ...old,
+              pages: old.pages.map((page: any) =>
+                page.map((thread: any) =>
+                  thread.id === threadId ? { ...thread, title: nextTitle } : thread
+                )
+              ),
+            };
+          }
+          if (Array.isArray(old)) {
+            return old.map((thread: any) =>
+              thread.id === threadId ? { ...thread, title: nextTitle } : thread
+            );
+          }
+          return old;
         }
       );
       

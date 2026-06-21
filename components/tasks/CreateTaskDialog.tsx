@@ -146,7 +146,7 @@ export function CreateTaskDialog({
           if (ids.length) {
             const { data: profs } = await supabase
               .from("profiles")
-              .select("id, username, full_name, email")
+              .select("id, full_name, email")
               .in("id", ids);
             profilesMap = Object.fromEntries(
               (profs ?? []).map((p: any) => [
@@ -166,9 +166,9 @@ export function CreateTaskDialog({
                 const query = encodeURIComponent(missingIds.join(','));
                 const res = await fetch(`/api/users/by-ids?ids=${query}`, { cache: 'no-store' });
                 if (res.ok) {
-                  const data: Array<{ id: string; email: string }> = await res.json();
+                  const data: Array<{ id: string; email: string; full_name?: string }> = await res.json();
                   data.forEach((entry) => {
-                    profilesMap[entry.id] = { username: null, full_name: null, email: entry.email };
+                    profilesMap[entry.id] = { full_name: entry.full_name ?? null, email: entry.email };
                   });
                 }
               } catch {}

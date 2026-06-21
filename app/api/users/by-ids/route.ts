@@ -28,9 +28,9 @@ export async function GET(req: Request) {
       return NextResponse.json({ error: 'Lookup failed' }, { status: 500 })
     }
 
-    const out: Array<{ id: string; email: string }> = ((data ?? []) as Array<{ id: string; email: string | null }>)
+    const out: Array<{ id: string; email: string; full_name?: string }> = ((data ?? []) as Array<{ id: string; email: string | null; full_name?: string }>)
       .filter((u) => !!u.email && !!u.id)
-      .map((u) => ({ id: u.id, email: u.email! }))
+      .map((u) => ({ id: u.id, email: u.email!, full_name: u.full_name }))
 
     // For IDs that didn't have a profile entry, try looking up via auth admin API
     const foundIds = new Set(out.map((u) => u.id))
@@ -48,7 +48,9 @@ export async function GET(req: Request) {
             const { data: userData } = result.value
             const user = userData?.user
             if (user?.id && user?.email) {
-              out.push({ id: user.id, email: user.email })
+              const meta = user.user_metadata || {}
+              const fullName = meta.full_name || meta.name || meta.username || meta.preferred_username || undefined;
+              out.push({ id: user.id, email: user.email, full_name: fullName })
             }
           }
         })

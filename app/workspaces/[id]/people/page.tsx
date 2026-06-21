@@ -75,13 +75,13 @@ export default function WorkspacePeoplePage() {
         // Try to select role_title first (actual column name), fall back without it
         const profsRes = await supabase
           .from('profiles')
-          .select(`id, email, avatar_url, username, full_name, ${PROFILE_ROLE_COLUMN}`)
+          .select(`id, email, avatar_url, full_name, ${PROFILE_ROLE_COLUMN}`)
           .in('id', ids)
         if (profsRes.error) {
           // If the column doesn't exist, try without it
           const fallbackRes = await supabase
             .from('profiles')
-            .select('id, email, avatar_url, username, full_name')
+            .select('id, email, avatar_url, full_name')
             .in('id', ids)
           if (!fallbackRes.error) {
             const profs = fallbackRes?.data as any[] | null
@@ -123,13 +123,12 @@ export default function WorkspacePeoplePage() {
             const query = encodeURIComponent(missingIds.join(','))
             const res = await fetch(`/api/users/by-ids?ids=${query}`, { cache: 'no-store' })
             if (res.ok) {
-              const data: Array<{ id: string; email: string }> = await res.json()
+              const data: Array<{ id: string; email: string; full_name?: string }> = await res.json()
               data.forEach((entry) => {
                 profileMap[entry.id] = {
                   email: entry.email,
                   avatar_url: null,
-                  username: null,
-                  full_name: null,
+                  full_name: entry.full_name ?? null,
                   job_title: null,
                 }
               })
