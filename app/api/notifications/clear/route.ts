@@ -3,6 +3,10 @@ import { createClient as createServerSupabase } from '@/utils/supabase/server'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { authenticateRequest } from '@/lib/validation/middleware'
 
+function getDb(supabase: Awaited<ReturnType<typeof createServerSupabase>>) {
+  return process.env.SUPABASE_SERVICE_ROLE_KEY ? createAdminClient() : supabase
+}
+
 export async function POST() {
   try {
     const supabase = await createServerSupabase()
@@ -13,8 +17,8 @@ export async function POST() {
     }
     const userId = authResult.userId
 
-    const admin = createAdminClient()
-    const { error: delErr } = await admin.from('notifications').delete().eq('user_id', userId)
+    const db = getDb(supabase)
+    const { error: delErr } = await db.from('notifications').delete().eq('user_id', userId)
     if (delErr) {
       console.error('[clear-notifications] database error', delErr)
       return NextResponse.json({ error: delErr.message }, { status: 400 })
@@ -26,4 +30,3 @@ export async function POST() {
     return NextResponse.json({ error: e?.message ?? 'Failed to clear notifications' }, { status: 500 })
   }
 }
-

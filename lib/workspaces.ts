@@ -311,15 +311,20 @@ export async function assignTask(taskId: string, assigneeId: string): Promise<{ 
   if (error) throw new Error(error.message)
   if (!task) throw new Error('Task not found')
 
-  await supabase.from('notifications').insert({
-    user_id: assigneeId,
-    type: 'task_assigned',
-    ref_id: taskId,
-    workspace_id: task.workspace_id ?? null,
-    title: 'Task assigned',
-    body: task.title ? `You were assigned: ${task.title}` : null,
-    is_read: false,
-  } as any)
+  try {
+    await fetch('/api/notifications/fanout', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        type: 'task_assigned',
+        actorId: user.id,
+        recipients: [assigneeId],
+        workspaceId: task.workspace_id ?? null,
+        taskId,
+        meta: { task_title: task.title ?? null },
+      }),
+    })
+  } catch {}
 
   return { id: taskId }
 }

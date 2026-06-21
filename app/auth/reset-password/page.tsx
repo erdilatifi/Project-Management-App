@@ -45,7 +45,7 @@ const ResetPasswordPage = () => {
         setIsSuccess(true)
         toast.success('Password updated successfully!')
         setTimeout(() => {
-          router.push('/login')
+          router.push('/workspaces')
         }, 2000)
       }
     } catch (error) {

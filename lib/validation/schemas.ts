@@ -177,10 +177,11 @@ export const acceptInvitationSchema = z
   .object({
     workspaceId: optionalStr,
     notificationId: optionalStr,
+    invitationId: optionalStr,
     token: z.string().min(6).max(64).optional().nullable().transform((v) => (v == null ? undefined : v)),
   })
-  .refine((data) => !!(data.workspaceId || data.notificationId || data.token), {
-    message: 'workspaceId, notificationId, or token is required',
+  .refine((data) => !!(data.workspaceId || data.notificationId || data.invitationId || data.token), {
+    message: 'workspaceId, notificationId, invitationId, or token is required',
     path: ['workspaceId'],
   })
 
@@ -188,9 +189,10 @@ export const declineInvitationSchema = z
   .object({
     workspaceId: optionalStr,
     notificationId: optionalStr,
+    invitationId: optionalStr,
   })
-  .refine((data) => !!(data.workspaceId || data.notificationId), {
-    message: 'workspaceId or notificationId is required',
+  .refine((data) => !!(data.workspaceId || data.notificationId || data.invitationId), {
+    message: 'workspaceId, notificationId, or invitationId is required',
     path: ['workspaceId'],
   })
 
@@ -204,11 +206,14 @@ export const notificationQuerySchema = z.object({
 })
 
 export const markNotificationsReadSchema = z.object({
-  ids: z.array(z.number().int().positive()).min(1, 'At least one notification ID is required').max(100),
+  ids: z
+    .array(z.union([z.string().min(1), z.number().int().positive()]))
+    .min(1, 'At least one notification ID is required')
+    .max(100),
 })
 
 export const markSingleNotificationReadSchema = z.object({
-  id: z.number().int().positive(),
+  id: z.union([z.string().min(1), z.number().int().positive()]),
 })
 
 // ============================================================================

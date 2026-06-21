@@ -251,14 +251,76 @@ html {
 @keyframes connector-flow { to{ top:140%; } }
 @keyframes cta-pulse { 0%,100%{ opacity:0.7; transform:translateX(-50%) scale(1); } 50%{ opacity:1; transform:translateX(-50%) scale(1.08); } }
 @keyframes hero-kanban-drag {
-  0%   { transform: translateX(0) translateY(0) rotate(0deg) scale(0.96); opacity: 0; }
+  0%   { transform: translateX(0) translateY(0) rotate(0deg) scale(0.98); opacity: 0; }
   6%   { transform: translateX(0) translateY(0) rotate(0deg) scale(1); opacity: 1; }
-  16%  { transform: translateX(0) translateY(-8px) rotate(-3deg) scale(1.03); opacity: 1; box-shadow: 0 20px 40px -10px rgba(0,0,0,0.8); z-index: 50; }
-  36%  { transform: translateX(calc(100% + 16px)) translateY(-8px) rotate(-3deg) scale(1.03); opacity: 1; box-shadow: 0 20px 40px -10px rgba(0,0,0,0.8); z-index: 50; }
+  16%  { transform: translateX(0) translateY(-8px) rotate(-2deg) scale(1.02); opacity: 1; box-shadow: 0 20px 40px -10px rgba(0,0,0,0.8); z-index: 50; }
+  36%  { transform: translateX(calc(100% + 16px)) translateY(-8px) rotate(-2deg) scale(1.02); opacity: 1; box-shadow: 0 20px 40px -10px rgba(0,0,0,0.8); z-index: 50; }
   44%  { transform: translateX(calc(100% + 16px)) translateY(0) rotate(0deg) scale(1); opacity: 1; box-shadow: none; z-index: 10; }
   56%  { transform: translateX(calc(100% + 16px)) translateY(0) rotate(0deg) scale(1); opacity: 1; box-shadow: none; z-index: 10; }
-  64%  { transform: translateX(calc(100% + 16px)) translateY(-8px) rotate(3deg) scale(1.03); opacity: 1; box-shadow: 0 20px 40px -10px rgba(0,0,0,0.8); z-index: 50; }
-  84%  { transform: translateX(calc(200% + 32px)) translateY(-8px) rotate(3deg) scale(1.03); opacity: 1; box-shadow: 0 20px 40px -10px rgba(0,0,0,0.8); z-index: 50; }
+  64%  { transform: translateX(calc(100% + 16px)) translateY(-8px) rotate(2deg) scale(1.02); opacity: 1; box-shadow: 0 20px 40px -10px rgba(0,0,0,0.8); z-index: 50; }
+  84%  { transform: translateX(calc(200% + 32px)) translateY(-8px) rotate(2deg) scale(1.02); opacity: 1; box-shadow: 0 20px 40px -10px rgba(0,0,0,0.8); z-index: 50; }
   92%  { transform: translateX(calc(200% + 32px)) translateY(0) rotate(0deg) scale(1); opacity: 1; box-shadow: none; z-index: 10; }
   100% { transform: translateX(calc(200% + 32px)) translateY(0) rotate(0deg) scale(1); opacity: 0; box-shadow: none; z-index: 10; }
+}
+@keyframes feed-item-in {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes feed-item-out {
+  from { opacity: 1; transform: translateY(0); }
+  to { opacity: 0; transform: translateY(-10px); }
+}
+@keyframes step-light-travel-v {
+  0% { top: 0; opacity: 0; }
+  4% { opacity: 1; }
+  28% { top: 0; opacity: 1; }
+  36% { top: 50%; }
+  60% { top: 50%; opacity: 1; }
+  68% { top: 100%; }
+  92% { top: 100%; opacity: 1; }
+  100% { top: 100%; opacity: 0; }
+}
+@keyframes step-light-travel-h {
+  0% { left: 0; opacity: 0; }
+  4% { opacity: 1; }
+  28% { left: 0; opacity: 1; }
+  36% { left: 50%; }
+  60% { left: 50%; opacity: 1; }
+  68% { left: 100%; }
+  92% { left: 100%; opacity: 1; }
+  100% { left: 100%; opacity: 0; }
+}
+@keyframes step-line-fill-v {
+  0%, 4% { height: 0; }
+  28% { height: 0; }
+  36% { height: 50%; }
+  60% { height: 50%; }
+  68% { height: 100%; }
+  92%, 100% { height: 100%; }
+}
+@keyframes step-line-fill-h {
+  0%, 4% { width: 0; }
+  28% { width: 0; }
+  36% { width: 50%; }
+  60% { width: 50%; }
+  68% { width: 100%; }
+  92%, 100% { width: 100%; }
+}
+@keyframes step-node-glow {
+  0%, 22%, 100% {
+    border-color: rgba(255,255,255,0.22);
+    box-shadow: none;
+    color: var(--lp-ink-dim);
+    background: #0b0d10;
+  }
+  8%, 16% {
+    border-color: rgba(201,255,61,0.85);
+    box-shadow: 0 0 0 4px rgba(201,255,61,0.15), 0 0 24px rgba(201,255,61,0.45);
+    color: #050607;
+    background: #c9ff3d;
+  }
+}
+@keyframes step-card-glow {
+  0%, 22%, 100% { border-color: rgba(255,255,255,0.08); background: rgba(255,255,255,0.02); }
+  8%, 16% { border-color: rgba(201,255,61,0.25); background: rgba(201,255,61,0.04); }
 }

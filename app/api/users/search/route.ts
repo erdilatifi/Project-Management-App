@@ -1,29 +1,31 @@
 import { NextResponse } from 'next/server'
-import { createClient as createAdminClient } from '@supabase/supabase-js'
 import { createClient as createServerSupabase } from '@/utils/supabase/server'
+import { createAdminClient } from '@/utils/supabase/admin'
 import { authenticateRequest } from '@/lib/validation/middleware'
-import { sanitizeSearchQuery, sanitizeEmail } from '@/lib/validation/sanitize'
+import { sanitizeSearchQuery } from '@/lib/validation/sanitize'
+
+function getDb(supabase: Awaited<ReturnType<typeof createServerSupabase>>) {
+  return process.env.SUPABASE_SERVICE_ROLE_KEY ? createAdminClient() : supabase
+}
 
 export async function GET(req: Request) {
   try {
-    // Ensure caller is authenticated (prevents open enumeration)
     const supabase = await createServerSupabase()
     const authResult = await authenticateRequest(supabase)
     if (!authResult.success) {
       return authResult.response
     }
 
-    // Validate and sanitize search query
     const url = new URL(req.url)
     const rawQuery = url.searchParams.get('q') || ''
     const q = sanitizeSearchQuery(rawQuery)
-    
+
     if (!q || q.length < 2) {
       return NextResponse.json([], { status: 200 })
     }
 
-    // Search profiles by email using profiles.email column
-    const { data, error } = await supabase
+    const db = getDb(supabase)
+    const { data, error } = await db
       .from('profiles')
       .select('id, email')
       .ilike('email', `%${q}%`)

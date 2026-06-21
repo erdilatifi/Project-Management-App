@@ -34,6 +34,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { TaskAssignees } from "@/components/tasks/TaskAssignees";
 import { CreateTaskDialog } from "@/components/tasks/CreateTaskDialog";
 import { getUserDisplayName } from "@/utils/userDisplay";
+import { mapTaskRow } from "@/utils/supabase/appActions";
 
 import {
   DndContext,
@@ -627,8 +628,18 @@ export default function ProjectTasksBoardPage() {
         { event: "*", schema: "public", table: "tasks", filter: `project_id=eq.${projectId}` },
         async (payload) => {
           const type = payload.eventType;
-          const row = type === "DELETE" ? (payload.old as TaskRow) : (payload.new as TaskRow);
-          if (!row) return;
+          const raw = type === "DELETE" ? payload.old : payload.new;
+          if (!raw || typeof raw !== "object") return;
+          const mapped = mapTaskRow(raw as Record<string, unknown>);
+          const row: TaskRow = {
+            ...mapped,
+            status: (mapped.status ?? (raw as { status?: Status }).status ?? "todo") as Status,
+            assignee_ids: Array.isArray((raw as { assignee_ids?: string[] }).assignee_ids)
+              ? (raw as { assignee_ids: string[] }).assignee_ids
+              : mapped.assignee_id
+                ? [mapped.assignee_id]
+                : null,
+          };
 
           // For INSERT or UPDATE events, fetch profile data for new assignees before mutating local state.
           if (type === "INSERT" || type === "UPDATE") {

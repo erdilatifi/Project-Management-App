@@ -45,7 +45,7 @@ function slugify(name: string): string {
   return base || `workspace-${Date.now()}`;
 }
 
-function mapTaskRow(row: Record<string, unknown>): TaskRow {
+export function mapTaskRow(row: Record<string, unknown>): TaskRow {
   return {
     id: row.id as string,
     project_id: row.project_id as string,

@@ -112,14 +112,14 @@ export default function WorkspaceMessagesPage() {
         { event: 'DELETE', schema: 'public', table: 'message_threads', filter: `id=eq.${activeThreadId}` },
         () => {
           toast.info("Conversation has been deleted");
-          router.push('/workspaces');
+          router.push(`/workspaces/${workspaceId}/messages`);
         }
       )
       .subscribe();
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [supabase, activeThreadId, router]);
+  }, [supabase, activeThreadId, router, workspaceId]);
 
   // Optimistic title update for mobile header
   const saveTitleMutation = useMutation({

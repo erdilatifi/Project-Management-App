@@ -127,36 +127,146 @@ function LiveFeed() {
   }
 
   return (
-    <div className="relative border-y border-[var(--lp-border)] bg-[#080a0c]/80 overflow-hidden">
-      {/* edge fades */}
-      <div className="absolute top-0 left-0 right-0 h-[28px] bg-gradient-to-b from-[var(--lp-bg)] to-transparent z-10 pointer-events-none" />
-      <div className="absolute bottom-0 left-0 right-0 h-[28px] bg-gradient-to-t from-[var(--lp-bg)] to-transparent z-10 pointer-events-none" />
+    <div className="relative border-y border-[var(--lp-border)] bg-[#080a0c]/90 overflow-hidden">
+      <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(ellipse_80%_120%_at_50%_50%,rgba(201,255,61,0.04),transparent_70%)]" />
 
       {/* live badge */}
-      <div className="absolute top-[10px] right-[16px] z-20 flex items-center gap-[6px] font-mono text-[10px] text-[var(--lp-accent)] tracking-widest uppercase">
+      <div className="absolute top-[12px] right-[20px] z-20 flex items-center gap-[6px] font-mono text-[10px] text-[var(--lp-accent)] tracking-widest uppercase px-[10px] py-[4px] rounded-full border border-[var(--lp-accent-line)] bg-[var(--lp-accent-dim)]">
         <span className="w-[5px] h-[5px] rounded-full bg-[var(--lp-accent)] animate-[pulse-ring_2s_infinite]" />
         LIVE
       </div>
 
-      <div className="flex flex-col items-center py-[16px] gap-0" style={{ minHeight: `${VISIBLE * 44}px` }}>
+      <div className="relative z-10 flex flex-col items-center py-[20px] px-[16px] sm:px-[24px] gap-[2px]" style={{ minHeight: `${VISIBLE * 48 + 24}px` }}>
         {items.map((item, i) => (
           <div
             key={`${offset}-${i}`}
-            className="flex items-center gap-[10px] px-[20px] sm:px-[30px] py-[10px] font-mono text-[12.5px] text-[var(--lp-ink-dim)] whitespace-nowrap w-full max-w-[480px] animate-[feed-item-in_0.6s_cubic-bezier(.16,1,.3,1)_forwards]"
-            style={{ animationDelay: `${i * 0.08}s`, opacity: 0 }}
+            className="flex items-center gap-[10px] sm:gap-[12px] px-[16px] sm:px-[24px] py-[11px] font-mono text-[12.5px] text-[var(--lp-ink-dim)] w-full max-w-[620px] rounded-[12px] border border-transparent bg-white/[0.02] animate-[feed-item-in_0.55s_cubic-bezier(.16,1,.3,1)_forwards]"
+            style={{ animationDelay: `${i * 0.07}s`, opacity: 0 }}
           >
-            <div className="relative">
-              <div className="w-[26px] h-[26px] rounded-full shrink-0 border border-white/10" style={{ background: `linear-gradient(135deg, ${item.color}, ${item.color}88)` }} />
+            <div className="relative shrink-0">
+              <div className="w-[28px] h-[28px] rounded-full border border-white/10" style={{ background: `linear-gradient(135deg, ${item.color}, ${item.color}88)` }} />
               <span className="absolute -bottom-[1px] -right-[1px] w-[8px] h-[8px] rounded-full bg-[var(--lp-accent)] border-[2px] border-[#080a0c]" />
             </div>
-            <span className="font-semibold text-[var(--lp-ink)]">{item.name}</span>
-            <span className="text-[var(--lp-ink-faint)]">{item.action}</span>
-            <span style={{ color: item.color }}>{item.project}</span>
-            <span className="ml-auto text-[10px] text-[var(--lp-ink-faint)] opacity-50">just now</span>
+            <span className="font-semibold text-[var(--lp-ink)] shrink-0">{item.name}</span>
+            <span className="text-[var(--lp-ink-faint)] shrink-0 hidden sm:inline">{item.action}</span>
+            <span className="text-[var(--lp-ink-faint)] shrink-0 sm:hidden truncate max-w-[72px]">{item.action}</span>
+            <span className="truncate" style={{ color: item.color }}>{item.project}</span>
+            <span className="ml-auto text-[10px] text-[var(--lp-ink-faint)] opacity-60 shrink-0">just now</span>
           </div>
         ))}
       </div>
     </div>
+  );
+}
+
+const HOW_IT_WORKS_STEPS = [
+  {
+    num: 1,
+    title: "Invite your team",
+    desc: "Create a workspace, send out invites, and get everyone into the same environment.",
+  },
+  {
+    num: 2,
+    title: "Build the board, assign the work",
+    desc: "Create projects, add tasks, set due dates, and assign them out. Everyone sees the same board, updating in real-time.",
+  },
+  {
+    num: 3,
+    title: "Discuss inline, never lose context",
+    desc: "Use the built-in workspace chat to discuss features, share links, and celebrate wins without ever tabbing over to Slack.",
+  },
+];
+
+function HowItWorksTimeline() {
+  return (
+    <Reveal className="mt-[72px]">
+      {/* Desktop: line sits above cards, connected by short stems */}
+      <div className="hidden lg:block">
+        <div className="relative grid grid-cols-3 gap-[24px]">
+          {/* Connector line — above the cards, through step nodes only */}
+          <div className="absolute left-[calc(16.666%-4px)] right-[calc(16.666%-4px)] top-[18px] h-[2px] rounded-full bg-[var(--lp-border-strong)] overflow-visible pointer-events-none">
+            <div
+              className="absolute left-0 top-0 h-full rounded-full origin-left animate-[step-line-fill-h_10s_ease-in-out_infinite]"
+              style={{
+                background: "linear-gradient(90deg, rgba(201,255,61,0.12), rgba(201,255,61,0.55), rgba(201,255,61,0.12))",
+                boxShadow: "0 0 14px rgba(201,255,61,0.35)",
+              }}
+            />
+            <div
+              className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-[12px] h-[12px] rounded-full animate-[step-light-travel-h_10s_ease-in-out_infinite]"
+              style={{
+                background: "radial-gradient(circle, #eaffb0 0%, #c9ff3d 50%, transparent 72%)",
+                boxShadow: "0 0 14px rgba(201,255,61,0.95), 0 0 28px rgba(201,255,61,0.35)",
+              }}
+            />
+          </div>
+
+          {HOW_IT_WORKS_STEPS.map((step) => (
+            <div key={step.num} className="flex flex-col items-center">
+              <div
+                className="relative z-10 flex items-center justify-center w-[38px] h-[38px] rounded-full border-[3px] font-mono text-[13.5px] font-bold bg-[#050607] animate-[step-node-glow_10s_ease-in-out_infinite]"
+                style={{ animationDelay: `${(step.num - 1) * 3.33}s` }}
+              >
+                {step.num}
+              </div>
+              <div className="w-[1px] h-[28px] bg-gradient-to-b from-[var(--lp-border-strong)] to-[var(--lp-border)] mt-[2px]" />
+              <div
+                className="w-full text-center px-[18px] py-[26px] rounded-[18px] border border-[var(--lp-border)] bg-white/[0.02] animate-[step-card-glow_10s_ease-in-out_infinite]"
+                style={{ animationDelay: `${(step.num - 1) * 3.33}s` }}
+              >
+                <h3 className="text-[18px] font-semibold text-[var(--lp-ink)] tracking-tight">{step.title}</h3>
+                <p className="text-[14.5px] text-[var(--lp-ink-dim)] mt-[10px] leading-[1.65]">{step.desc}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Mobile: nodes + line on the left, cards separate on the right */}
+      <div className="lg:hidden relative max-w-[540px] mx-auto">
+        {HOW_IT_WORKS_STEPS.map((step, i) => (
+          <div key={step.num} className="flex gap-[16px]">
+            <div className="flex flex-col items-center w-[40px] shrink-0">
+              <div
+                className="relative z-10 flex items-center justify-center w-[38px] h-[38px] rounded-full border-[3px] font-mono text-[13.5px] font-bold bg-[#050607] animate-[step-node-glow_10s_ease-in-out_infinite]"
+                style={{ animationDelay: `${(step.num - 1) * 3.33}s` }}
+              >
+                {step.num}
+              </div>
+              {i < HOW_IT_WORKS_STEPS.length - 1 && (
+                <div className="relative flex-1 w-[2px] min-h-[48px] my-[6px] rounded-full bg-[var(--lp-border-strong)] overflow-visible">
+                  <div
+                    className="absolute inset-x-0 top-0 w-full rounded-full origin-top animate-[step-line-fill-v_10s_ease-in-out_infinite]"
+                    style={{
+                      height: i === 0 ? "100%" : "0%",
+                      animationDelay: `${i * 3.33}s`,
+                      background: "linear-gradient(180deg, rgba(201,255,61,0.15), rgba(201,255,61,0.55))",
+                      boxShadow: "0 0 10px rgba(201,255,61,0.3)",
+                    }}
+                  />
+                  {i === 0 && (
+                    <div
+                      className="absolute left-1/2 -translate-x-1/2 -translate-y-1/2 w-[10px] h-[10px] rounded-full animate-[step-light-travel-v_10s_ease-in-out_infinite]"
+                      style={{
+                        background: "radial-gradient(circle, #eaffb0 0%, #c9ff3d 50%, transparent 72%)",
+                        boxShadow: "0 0 12px rgba(201,255,61,0.9)",
+                      }}
+                    />
+                  )}
+                </div>
+              )}
+            </div>
+            <div
+              className={`flex-1 rounded-[16px] border border-[var(--lp-border)] bg-white/[0.02] px-[18px] py-[18px] animate-[step-card-glow_10s_ease-in-out_infinite] ${i < HOW_IT_WORKS_STEPS.length - 1 ? "mb-[20px]" : ""}`}
+              style={{ animationDelay: `${(step.num - 1) * 3.33}s` }}
+            >
+              <h3 className="text-[17px] font-semibold text-[var(--lp-ink)] tracking-tight">{step.title}</h3>
+              <p className="text-[14px] text-[var(--lp-ink-dim)] mt-[8px] leading-[1.65]">{step.desc}</p>
+            </div>
+          </div>
+        ))}
+      </div>
+    </Reveal>
   );
 }
 
@@ -424,7 +534,7 @@ export default function LandingPage() {
                 
                 {/* Floating Animated Card that drags across columns */}
                 <div className="absolute top-[58px] left-[22px] w-[calc((100%-76px)/3)] z-50 animate-[hero-kanban-drag_7s_cubic-bezier(.65,0,.35,1)_infinite] pointer-events-none hidden md:block">
-                  <div className="border border-[var(--lp-accent-line)] rounded-[11px] bg-[#1a1e23] p-[12px_13px] shadow-[0_20px_40px_-10px_rgba(0,0,0,0.8)] backdrop-blur-md">
+                  <div className="border border-[var(--lp-accent-line)] rounded-[11px] bg-[#1a1e23] p-[12px_13px] shadow-[0_20px_40px_-10px_rgba(0,0,0,0.8)]">
                     <div className="flex items-center justify-between gap-[8px]"><span className="font-mono text-[9.5px] font-semibold px-[6px] py-[2px] rounded-[5px] tracking-wider text-[#ff8a7a] bg-[#ff5d4a]/10">P1</span></div>
                     <div className="text-[12.5px] text-[var(--lp-ink)] mt-[9px] leading-[1.4] font-medium">Fix mobile nav overflow</div>
                     <div className="flex items-center justify-between mt-[11px]">
@@ -747,26 +857,7 @@ export default function LandingPage() {
               <p className="text-[16px] leading-[1.7] text-[var(--lp-ink-dim)] mt-[18px] max-w-[480px]">This is a real sequence — each step unlocks the next, the same way it works inside the app.</p>
             </Reveal>
 
-            <div className="mt-[80px]">
-              {/* Vertical Timeline */}
-              <div className="max-w-[500px] mt-[60px]">
-                <Reveal className="relative border-l border-[var(--lp-border-strong)] pl-[40px] ml-[10px] pb-[50px]">
-                  <div className="absolute left-[calc(-4px-4px)] top-[6px] w-[17px] h-[17px] rounded-full bg-[var(--lp-bg)] border-[4px] border-[var(--lp-border-strong)] -translate-x-1/2"></div>
-                  <h3 className="text-[20px] font-semibold text-[var(--lp-ink)] tracking-tight">Invite your team</h3>
-                  <p className="text-[15.5px] text-[var(--lp-ink-dim)] mt-[8px] leading-[1.6]">Create a workspace, send out invites, and get everyone into the same environment.</p>
-                </Reveal>
-                <Reveal className="relative border-l border-[var(--lp-border-strong)] pl-[40px] ml-[10px] pb-[50px]" delay={0.1}>
-                  <div className="absolute left-[calc(-4px-4px)] top-[6px] w-[17px] h-[17px] rounded-full bg-[var(--lp-bg)] border-[4px] border-[var(--lp-accent)] -translate-x-1/2"></div>
-                  <h3 className="text-[20px] font-semibold text-[var(--lp-ink)] tracking-tight">Build the board, assign the work</h3>
-                  <p className="text-[15.5px] text-[var(--lp-ink-dim)] mt-[8px] leading-[1.6]">Create projects, add tasks, set due dates, and assign them out. Everyone sees the same board, updating in real-time.</p>
-                </Reveal>
-                <Reveal className="relative border-l border-transparent pl-[40px] ml-[10px]" delay={0.2}>
-                  <div className="absolute left-[calc(-4px-4px)] top-[6px] w-[17px] h-[17px] rounded-full bg-[var(--lp-bg)] border-[4px] border-[var(--lp-border-strong)] -translate-x-1/2"></div>
-                  <h3 className="text-[20px] font-semibold text-[var(--lp-ink)] tracking-tight">Discuss inline, never lose context</h3>
-                  <p className="text-[15.5px] text-[var(--lp-ink-dim)] mt-[8px] leading-[1.6]">Use the built-in workspace chat to discuss features, share links, and celebrate wins without ever tabbing over to Slack.</p>
-                </Reveal>
-              </div>
-            </div>
+            <HowItWorksTimeline />
           </div>
         </section>
 

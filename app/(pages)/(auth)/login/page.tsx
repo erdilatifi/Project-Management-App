@@ -1,7 +1,7 @@
 'use client'
-import React, { useEffect } from 'react'
+import React, { Suspense, useEffect } from 'react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { useForm } from 'react-hook-form'
 import { z } from 'zod'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -20,8 +20,14 @@ const loginSchema = z.object({
 
 type LoginFormData = z.infer<typeof loginSchema>
 
-const LoginPage = () => {
+const LoginPageContent = () => {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const nextPath = (() => {
+    const next = searchParams.get('next')
+    if (!next || !next.startsWith('/') || next.startsWith('//')) return '/workspaces'
+    return next
+  })()
   const { user, loading: isCheckingAuth, refreshAuth } = useAuth()
   const {
     register,
@@ -34,9 +40,9 @@ const LoginPage = () => {
 
   useEffect(() => {
     if (!isCheckingAuth && user) {
-      router.replace('/workspaces')
+      router.replace(nextPath)
     }
-  }, [user, isCheckingAuth, router])
+  }, [user, isCheckingAuth, router, nextPath])
 
   const onSubmit = async (data: LoginFormData) => {
     try {
@@ -49,7 +55,7 @@ const LoginPage = () => {
         // Refresh auth context to immediately update navbar
         await refreshAuth()
         toast.success('Successfully logged in!')
-        router.push('/workspaces')
+        router.push(nextPath)
         router.refresh()
       }
     } catch {
@@ -117,7 +123,7 @@ const LoginPage = () => {
           htmlFor="password"
           error={errors.password?.message}
           aside={
-            <Link href="/auth/reset-password" className="text-xs font-semibold text-[var(--lp-ink-dim)] hover:text-[var(--lp-accent)] transition-colors">
+            <Link href="/forgot-password" className="text-xs font-semibold text-[var(--lp-ink-dim)] hover:text-[var(--lp-accent)] transition-colors">
               Forgot password?
             </Link>
           }
@@ -285,4 +291,14 @@ function GoogleIcon() {
   )
 }
 
-export default LoginPage
+export default function LoginPage() {
+  return (
+    <Suspense fallback={
+      <div className="landing-page flex justify-center items-center min-h-screen" style={{ background: 'var(--lp-bg)' }}>
+        <Loader2 className="w-8 h-8 animate-spin text-[var(--lp-accent)]" />
+      </div>
+    }>
+      <LoginPageContent />
+    </Suspense>
+  )
+}

@@ -199,8 +199,12 @@ export default function MyTasksPage() {
     const init = async () => {
       try {
         const { data } = await supabase.auth.getUser();
-        setUserId(data.user?.id ?? null);
-      } catch {}
+        const uid = data.user?.id ?? null;
+        setUserId(uid);
+        if (!uid) setLoading(false);
+      } catch {
+        setLoading(false);
+      }
     };
     init();
   }, [supabase]);

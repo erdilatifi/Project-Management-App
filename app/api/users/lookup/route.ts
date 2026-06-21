@@ -1,12 +1,17 @@
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { createClient as createServerSupabase } from '@/utils/supabase/server'
-import { validateBody } from '@/lib/validation/middleware'
+import { createAdminClient } from '@/utils/supabase/admin'
+import { validateBody, authenticateRequest } from '@/lib/validation/middleware'
 import { emailSchema } from '@/lib/validation/schemas'
 
 const lookupSchema = z.object({
   email: emailSchema,
 })
+
+function getDb(supabase: Awaited<ReturnType<typeof createServerSupabase>>) {
+  return process.env.SUPABASE_SERVICE_ROLE_KEY ? createAdminClient() : supabase
+}
 
 export async function POST(req: Request) {
   try {
@@ -17,9 +22,13 @@ export async function POST(req: Request) {
 
     const { email } = bodyValidation.data
     const supabase = await createServerSupabase()
+    const authResult = await authenticateRequest(supabase)
+    if (!authResult.success) {
+      return authResult.response
+    }
+    const db = getDb(supabase)
 
-    // Lookup user by email from profiles table
-    const { data, error } = await supabase
+    const { data, error } = await db
       .from('profiles')
       .select('id, email')
       .ilike('email', email.toLowerCase())

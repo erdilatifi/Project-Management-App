@@ -43,6 +43,7 @@ export default function NotificationBell() {
   const router = useRouter()
   const [open, setOpen] = useState(false)
   const [items, setItems] = useState<Item[]>([])
+  const [unreadTotal, setUnreadTotal] = useState(0)
   const [hasMore, setHasMore] = useState(true)
   const [cursor, setCursor] = useState<string | null>(null)
   const [loadingMore, setLoadingMore] = useState(false)
@@ -78,6 +79,7 @@ export default function NotificationBell() {
       setItems(validItems)
       setCursor(json.nextCursor)
       setHasMore(!!json.nextCursor)
+      if (typeof json.unread === 'number') setUnreadTotal(json.unread)
     } catch (e: any) {
       toast.error(e?.message ?? 'Failed to load notifications')
     }
@@ -111,6 +113,7 @@ export default function NotificationBell() {
     setItems([])
     setCursor(null)
     setHasMore(true)
+    setUnreadTotal(0)
     if (user?.id) load()
   }, [user?.id, load])
 
@@ -218,7 +221,6 @@ export default function NotificationBell() {
 
       setItems((prev) => {
         if (prev.some((item) => item.id === normalized.id)) {
-          console.log('[notification-bell] Notification already exists, skipping', normalized.id)
           return prev
         }
 
@@ -228,6 +230,7 @@ export default function NotificationBell() {
 
         return updated
       })
+      setUnreadTotal((count) => count + 1)
     })
 
     subscribed.current = true
@@ -240,12 +243,14 @@ export default function NotificationBell() {
     }
   }, [supabase, user?.id])
 
-  const unread = items.filter((i) => !i.is_read).length
+  const unread = unreadTotal
 
   const markAll = async () => {
     if (!user?.id || unread === 0) return
     const prev = items
+    const prevUnread = unreadTotal
     setItems((cur) => cur.map((n) => ({ ...n, is_read: true })))
+    setUnreadTotal(0)
     try {
       const res = await fetch('/api/notifications/mark-all-read', { method: 'POST' })
       const json = await res.json()
@@ -253,13 +258,16 @@ export default function NotificationBell() {
     } catch (e: any) {
       toast.error(e?.message ?? 'Failed to mark all read')
       setItems(prev)
+      setUnreadTotal(prevUnread)
     }
   }
 
   const clearAll = async () => {
     if (!user?.id || items.length === 0) return
     const prev = items
+    const prevUnread = unreadTotal
     setItems([])
+    setUnreadTotal(0)
     try {
       const res = await fetch('/api/notifications/clear', { method: 'POST' })
       const json = await res.json()
@@ -267,40 +275,34 @@ export default function NotificationBell() {
     } catch (e: any) {
       toast.error(e?.message ?? 'Failed to clear notifications')
       setItems(prev)
+      setUnreadTotal(prevUnread)
     }
   }
 
   const markRead = async (id: string) => {
-    // Validate ID before sending
     if (!id || typeof id !== 'string' || !id.trim()) {
-      console.error('[mark-read] Invalid notification ID', { id })
       return
     }
 
-    // Convert string ID to number for API
-    const numericId = parseInt(id, 10)
-    if (isNaN(numericId)) {
-      console.error('[mark-read] Invalid notification ID - not a number', { id })
-      return
-    }
-
+    const wasUnread = items.some((n) => n.id === id && !n.is_read)
     const prev = items
+    const prevUnread = unreadTotal
     setItems((cur) => cur.map((n) => (n.id === id ? { ...n, is_read: true } : n)))
+    if (wasUnread) setUnreadTotal((count) => Math.max(0, count - 1))
     try {
       const res = await fetch('/api/notifications/mark-read', { 
         method: 'POST', 
         headers: { 'Content-Type': 'application/json' }, 
-        body: JSON.stringify({ ids: [numericId] }) 
+        body: JSON.stringify({ ids: [id] }) 
       })
       const json = await res.json()
       if (!res.ok) {
-        console.error('[mark-read] API error', { status: res.status, json })
         throw new Error(json?.error || 'Failed to mark read')
       }
     } catch (e: any) {
-      console.error('[mark-read] Failed to mark notification as read', e)
       toast.error(e?.message ?? 'Failed to mark read')
       setItems(prev)
+      setUnreadTotal(prevUnread)
     }
   }
 

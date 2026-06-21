@@ -13,16 +13,13 @@ import { toast } from 'sonner'
 import { AtSign, Mail, Lock, CheckCircle2, Loader2, Workflow, ArrowRight } from 'lucide-react'
 import { useAuth } from '@/app/context/ContextApiProvider'
 
+import { passwordSchema, usernameSchema } from '@/lib/validation/schemas'
+
 const registerSchema = z.object({
-  username: z
-    .string()
-    .min(3, 'Username must be at least 3 characters')
-    .max(32, 'Username must be at most 32 characters')
-    .regex(/^[a-zA-Z0-9_.-]+$/, 'Only letters, numbers, _, ., - allowed')
-    .transform((s) => s.trim()),
+  username: usernameSchema,
   email: z.string().email('Please enter a valid email'),
-  password: z.string().min(6, 'Password must be at least 6 characters long'),
-  confirmPassword: z.string().min(6, 'Password must be at least 6 characters long'),
+  password: passwordSchema,
+  confirmPassword: z.string(),
 }).refine((data) => data.password === data.confirmPassword, {
   message: "Passwords don't match",
   path: ["confirmPassword"],

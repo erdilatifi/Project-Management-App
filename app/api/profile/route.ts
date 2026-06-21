@@ -26,16 +26,12 @@ export async function GET() {
       return NextResponse.json({ error: 'Profile not found' }, { status: 404 })
     }
 
-    // Fetch preferences
-    const { data: preferences, error: preferencesError } = await supabase
+    // Fetch preferences (optional — new users may not have a row yet)
+    const { data: preferences } = await supabase
       .from('user_preferences')
       .select('*')
       .eq('user_id', user.id)
-      .single()
-
-    if (preferencesError) {
-      return NextResponse.json({ error: 'Preferences not found' }, { status: 404 })
-    }
+      .maybeSingle()
 
     // Fetch OAuth connections
     const { data: oauthConnections } = await supabase

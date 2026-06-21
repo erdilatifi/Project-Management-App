@@ -138,29 +138,34 @@ async function ensureUsername(supabase: Awaited<ReturnType<typeof createClient>>
   }
 }
 
+function safeRedirectPath(next: string | null): string {
+  if (!next || !next.startsWith('/') || next.startsWith('//')) return '/workspaces'
+  return next
+}
+
+function getRedirectOrigin(request: Request, origin: string): string {
+  if (process.env.NEXT_PUBLIC_SITE_URL) return process.env.NEXT_PUBLIC_SITE_URL.replace(/\/$/, '')
+  const isLocalEnv = process.env.NODE_ENV === 'development'
+  if (isLocalEnv) return origin
+  const forwardedHost = request.headers.get('x-forwarded-host')
+  if (forwardedHost && !forwardedHost.includes(',')) return `https://${forwardedHost}`
+  return origin
+}
+
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url)
   const code = searchParams.get('code')
-  const next = searchParams.get('next') ?? '/workspaces'
+  const next = safeRedirectPath(searchParams.get('next'))
 
   if (code) {
     const supabase = await createClient()
     const { error } = await supabase.auth.exchangeCodeForSession(code)
     if (!error) {
-      // Best-effort populate username/email after OAuth/email confirmation.
       await ensureUsername(supabase)
-      const forwardedHost = request.headers.get('x-forwarded-host')
-      const isLocalEnv = process.env.NODE_ENV === 'development'
-      if (isLocalEnv) {
-        return NextResponse.redirect(`${origin}${next}`)
-      } else if (forwardedHost) {
-        return NextResponse.redirect(`https://${forwardedHost}${next}`)
-      } else {
-        return NextResponse.redirect(`${origin}${next}`)
-      }
+      const base = getRedirectOrigin(request, origin)
+      return NextResponse.redirect(`${base}${next}`)
     }
   }
 
-  // return the user to an error page with instructions
-  return NextResponse.redirect(`${origin}/error`)
+  return NextResponse.redirect(`${origin}/login?error=auth_callback_failed`)
 }
