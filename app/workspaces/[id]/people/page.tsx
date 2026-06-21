@@ -72,32 +72,77 @@ export default function WorkspacePeoplePage() {
         { email: string | null; avatar_url: string | null; username: string | null; full_name: string | null; job_title: string | null }
       > = {}
       if (ids.length) {
+        // Try to select role_title first (actual column name), fall back without it
         const profsRes = await supabase
           .from('profiles')
           .select(`id, email, avatar_url, username, full_name, ${PROFILE_ROLE_COLUMN}`)
           .in('id', ids)
         if (profsRes.error) {
-          toast.error(profsRes.error.message || 'Failed to load member profile details')
+          // If the column doesn't exist, try without it
+          const fallbackRes = await supabase
+            .from('profiles')
+            .select('id, email, avatar_url, username, full_name')
+            .in('id', ids)
+          if (!fallbackRes.error) {
+            const profs = fallbackRes?.data as any[] | null
+            profileMap = Object.fromEntries(
+              (profs ?? []).map((p: any) => [
+                p.id,
+                {
+                  email: (p.email as string | null) ?? null,
+                  avatar_url: (p.avatar_url as string | null) ?? null,
+                  username: (p.username as string | null) ?? null,
+                  full_name: (p.full_name as string | null) ?? null,
+                  job_title: null,
+                },
+              ])
+            )
+          } else {
+            toast.error(profsRes.error.message || 'Failed to load member profile details')
+          }
+        } else {
+          const profs = profsRes?.data as any[] | null
+          profileMap = Object.fromEntries(
+            (profs ?? []).map((p: any) => [
+              p.id,
+              {
+                email: (p.email as string | null) ?? null,
+                avatar_url: (p.avatar_url as string | null) ?? null,
+                username: (p.username as string | null) ?? null,
+                full_name: (p.full_name as string | null) ?? null,
+                job_title: getProfileRoleTitle(p) || null,
+              },
+            ])
+          )
         }
-        const profs = profsRes?.data as any[] | null
-        profileMap = Object.fromEntries(
-          (profs ?? []).map((p: any) => [
-            p.id,
-            {
-              email: (p.email as string | null) ?? null,
-              avatar_url: (p.avatar_url as string | null) ?? null,
-              username: (p.username as string | null) ?? null,
-              full_name: (p.full_name as string | null) ?? null,
-              job_title: getProfileRoleTitle(p) || null,
-            },
-          ])
-        )
+
+        // For members who have no profile row, try to fetch their email via API fallback
+        const missingIds = ids.filter((id) => !profileMap[id])
+        if (missingIds.length) {
+          try {
+            const query = encodeURIComponent(missingIds.join(','))
+            const res = await fetch(`/api/users/by-ids?ids=${query}`, { cache: 'no-store' })
+            if (res.ok) {
+              const data: Array<{ id: string; email: string }> = await res.json()
+              data.forEach((entry) => {
+                profileMap[entry.id] = {
+                  email: entry.email,
+                  avatar_url: null,
+                  username: null,
+                  full_name: null,
+                  job_title: null,
+                }
+              })
+            }
+          } catch {}
+        }
       }
       const newRows = (members ?? []).map((m: any) => {
           const id = m.user_id
           const profile = profileMap[id]
           const fullName = profile?.full_name ? profile.full_name.trim() : null
           const username = profile?.username ? profile.username.trim() : null
+          // Use profile email for display name
           const email = profile?.email ?? null
           const nameCandidate = fullName || username || null
           const displayName = nameCandidate || (email ? email.split('@')[0] : 'Team Member')
@@ -120,6 +165,7 @@ export default function WorkspacePeoplePage() {
         setLoading(false)
       }
   }, [supabase, workspaceId])
+
 
   useEffect(() => {
     setRows([])

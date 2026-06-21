@@ -158,8 +158,24 @@ export function CreateTaskDialog({
                 },
               ])
             );
+
+            // Fallback: fetch emails for members with no profile
+            const missingIds = ids.filter((id) => !profilesMap[id]);
+            if (missingIds.length) {
+              try {
+                const query = encodeURIComponent(missingIds.join(','));
+                const res = await fetch(`/api/users/by-ids?ids=${query}`, { cache: 'no-store' });
+                if (res.ok) {
+                  const data: Array<{ id: string; email: string }> = await res.json();
+                  data.forEach((entry) => {
+                    profilesMap[entry.id] = { username: null, full_name: null, email: entry.email };
+                  });
+                }
+              } catch {}
+            }
           }
         } catch {}
+
         
         const userList: User[] = wms.map((wm: any) => {
           const id = String(wm.user_id);
