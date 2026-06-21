@@ -85,15 +85,40 @@ export async function POST(req: Request) {
         const { data, error } = await sb
           .from('notifications')
           .insert(notificationData)
-          .select('id')
-          .single<{ id: string }>()
+          .select('*')
+          .single()
 
         if (error) {
           console.error('[fanout] Insert error for user', { uid, error })
           throw error
         }
 
-        if (data?.id) ids.push(String(data.id))
+        if (data?.id) {
+          ids.push(String(data.id))
+          try {
+            await new Promise<void>((resolve) => {
+              const channel = sb.channel(`user:${uid}:notifications`)
+              channel.subscribe((status) => {
+                if (status === 'SUBSCRIBED') {
+                  channel.send({
+                    type: 'broadcast',
+                    event: 'notification',
+                    payload: data
+                  }).finally(() => {
+                    sb.removeChannel(channel)
+                    resolve()
+                  })
+                } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+                  sb.removeChannel(channel)
+                  resolve()
+                }
+              })
+              setTimeout(() => resolve(), 1500)
+            })
+          } catch (err) {
+            console.error('[fanout] Failed to broadcast notification', err)
+          }
+        }
       } catch (e: any) {
         errors[uid] = e?.message || String(e)
       }

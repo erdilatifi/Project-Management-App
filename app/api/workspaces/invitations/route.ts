@@ -203,7 +203,7 @@ export async function POST(req: Request) {
 
     let notificationSent = false
     if (userId) {
-      const { error: notificationErr } = await db.from('notifications').insert({
+      const { data: insertedNotif, error: notificationErr } = await db.from('notifications').insert({
         user_id: userId,
         type: 'workspace_invite',
         ref_id: workspaceId,
@@ -211,12 +211,37 @@ export async function POST(req: Request) {
         title: wsName ? `You were invited to ${wsName}` : 'You were invited to a workspace',
         body: 'Open your invitations to accept or decline.',
         is_read: false,
-      } as any)
+      } as any).select().single()
 
       if (notificationErr) {
         console.warn('[invite] Failed to insert notification; invitation row still exists', notificationErr)
       } else {
         notificationSent = true
+        if (insertedNotif) {
+          try {
+            await new Promise<void>((resolve) => {
+              const channel = db.channel(`user:${userId}:notifications`)
+              channel.subscribe((status) => {
+                if (status === 'SUBSCRIBED') {
+                  channel.send({
+                    type: 'broadcast',
+                    event: 'notification',
+                    payload: insertedNotif
+                  }).finally(() => {
+                    db.removeChannel(channel)
+                    resolve()
+                  })
+                } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+                  db.removeChannel(channel)
+                  resolve()
+                }
+              })
+              setTimeout(() => resolve(), 1500)
+            })
+          } catch (err) {
+            console.error('[invite] Failed to broadcast notification', err)
+          }
+        }
       }
     }
 
