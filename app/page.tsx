@@ -3,7 +3,8 @@
 import React, { useEffect, useRef, useState, useCallback } from "react";
 import Link from "next/link";
 import { useInView } from "framer-motion";
-import { Workflow } from "lucide-react";
+import { Workflow, PanelsTopLeft } from "lucide-react";
+import { useAuth } from "@/app/context/ContextApiProvider";
 
 // Helper for revealing elements on scroll. When `spotlight` is set, the element
 // also gets a cursor-following accent glow + lift on hover for a premium feel.
@@ -293,6 +294,7 @@ function TestimonialCarousel() {
 
 export default function LandingPage() {
   const [scrolled, setScrolled] = useState(false);
+  const { user } = useAuth();
 
   useEffect(() => {
     const handleScroll = () => {
@@ -343,8 +345,17 @@ export default function LandingPage() {
               <a href="#faq" className="hover:text-[var(--lp-ink)] transition-colors">FAQ</a>
             </div>
             <div className="flex items-center gap-3 sm:gap-[18px]">
-              <Link href="/login" className="hidden sm:inline-flex items-center gap-2 px-4 py-[9px] sm:px-[20px] sm:py-[10px] rounded-[9px] text-[12.5px] sm:text-[13.5px] font-semibold text-[var(--lp-ink-dim)] border border-[var(--lp-border)] bg-white/5 hover:bg-white/10 hover:text-[var(--lp-ink)] hover:border-[var(--lp-border-strong)] transition-all">Sign in</Link>
-              <Link href="/register" className="inline-flex items-center gap-2 px-4 py-[9px] sm:px-[20px] sm:py-[10px] rounded-[9px] text-[12.5px] sm:text-[13.5px] font-semibold text-[#06140a] bg-[var(--lp-accent)] hover:-translate-y-[2px] hover:shadow-[0_8px_28px_rgba(201,255,61,0.28)] transition-all">Get started</Link>
+              {user ? (
+                <Link href="/workspaces" className="inline-flex items-center gap-2 px-4 py-[9px] sm:px-[20px] sm:py-[10px] rounded-[9px] text-[12.5px] sm:text-[13.5px] font-semibold text-[#06140a] bg-[var(--lp-accent)] hover:-translate-y-[2px] hover:shadow-[0_8px_28px_rgba(201,255,61,0.28)] transition-all">
+                  <PanelsTopLeft className="w-[16px] h-[16px]" />
+                  Go to workspace
+                </Link>
+              ) : (
+                <>
+                  <Link href="/login" className="hidden sm:inline-flex items-center gap-2 px-4 py-[9px] sm:px-[20px] sm:py-[10px] rounded-[9px] text-[12.5px] sm:text-[13.5px] font-semibold text-[var(--lp-ink-dim)] border border-[var(--lp-border)] bg-white/5 hover:bg-white/10 hover:text-[var(--lp-ink)] hover:border-[var(--lp-border-strong)] transition-all">Sign in</Link>
+                  <Link href="/register" className="inline-flex items-center gap-2 px-4 py-[9px] sm:px-[20px] sm:py-[10px] rounded-[9px] text-[12.5px] sm:text-[13.5px] font-semibold text-[#06140a] bg-[var(--lp-accent)] hover:-translate-y-[2px] hover:shadow-[0_8px_28px_rgba(201,255,61,0.28)] transition-all">Get started</Link>
+                </>
+              )}
             </div>
           </div>
         </nav>
@@ -750,7 +761,7 @@ export default function LandingPage() {
 
             <div className="mt-[80px]">
               {/* Step 1 */}
-              <Reveal spotlight className="grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-12 items-center border border-[var(--lp-border)] rounded-[24px] bg-white/[0.02] p-6 md:p-10 relative overflow-hidden mb-[24px] hover:bg-white/[0.04] transition-colors duration-300">
+              <Reveal spotlight className="grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-12 items-center border border-[var(--lp-border)] rounded-[24px] bg-white/[0.02] p-6 md:p-10 relative overflow-hidden hover:bg-white/[0.04] transition-colors duration-300">
                 <div className="flex flex-col items-start relative z-10">
                   <div className="w-[38px] h-[38px] rounded-[10px] border border-[var(--lp-accent-line)] bg-[var(--lp-accent-dim)] text-[var(--lp-accent)] font-mono text-[14px] flex items-center justify-center mb-6 shadow-[0_0_15px_rgba(201,255,61,0.15)]">1</div>
                   <h3 className="text-[22px] font-semibold text-[var(--lp-ink)] tracking-tight">Create a workspace, invite your team</h3>
@@ -770,8 +781,13 @@ export default function LandingPage() {
                 </div>
               </Reveal>
 
+              {/* Connector light: step 1 → step 2 */}
+              <div className="flex justify-center" aria-hidden>
+                <div className="w-[2px] h-[56px] my-[4px] rounded-full bg-[var(--lp-border)] relative overflow-hidden after:content-[''] after:absolute after:left-0 after:-top-[50%] after:w-full after:h-[60%] after:bg-gradient-to-b after:from-transparent after:via-[var(--lp-accent)] after:to-transparent after:animate-[connector-flow_2.4s_linear_infinite]"></div>
+              </div>
+
               {/* Step 2 */}
-              <Reveal spotlight delay={0.1} className="grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-12 items-center border border-[var(--lp-border)] rounded-[24px] bg-white/[0.02] p-6 md:p-10 relative overflow-hidden mb-[24px] hover:bg-white/[0.04] transition-colors duration-300">
+              <Reveal spotlight delay={0.1} className="grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-12 items-center border border-[var(--lp-border)] rounded-[24px] bg-white/[0.02] p-6 md:p-10 relative overflow-hidden hover:bg-white/[0.04] transition-colors duration-300">
                 <div className="flex flex-col items-start relative z-10 md:order-2">
                   <div className="w-[38px] h-[38px] rounded-[10px] border border-[var(--lp-violet-line)] bg-[var(--lp-violet-dim)] text-[var(--lp-violet)] font-mono text-[14px] flex items-center justify-center mb-6 shadow-[0_0_15px_rgba(139,124,246,0.15)]">2</div>
                   <h3 className="text-[22px] font-semibold text-[var(--lp-ink)] tracking-tight">Build the board, assign the work</h3>
@@ -796,6 +812,11 @@ export default function LandingPage() {
                   </div>
                 </div>
               </Reveal>
+
+              {/* Connector light: step 2 → step 3 */}
+              <div className="flex justify-center" aria-hidden>
+                <div className="w-[2px] h-[56px] my-[4px] rounded-full bg-[var(--lp-border)] relative overflow-hidden after:content-[''] after:absolute after:left-0 after:-top-[50%] after:w-full after:h-[60%] after:bg-gradient-to-b after:from-transparent after:via-[var(--lp-violet)] after:to-transparent after:animate-[connector-flow_2.4s_linear_infinite]" style={{ animationDelay: '1.2s' }}></div>
+              </div>
 
               {/* Step 3 */}
               <Reveal spotlight delay={0.2} className="grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-12 items-center border border-[var(--lp-border)] rounded-[24px] bg-white/[0.02] p-6 md:p-10 relative overflow-hidden hover:bg-white/[0.04] transition-colors duration-300">

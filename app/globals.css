@@ -247,6 +247,7 @@ html {
   100% { transform: translateX(calc(200% + 20px)) translateY(0) rotate(0deg) scale(1); opacity: 0; }
 }
 @keyframes msg-in { from{ opacity:0; transform:translateY(6px); } to{ opacity:1; transform:translateY(0); } }
+@keyframes feed-item-in { from{ opacity:0; transform:translateY(10px); } to{ opacity:1; transform:translateY(0); } }
 @keyframes pulse-fade { 0%,100%{ opacity:0.3; } 50%{ opacity:1; } }
 @keyframes connector-flow { to{ top:140%; } }
 @keyframes cta-pulse { 0%,100%{ opacity:0.7; transform:translateX(-50%) scale(1); } 50%{ opacity:1; transform:translateX(-50%) scale(1.08); } }
