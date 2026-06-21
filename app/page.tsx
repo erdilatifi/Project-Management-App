@@ -417,19 +417,36 @@ export default function LandingPage() {
 
             {/* Kanban Panel */}
             <div className="relative z-10 rounded-[20px] border border-[var(--lp-border-strong)] shadow-[0_40px_100px_-20px_rgba(0,0,0,0.7),inset_0_1px_0_rgba(255,255,255,0.05)] overflow-hidden transform-gpu transition-transform duration-150" style={{ background: "linear-gradient(180deg, #0d1013, #07090b)" }}>
-              <div className="flex items-center justify-between p-[16px_22px] border-b border-[var(--lp-border)]">
-                <div className="flex gap-[7px]">
-                  <span className="w-[9px] h-[9px] rounded-full bg-white/10"></span>
-                  <span className="w-[9px] h-[9px] rounded-full bg-white/10"></span>
-                  <span className="w-[9px] h-[9px] rounded-full bg-white/10"></span>
+              <div className="flex items-center justify-between gap-[12px] p-[14px_18px] border-b border-[var(--lp-border)] bg-white/[0.015]">
+                {/* Left: window dots + project chip */}
+                <div className="flex items-center gap-[14px] min-w-0">
+                  <div className="hidden sm:flex gap-[7px]">
+                    <span className="w-[9px] h-[9px] rounded-full bg-white/10"></span>
+                    <span className="w-[9px] h-[9px] rounded-full bg-white/10"></span>
+                    <span className="w-[9px] h-[9px] rounded-full bg-white/10"></span>
+                  </div>
+                  <div className="flex items-center gap-[9px] min-w-0">
+                    <span className="grid place-items-center w-[22px] h-[22px] rounded-[7px] bg-[var(--lp-accent-dim)] border border-[var(--lp-accent-line)] shrink-0">
+                      <Workflow className="w-[12px] h-[12px] text-[var(--lp-accent)]" />
+                    </span>
+                    <span className="font-mono text-[11.5px] text-[var(--lp-ink-dim)] tracking-wide truncate">
+                      <span className="text-[var(--lp-ink-faint)]">flowfoundry /</span> Website Redesign
+                    </span>
+                  </div>
                 </div>
-                <div className="font-mono text-[11.5px] text-[var(--lp-ink-faint)] tracking-wider flex items-center gap-[8px]">
-                  FLOWFOUNDRY / WEBSITE REDESIGN 
-                  <span className="flex items-center gap-[5px] text-[10px] text-[var(--lp-accent)]">
+
+                {/* Right: LIVE pill + presence stack */}
+                <div className="flex items-center gap-[12px] shrink-0">
+                  <span className="flex items-center gap-[6px] font-mono text-[10px] tracking-widest text-[var(--lp-accent)] bg-[var(--lp-accent-dim)] border border-[var(--lp-accent-line)] rounded-full px-[9px] py-[3px]">
                     <span className="w-[5px] h-[5px] rounded-full bg-[var(--lp-accent)] animate-[pulse-ring_2.2s_infinite]"></span> LIVE
                   </span>
+                  <div className="hidden sm:flex items-center">
+                    <div className="w-[22px] h-[22px] rounded-full border-[1.5px] border-[#0d1013] bg-gradient-to-br from-[var(--lp-accent)] to-[#8fc92a]"></div>
+                    <div className="w-[22px] h-[22px] rounded-full border-[1.5px] border-[#0d1013] bg-gradient-to-br from-[var(--lp-violet)] to-[#5a4fc4] -ml-[7px]"></div>
+                    <div className="w-[22px] h-[22px] rounded-full border-[1.5px] border-[#0d1013] bg-gradient-to-br from-[var(--lp-amber)] to-[#e0962b] -ml-[7px]"></div>
+                    <span className="grid place-items-center w-[22px] h-[22px] rounded-full border-[1.5px] border-[#0d1013] bg-white/10 -ml-[7px] font-mono text-[9px] text-[var(--lp-ink-dim)]">+5</span>
+                  </div>
                 </div>
-                <div className="w-[48px]"></div>
               </div>
               
               <div className="relative grid grid-cols-1 md:grid-cols-3 gap-[16px] p-[22px]">
