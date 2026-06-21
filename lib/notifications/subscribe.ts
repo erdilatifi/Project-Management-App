@@ -49,17 +49,32 @@ export function subscribeToNotifications(
     )
     .subscribe()
 
-  // Fallback place-holder for custom channel if later enabled server-side
-  // const custom = sb
-  //   .channel(`user:${userId}:notifications`)
-  //   .on('broadcast', { event: 'notification' }, (payload) => {
-  //     onReceive(payload.payload as NotificationPayload)
-  //   })
-  //   .subscribe()
+  // Fallback broadcast channel if Postgres realtime is disabled on the table
+  const custom = sb
+    .channel(`user:${userId}:notifications`)
+    .on('broadcast', { event: 'notification' }, (payload) => {
+      const row = payload.payload as any
+      console.log('[notification-subscribe] Received broadcast notification', row)
+      onReceive({
+        id: String(row.id),
+        type: (row.type as string) ?? null,
+        title: (row.title as string) ?? null,
+        body: (row.body as string) ?? null,
+        created_at: typeof row.created_at === 'string' && row.created_at
+          ? row.created_at
+          : new Date().toISOString(),
+        workspace_id: (row.workspace_id as string) ?? null,
+        ref_id: (row.ref_id as string) ?? null,
+        thread_id: (row.thread_id as string) ?? null,
+        message_id: (row.message_id as string) ?? null,
+        task_id: (row.task_id as string) ?? null,
+        project_id: (row.project_id as string) ?? null,
+      })
+    })
+    .subscribe()
 
   return () => {
     sb.removeChannel(tableChannel)
-    // sb.removeChannel(custom)
+    sb.removeChannel(custom)
   }
 }
-
