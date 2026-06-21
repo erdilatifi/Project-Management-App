@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient as createServerSupabase } from '@/utils/supabase/server'
 import { authenticateRequest } from '@/lib/validation/middleware'
-import { sanitizeInteger } from '@/lib/validation/sanitize'
+import { sanitizeInteger, sanitizeEmail } from '@/lib/validation/sanitize'
 
 export async function GET(req: Request) {
   try {
@@ -94,8 +94,8 @@ export async function GET(req: Request) {
       }))
       
       // Filter out any invites that already have a corresponding notification
-      const existingRefs = new Set(items.filter(i => i.type === 'workspace_invite').map(i => i.ref_id))
-      const uniqueInvites = inviteItems.filter(i => !existingRefs.has(i.workspace_id))
+      const existingRefs = new Set(items.filter((i: any) => i.type === 'workspace_invite').map((i: any) => i.ref_id))
+      const uniqueInvites = inviteItems.filter((i: any) => !existingRefs.has(i.workspace_id))
       
       items = [...uniqueInvites, ...items].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
     }
