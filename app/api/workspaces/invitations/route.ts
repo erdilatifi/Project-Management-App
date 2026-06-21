@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient as createServerSupabase } from '@/utils/supabase/server'
 import { createAdminClient } from '@/utils/supabase/admin'
-import { validateBody, authenticateRequest, errorResponse } from '@/lib/validation/middleware'
+import { validateBody, authenticateRequest } from '@/lib/validation/middleware'
 import { inviteUserSchema } from '@/lib/validation/schemas'
 import { sanitizeEmail } from '@/lib/validation/sanitize'
 
@@ -16,7 +16,6 @@ function randToken(len = 12) {
 
 export async function POST(req: Request) {
   try {
-    // Ensure caller is authenticated
     const supabase = await createServerSupabase()
     const authResult = await authenticateRequest(supabase)
     if (!authResult.success) {
@@ -24,19 +23,17 @@ export async function POST(req: Request) {
     }
     const actorId = authResult.userId
 
-    // Validate request body
     const bodyValidation = await validateBody(req, inviteUserSchema)
     if (!bodyValidation.success) {
       return bodyValidation.response
     }
-    
+
     const { workspaceId } = bodyValidation.data
     let { userId } = bodyValidation.data
     const { email } = bodyValidation.data
 
-    const admin = createAdminClient()
+    const db = process.env.SUPABASE_SERVICE_ROLE_KEY ? createAdminClient() : supabase
 
-    // Ensure provided email (if any) is valid
     const requestedEmail = email ? sanitizeEmail(email) : ''
     if (email && !requestedEmail) {
       return NextResponse.json({ error: 'Please provide a valid email address' }, { status: 400 })
@@ -49,20 +46,41 @@ export async function POST(req: Request) {
       return sanitized || null
     }
 
-    // Prevent auto-membership: ensure we do not already have a membership
-    const { data: existingMember } = await admin
+    const { data: actorMember, error: actorMemberErr } = await db
       .from('workspace_members')
-      .select('user_id')
+      .select('role')
       .eq('workspace_id', workspaceId)
-      .eq('user_id', userId ?? '00000000-0000-0000-0000-000000000000')
+      .eq('user_id', actorId)
       .maybeSingle()
-    if (existingMember?.user_id) {
-      return NextResponse.json({ error: 'User is already a member' }, { status: 409 })
+
+    if (actorMemberErr) {
+      console.error('[invite] Failed to verify workspace role', actorMemberErr)
+      return NextResponse.json({ error: 'Unable to verify workspace permissions' }, { status: 500 })
     }
 
-    // Resolve invitee identity strictly via profiles table
+    let actorRole = (actorMember?.role as string | null) ?? null
+    if (!actorRole) {
+      const { data: workspaceOwner, error: workspaceOwnerErr } = await db
+        .from('workspaces')
+        .select('owner_id')
+        .eq('id', workspaceId)
+        .maybeSingle()
+
+      if (workspaceOwnerErr) {
+        console.error('[invite] Failed to verify workspace owner', workspaceOwnerErr)
+        return NextResponse.json({ error: 'Unable to verify workspace permissions' }, { status: 500 })
+      }
+      if (workspaceOwner?.owner_id === actorId) {
+        actorRole = 'owner'
+      }
+    }
+
+    if (actorRole !== 'owner' && actorRole !== 'admin') {
+      return NextResponse.json({ error: 'Only workspace owners and admins can invite members' }, { status: 403 })
+    }
+
     if (userId) {
-      const { data: profile, error: profileErr } = await admin
+      const { data: profile, error: profileErr } = await db
         .from('profiles')
         .select('id, email')
         .eq('id', userId)
@@ -80,11 +98,9 @@ export async function POST(req: Request) {
       if (profileEmail) {
         targetEmail = profileEmail
       } else if (targetEmail) {
-        // Best-effort backfill missing email
-        try {
-          await admin.from('profiles').update({ email: targetEmail } as any).eq('id', userId)
-        } catch (e) {
-          console.warn('[invite] Failed to backfill profile email', e)
+        const { error: backfillErr } = await db.from('profiles').update({ email: targetEmail } as any).eq('id', userId)
+        if (backfillErr) {
+          console.warn('[invite] Failed to backfill profile email', backfillErr)
         }
       } else {
         return NextResponse.json(
@@ -93,7 +109,7 @@ export async function POST(req: Request) {
         )
       }
     } else if (targetEmail) {
-      const { data: profile, error: profileErr } = await admin
+      const { data: profile, error: profileErr } = await db
         .from('profiles')
         .select('id, email')
         .eq('email', targetEmail)
@@ -118,26 +134,45 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Unable to resolve user for invitation' }, { status: 422 })
     }
 
-    // Create invitation row if table exists
-    let token: string | null = null
-    try {
-      token = randToken(16)
-      await admin.from('workspace_invitations').insert({
+    const { data: existingMember, error: existingMemberErr } = await db
+      .from('workspace_members')
+      .select('user_id')
+      .eq('workspace_id', workspaceId)
+      .eq('user_id', userId)
+      .maybeSingle()
+
+    if (existingMemberErr) {
+      console.error('[invite] Failed to check existing membership', existingMemberErr)
+      return NextResponse.json({ error: 'Unable to check workspace membership' }, { status: 500 })
+    }
+    if (existingMember?.user_id) {
+      return NextResponse.json({ error: 'User is already a member' }, { status: 409 })
+    }
+
+    const token = randToken(16)
+    const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
+    const { error: invitationErr } = await db
+      .from('workspace_invitations')
+      .insert({
         workspace_id: workspaceId,
-        email: targetEmail ?? null,
+        email: targetEmail,
         invited_by: actorId,
         token,
         status: 'pending',
+        expires_at: expiresAt,
       } as any)
-    } catch {
-      // Table might not exist; continue without it
-      token = null
+
+    if (invitationErr) {
+      console.error('[invite] Failed to insert invitation', invitationErr)
+      const message = invitationErr.code === '23505'
+        ? 'A pending invitation already exists for this user'
+        : invitationErr.message
+      return NextResponse.json({ error: message }, { status: invitationErr.code === '23505' ? 409 : 500 })
     }
 
-    // Load workspace for a nice title
     let wsName: string | null = null
     try {
-      const { data: ws } = await admin
+      const { data: ws } = await db
         .from('workspaces')
         .select('name')
         .eq('id', workspaceId)
@@ -145,24 +180,23 @@ export async function POST(req: Request) {
       wsName = (ws?.name as string) ?? null
     } catch {}
 
-    // Send in-app notification in our table to the invitee (if we have the user id)
-    const targetId = userId || null
-    if (targetId) {
-      try {
-        await admin.from('notifications').insert({
-          user_id: targetId,
-          type: 'workspace_invite',
-          ref_id: workspaceId,
-          workspace_id: workspaceId,
-          title: wsName ? `You were invited to ${wsName}` : 'You were invited to a workspace',
-          body: token ? `Use token ${token} to accept` : null,
-          is_read: false,
-        } as any)
-      } catch {}
+    const { error: notificationErr } = await db.from('notifications').insert({
+      user_id: userId,
+      type: 'workspace_invite',
+      ref_id: workspaceId,
+      workspace_id: workspaceId,
+      title: wsName ? `You were invited to ${wsName}` : 'You were invited to a workspace',
+      body: `Use token ${token} to accept`,
+      is_read: false,
+    } as any)
+
+    if (notificationErr) {
+      console.warn('[invite] Failed to insert notification', notificationErr)
     }
 
     return NextResponse.json({ ok: true, token })
   } catch (e) {
+    console.error('[invite] unhandled error', e)
     return NextResponse.json({ error: 'Failed to create invitation' }, { status: 500 })
   }
 }
