@@ -48,9 +48,6 @@ export function getUserDisplayName(profile: {
     }
   }
 
-  const fromId = sanitize(profile.id);
-  if (fromId) return fromId.slice(0, 8);
-
   return 'User';
 }
 

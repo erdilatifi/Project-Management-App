@@ -23,6 +23,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Label } from "@/components/ui/label";
 import { UserCircle } from "lucide-react";
 import { getProfileRoleTitle, PROFILE_ROLE_COLUMN } from "@/lib/profileFields";
+import { syncWorkspaceMemberProfile } from "@/lib/memberProfileSync";
 
 // Validation schema for profile form fields
 const schema = z.object({
@@ -38,6 +39,7 @@ export default function ProfilePage() {
 
   // User authentication and profile state
   const [userId, setUserId] = useState<string | null>(null);
+  const [userEmail, setUserEmail] = useState<string | null>(null);
   const [existingAvatarUrl, setExistingAvatarUrl] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -97,12 +99,13 @@ export default function ProfilePage() {
       }
       const uid = data.user?.id ?? null;
       setUserId(uid);
+      setUserEmail(data.user?.email ?? null);
       if (!uid) return;
 
       // Fetch user profile from database
       const { data: profile, error: profErr, status } = await supabase
         .from("profiles")
-        .select(`full_name, ${PROFILE_ROLE_COLUMN}, avatar_url`)
+        .select(`full_name, username, email, ${PROFILE_ROLE_COLUMN}, avatar_url`)
         .eq("id", uid)
         .maybeSingle();
 
@@ -121,6 +124,10 @@ export default function ProfilePage() {
           job_title: getProfileRoleTitle(profile),
         });
         setExistingAvatarUrl(profile.avatar_url ?? null);
+        await syncWorkspaceMemberProfile(supabase as any, uid, {
+          ...profile,
+          email: profile.email ?? data.user?.email ?? null,
+        });
       } else {
         reset({ full_name: "", job_title: "" });
       }
@@ -276,6 +283,13 @@ export default function ProfilePage() {
       if (error) throw error;
 
       if (newAvatarUrl) setExistingAvatarUrl(newAvatarUrl);
+
+      await syncWorkspaceMemberProfile(supabase as any, userId, {
+        full_name: values.full_name,
+        email: userEmail,
+        [PROFILE_ROLE_COLUMN]: values.job_title || null,
+        avatar_url: (newAvatarUrl ?? existingAvatarUrl) ?? null,
+      });
 
       // Clear file input to allow reselecting the same file
       if (fileInputRef.current) fileInputRef.current.value = "";
