@@ -14,6 +14,16 @@ function randToken(len = 12) {
   return out
 }
 
+function getDb(supabase: Awaited<ReturnType<typeof createServerSupabase>>) {
+  return process.env.SUPABASE_SERVICE_ROLE_KEY ? createAdminClient() : supabase
+}
+
+function normalizeProfileEmail(value: string | null | undefined) {
+  if (!value) return null
+  const sanitized = sanitizeEmail(value)
+  return sanitized || null
+}
+
 export async function POST(req: Request) {
   try {
     const supabase = await createServerSupabase()
@@ -31,20 +41,13 @@ export async function POST(req: Request) {
     const { workspaceId } = bodyValidation.data
     let { userId } = bodyValidation.data
     const { email } = bodyValidation.data
-
-    const db = process.env.SUPABASE_SERVICE_ROLE_KEY ? createAdminClient() : supabase
+    const db = getDb(supabase)
 
     const requestedEmail = email ? sanitizeEmail(email) : ''
     if (email && !requestedEmail) {
       return NextResponse.json({ error: 'Please provide a valid email address' }, { status: 400 })
     }
     let targetEmail: string | null = requestedEmail || null
-
-    const normalizeProfileEmail = (value: string | null | undefined) => {
-      if (!value) return null
-      const sanitized = sanitizeEmail(value)
-      return sanitized || null
-    }
 
     const { data: actorMember, error: actorMemberErr } = await db
       .from('workspace_members')
@@ -87,28 +90,33 @@ export async function POST(req: Request) {
         .maybeSingle()
 
       if (profileErr) {
-        console.error('[invite] Failed to resolve profile by id', profileErr)
-        return NextResponse.json({ error: 'Failed to resolve user profile' }, { status: 500 })
-      }
-      if (!profile) {
-        return NextResponse.json({ error: 'No user found with this identifier' }, { status: 404 })
-      }
-
-      const profileEmail = normalizeProfileEmail(profile.email as string | null)
-      if (profileEmail) {
-        targetEmail = profileEmail
-      } else if (targetEmail) {
-        const { error: backfillErr } = await db.from('profiles').update({ email: targetEmail } as any).eq('id', userId)
-        if (backfillErr) {
-          console.warn('[invite] Failed to backfill profile email', backfillErr)
+        console.warn('[invite] Could not resolve profile by id; continuing with email invite if available', profileErr)
+        userId = undefined
+      } else if (!profile) {
+        if (!targetEmail) {
+          return NextResponse.json({ error: 'No user found with this identifier' }, { status: 404 })
         }
+        userId = undefined
       } else {
-        return NextResponse.json(
-          { error: 'User profile is missing an email address. Ask the user to complete their profile.' },
-          { status: 422 }
-        )
+        userId = profile.id as string
+        const profileEmail = normalizeProfileEmail(profile.email as string | null)
+        if (profileEmail) {
+          targetEmail = profileEmail
+        } else if (targetEmail) {
+          const { error: backfillErr } = await db.from('profiles').update({ email: targetEmail } as any).eq('id', userId)
+          if (backfillErr) {
+            console.warn('[invite] Failed to backfill profile email', backfillErr)
+          }
+        } else {
+          return NextResponse.json(
+            { error: 'User profile is missing an email address. Ask the user to complete their profile.' },
+            { status: 422 }
+          )
+        }
       }
-    } else if (targetEmail) {
+    }
+
+    if (!userId && targetEmail) {
       const { data: profile, error: profileErr } = await db
         .from('profiles')
         .select('id, email')
@@ -116,42 +124,53 @@ export async function POST(req: Request) {
         .maybeSingle()
 
       if (profileErr) {
-        console.error('[invite] Failed to resolve profile by email', profileErr)
-        return NextResponse.json({ error: 'Failed to resolve user profile' }, { status: 500 })
+        console.warn('[invite] Could not resolve profile by email; creating email-only invitation', profileErr)
+      } else if (profile?.id) {
+        userId = profile.id as string
+        const profileEmail = normalizeProfileEmail(profile.email as string | null)
+        targetEmail = profileEmail ?? targetEmail
       }
-      if (!profile) {
-        return NextResponse.json({ error: 'No user found with this email' }, { status: 404 })
-      }
-
-      userId = profile.id as string
-      const profileEmail = normalizeProfileEmail(profile.email as string | null)
-      targetEmail = profileEmail ?? targetEmail
-    } else {
-      return NextResponse.json({ error: 'Either userId or email is required' }, { status: 400 })
     }
 
-    if (!userId || !targetEmail) {
-      return NextResponse.json({ error: 'Unable to resolve user for invitation' }, { status: 422 })
+    if (!targetEmail) {
+      return NextResponse.json({ error: 'Email is required to create an invitation' }, { status: 400 })
     }
 
-    const { data: existingMember, error: existingMemberErr } = await db
-      .from('workspace_members')
-      .select('user_id')
+    if (userId) {
+      const { data: existingMember, error: existingMemberErr } = await db
+        .from('workspace_members')
+        .select('user_id')
+        .eq('workspace_id', workspaceId)
+        .eq('user_id', userId)
+        .maybeSingle()
+
+      if (existingMemberErr) {
+        console.error('[invite] Failed to check existing membership', existingMemberErr)
+        return NextResponse.json({ error: 'Unable to check workspace membership' }, { status: 500 })
+      }
+      if (existingMember?.user_id) {
+        return NextResponse.json({ error: 'User is already a member' }, { status: 409 })
+      }
+    }
+
+    const { data: existingInvite, error: existingInviteErr } = await db
+      .from('workspace_invitations')
+      .select('id')
       .eq('workspace_id', workspaceId)
-      .eq('user_id', userId)
+      .ilike('email', targetEmail)
+      .eq('status', 'pending')
       .maybeSingle()
 
-    if (existingMemberErr) {
-      console.error('[invite] Failed to check existing membership', existingMemberErr)
-      return NextResponse.json({ error: 'Unable to check workspace membership' }, { status: 500 })
+    if (existingInviteErr) {
+      console.warn('[invite] Failed to check existing invitations; insert constraint will be authoritative', existingInviteErr)
     }
-    if (existingMember?.user_id) {
-      return NextResponse.json({ error: 'User is already a member' }, { status: 409 })
+    if (existingInvite?.id) {
+      return NextResponse.json({ error: 'A pending invitation already exists for this email' }, { status: 409 })
     }
 
     const token = randToken(16)
     const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
-    const { error: invitationErr } = await db
+    const { data: invitation, error: invitationErr } = await db
       .from('workspace_invitations')
       .insert({
         workspace_id: workspaceId,
@@ -161,11 +180,13 @@ export async function POST(req: Request) {
         status: 'pending',
         expires_at: expiresAt,
       } as any)
+      .select('id')
+      .single()
 
     if (invitationErr) {
       console.error('[invite] Failed to insert invitation', invitationErr)
       const message = invitationErr.code === '23505'
-        ? 'A pending invitation already exists for this user'
+        ? 'A pending invitation already exists for this email'
         : invitationErr.message
       return NextResponse.json({ error: message }, { status: invitationErr.code === '23505' ? 409 : 500 })
     }
@@ -180,23 +201,70 @@ export async function POST(req: Request) {
       wsName = (ws?.name as string) ?? null
     } catch {}
 
-    const { error: notificationErr } = await db.from('notifications').insert({
-      user_id: userId,
-      type: 'workspace_invite',
-      ref_id: workspaceId,
-      workspace_id: workspaceId,
-      title: wsName ? `You were invited to ${wsName}` : 'You were invited to a workspace',
-      body: `Use token ${token} to accept`,
-      is_read: false,
-    } as any)
+    let notificationSent = false
+    if (userId) {
+      const { error: notificationErr } = await db.from('notifications').insert({
+        user_id: userId,
+        type: 'workspace_invite',
+        ref_id: workspaceId,
+        workspace_id: workspaceId,
+        title: wsName ? `You were invited to ${wsName}` : 'You were invited to a workspace',
+        body: 'Open your invitations to accept or decline.',
+        is_read: false,
+      } as any)
 
-    if (notificationErr) {
-      console.warn('[invite] Failed to insert notification', notificationErr)
+      if (notificationErr) {
+        console.warn('[invite] Failed to insert notification; invitation row still exists', notificationErr)
+      } else {
+        notificationSent = true
+      }
     }
 
-    return NextResponse.json({ ok: true, token })
+    return NextResponse.json({ ok: true, invitationId: invitation?.id ?? null, token, notificationSent })
   } catch (e) {
     console.error('[invite] unhandled error', e)
     return NextResponse.json({ error: 'Failed to create invitation' }, { status: 500 })
+  }
+}
+export async function GET() {
+  try {
+    const supabase = await createServerSupabase()
+    const authResult = await authenticateRequest(supabase)
+    if (!authResult.success) {
+      return authResult.response
+    }
+
+    const { data: { user } } = await supabase.auth.getUser()
+    const email = sanitizeEmail(user?.email ?? '')
+    if (!email) {
+      return NextResponse.json({ items: [] })
+    }
+
+    const db = getDb(supabase)
+    const { data, error } = await db
+      .from('workspace_invitations')
+      .select('id, workspace_id, email, status, created_at, workspaces(name)')
+      .ilike('email', email)
+      .eq('status', 'pending')
+      .order('created_at', { ascending: false })
+
+    if (error) {
+      console.error('[invite] Failed to list invitations', error)
+      return NextResponse.json({ error: error.message }, { status: 500 })
+    }
+
+    const items = (data ?? []).map((row: any) => ({
+      id: row.id,
+      workspace_id: row.workspace_id,
+      workspace_name: row.workspaces?.name ?? null,
+      email: row.email,
+      status: row.status,
+      created_at: row.created_at,
+    }))
+
+    return NextResponse.json({ items })
+  } catch (e) {
+    console.error('[invite] list unhandled error', e)
+    return NextResponse.json({ error: 'Failed to load invitations' }, { status: 500 })
   }
 }

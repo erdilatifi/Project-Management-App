@@ -19,12 +19,13 @@ export async function POST(req: Request) {
     }
     
     const { ids } = bodyValidation.data
+    const normalizedIds = ids.map((id) => String(id))
 
     const { data, error } = await supabase
       .from('notifications')
       .update({ is_read: true })
       .eq('user_id', userId)
-      .in('id', ids)
+      .in('id', normalizedIds)
       .select('id')
     if (error) throw error
     return NextResponse.json({ updated: (data ?? []).length })

@@ -55,6 +55,8 @@ export function titleByType(type: NotificationType, meta?: Record<string, any>):
     }
     case 'task_assigned':
       return `You were assigned '${meta?.task_title ?? 'a task'}'`
+    case 'task_update':
+      return `'${meta?.task_title ?? 'A task'}' was updated`
     default:
       return 'Notification'
   }
@@ -91,6 +93,7 @@ export function hrefByType(params: LinkParams): string | null {
         : '/workspaces'
     case 'task_created':
     case 'task_assigned':
+    case 'task_update':
       return projectId ? `/projects/${projectId}/tasks` : '/projects'
     default:
       return null

@@ -1,7 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useState } from 'react'
-import { createClient } from '@/utils/supabase/client'
+import { useEffect, useState } from 'react'
 import { useAuth } from '@/app/context/ContextApiProvider'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -10,29 +9,28 @@ import { toast } from 'sonner'
 type InviteRow = {
   id: string
   workspace_id: string
+  workspace_name?: string | null
   email: string | null
   status: string
   created_at: string
 }
 
 export default function InvitationsPage() {
-  const supabase = useMemo(() => createClient(), [])
   const { user } = useAuth()
   const [items, setItems] = useState<InviteRow[]>([])
   const [loading, setLoading] = useState(true)
 
   const load = async () => {
-    if (!user?.email) return
+    if (!user?.email) {
+      setLoading(false)
+      return
+    }
     setLoading(true)
     try {
-      const { data, error } = await supabase
-        .from('workspace_invitations')
-        .select('id, workspace_id, email, status, created_at')
-        .ilike('email', user.email.toLowerCase())
-        .eq('status', 'pending')
-        .order('created_at', { ascending: false })
-      if (error) throw error
-      setItems((data ?? []) as InviteRow[])
+      const res = await fetch('/api/workspaces/invitations')
+      const json = await res.json()
+      if (!res.ok) throw new Error(json?.error || 'Failed to load invitations')
+      setItems((json?.items ?? []) as InviteRow[])
     } catch (e: any) {
       toast.error(e?.message ?? 'Failed to load invitations')
     } finally {
@@ -42,7 +40,6 @@ export default function InvitationsPage() {
 
   useEffect(() => {
     load()
-
   }, [user?.email])
 
   const accept = async (row: InviteRow) => {
@@ -50,7 +47,7 @@ export default function InvitationsPage() {
       const res = await fetch('/api/workspaces/invitations/accept', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ workspaceId: row.workspace_id }),
+        body: JSON.stringify({ invitationId: row.id, workspaceId: row.workspace_id }),
       })
       const json = await res.json()
       if (!res.ok) throw new Error(json?.error || 'Failed to accept invitation')
@@ -66,7 +63,7 @@ export default function InvitationsPage() {
       const res = await fetch('/api/workspaces/invitations/decline', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ workspaceId: row.workspace_id }),
+        body: JSON.stringify({ invitationId: row.id, workspaceId: row.workspace_id }),
       })
       const json = await res.json()
       if (!res.ok) throw new Error(json?.error || 'Failed to decline invitation')
@@ -90,7 +87,9 @@ export default function InvitationsPage() {
           items.map((row) => (
             <Card key={row.id} className="p-4 flex items-center justify-between">
               <div>
-                <div className="text-sm font-medium">Workspace invite</div>
+                <div className="text-sm font-medium">
+                  {row.workspace_name ? `Invite to ${row.workspace_name}` : 'Workspace invite'}
+                </div>
                 <div className="text-xs text-neutral-500">Created {new Date(row.created_at).toLocaleString()}</div>
               </div>
               <div className="flex items-center gap-2">

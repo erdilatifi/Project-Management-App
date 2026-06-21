@@ -1,5 +1,10 @@
 import { NextResponse } from 'next/server'
 import { createClient as createServerSupabase } from '@/utils/supabase/server'
+import { createAdminClient } from '@/utils/supabase/admin'
+
+function getDb(supabase: Awaited<ReturnType<typeof createServerSupabase>>) {
+  return process.env.SUPABASE_SERVICE_ROLE_KEY ? createAdminClient() : supabase
+}
 
 export async function GET(req: Request) {
   try {
@@ -12,8 +17,8 @@ export async function GET(req: Request) {
     const { data: authRes } = await supabase.auth.getUser()
     if (!authRes?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-    // Fetch from profiles table using profiles.email column
-    const { data, error } = await supabase
+    const db = getDb(supabase)
+    const { data, error } = await db
       .from('profiles')
       .select('id, email')
       .in('id', ids)
