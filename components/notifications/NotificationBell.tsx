@@ -321,6 +321,7 @@ export default function NotificationBell() {
     try {
       switch (n.type) {
         case 'message':
+        case 'thread_added':
         case 'message_new':
         case 'message_mention':
         case 'thread_added':
@@ -384,6 +385,7 @@ export default function NotificationBell() {
   const iconFor = (t: string) => {
     switch (t) {
       case 'message':
+      case 'thread_added':
       case 'message_new':
       case 'message_mention':
       case 'thread_added':
