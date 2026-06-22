@@ -124,13 +124,15 @@ export default function ThreadList({ workspaceId, onSelect, activeThreadId }: Pr
   const createMutation = useMutation({
     mutationFn: async ({ title, userIds }: { title: string; userIds: string[] }) => {
       const trimmedTitle = title.trim()
+      const actorId = userId
+      if (!actorId) throw new Error('Not signed in')
 
       const { data: thread, error } = await supabase
         .from('message_threads')
         .insert({
           workspace_id: workspaceId,
           title: trimmedTitle || null,
-          created_by: userId,
+          created_by: actorId,
         })
         .select()
         .single()
@@ -141,9 +143,9 @@ export default function ThreadList({ workspaceId, onSelect, activeThreadId }: Pr
       const threadId: string = (thread as MessageThread).id
 
       const participantsParam = [
-        ...(userId ? [{ user_id: userId, is_admin: true }] : []),
+        { user_id: actorId, is_admin: true },
         ...userIds
-          .filter((participantId) => participantId && participantId !== userId)
+          .filter((participantId) => participantId && participantId !== actorId)
           .map((participantId) => ({
             user_id: participantId,
             is_admin: false,
@@ -156,19 +158,22 @@ export default function ThreadList({ workspaceId, onSelect, activeThreadId }: Pr
 
       // Notify the added participants (everyone except the creator) that they
       // were added to a new conversation.
-      const recipients = userIds.filter((participantId) => participantId && participantId !== userId)
-      if (recipients.length && userId) {
+      const recipients = Array.from(new Set(userIds.filter((participantId) => participantId && participantId !== actorId)))
+      if (recipients.length) {
         try {
           await fetch('/api/notifications/fanout', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               type: 'thread_added',
-              actorId: userId,
+              actorId,
               recipients,
               workspaceId,
               threadId,
-              meta: { thread_title: trimmedTitle || null },
+              meta: {
+                actor_name: userName || 'Someone',
+                thread_title: trimmedTitle || null,
+              },
             }),
           })
         } catch {
@@ -534,30 +539,6 @@ export default function ThreadList({ workspaceId, onSelect, activeThreadId }: Pr
               title: newTitle.trim(), 
               userIds 
             })
-            
-            // Fanout thread_added notification
-            if (t && userIds.length > 0 && userId) {
-              try {
-                await fetch('/api/notifications/fanout', {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({
-                    type: 'thread_added',
-                    actorId: userId,
-                    recipients: userIds,
-                    workspaceId,
-                    threadId: (t as MessageThread).id,
-                    meta: { 
-                      thread_name: newTitle.trim() || 'a conversation', 
-                      actor_name: userName || 'Someone' 
-                    }
-                  }),
-                });
-              } catch (e) {
-                console.error('Failed to send thread_added notification', e);
-              }
-            }
-
             // Invalidate queries to refresh thread list
             await queryClient.invalidateQueries({ queryKey: ['threads', workspaceId] })
             if (t) {

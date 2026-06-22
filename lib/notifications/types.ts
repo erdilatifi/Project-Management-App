@@ -5,7 +5,6 @@ export type NotificationType =
   | 'thread_added'
   | 'message_new'
   | 'message_mention'
-  | 'thread_added'
   | 'task_created'
   | 'task_assigned'
   | 'task_update'
@@ -28,7 +27,6 @@ export function iconByType(type: NotificationType): 'message' | 'user' | 'check'
     case 'thread_added':
     case 'message_new':
     case 'message_mention':
-    case 'thread_added':
       return 'message'
     case 'task_created':
     case 'task_assigned':
@@ -47,14 +45,14 @@ export function titleByType(type: NotificationType, meta?: Record<string, any>):
       return `You were removed from ${meta?.workspace_name ?? 'a workspace'}`
     case 'workspace_member_left':
       return `${meta?.leaver_name ?? 'A member'} left ${meta?.workspace_name ?? 'workspace'}`
-    case 'thread_added':
-      return `${meta?.actor_name ?? 'Someone'} added you to ${meta?.thread_title ? `'${meta.thread_title}'` : 'a conversation'}`
+    case 'thread_added': {
+      const threadTitle = meta?.thread_title ?? meta?.thread_name
+      return `${meta?.actor_name ?? 'Someone'} added you to ${threadTitle ? `'${threadTitle}'` : 'a conversation'}`
+    }
     case 'message_new':
       return `${meta?.actor_name ?? 'Someone'} sent a new message`
     case 'message_mention':
       return `${meta?.actor_name ?? 'Someone'} mentioned you`
-    case 'thread_added':
-      return `You were added to '${meta?.thread_name ?? 'a conversation'}'`
     case 'task_created': {
       const t = meta?.task_title ?? 'a task'
       if (meta?.assignee_is_actor) return `You created '${t}' (assigned to you)`
@@ -73,12 +71,10 @@ export function titleByType(type: NotificationType, meta?: Record<string, any>):
 export function subtitleByType(type: NotificationType, meta?: Record<string, any>): string | null {
   switch (type) {
     case 'thread_added':
-      return meta?.workspace_name ? `In ${meta.workspace_name}` : null
+      return meta?.workspace_name ? `In ${meta.workspace_name}` : meta?.actor_name ? `Added by ${meta.actor_name}` : null
     case 'message_new':
     case 'message_mention':
       return meta?.snippet ? String(meta.snippet) : null
-    case 'thread_added':
-      return meta?.actor_name ? `Added by ${meta.actor_name}` : null
     case 'workspace_invite':
       return meta?.inviter_name ? `Invited by ${meta.inviter_name}` : null
     case 'task_created':
@@ -99,7 +95,6 @@ export function hrefByType(params: LinkParams): string | null {
     case 'thread_added':
     case 'message_new':
     case 'message_mention':
-    case 'thread_added':
       return workspaceId && threadId
         ? `/workspaces/${workspaceId}/messages?thread=${threadId}${messageId ? `&m=${messageId}` : ''}`
         : workspaceId
