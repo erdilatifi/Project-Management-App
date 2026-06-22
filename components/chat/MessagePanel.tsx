@@ -596,7 +596,7 @@ export default function MessagePanel({ threadId, workspaceId, title: titleProp, 
 
       // Fanout notifications to participants or workspace members (exclude author)
       try {
-        const actor = userId;
+        const actor = msg.author_id;
         if (!actor) return
         
         let currentParticipantsRows: Array<{user_id: string}> = [];
@@ -606,42 +606,35 @@ export default function MessagePanel({ threadId, workspaceId, title: titleProp, 
           console.error("Failed to fetch fresh participants for fanout", e);
         }
         
-        let recipients = currentParticipantsRows
+        let recipients = Array.from(new Set(currentParticipantsRows
           .map((r: any) => String(r.user_id))
-          .filter((id) => id && id !== actor);
+          .filter((id) => id && id !== actor)));
         
         // If no participants, notify all workspace members
         if (!recipients.length) {
-          const { data: members } = await supabase
+          const { data: members, error: membersError } = await supabase
             .from('workspace_members')
             .select('user_id')
             .eq('workspace_id', workspaceId);
-          recipients = (members ?? [])
+          if (membersError) throw new Error(membersError.message);
+          recipients = Array.from(new Set((members ?? [])
             .map((m: any) => String(m.user_id))
-            .filter((id) => id && id !== actor);
+            .filter((id) => id && id !== actor)));
         }
         
         if (recipients.length) {
           const type = /@\w+/.test(msg.body) ? 'message_mention' : 'message_new';
           const actorInfo = participants.find(p => p.id === actor);
           let actor_name = actorInfo?.email || null;
-          if (!actor_name && actor) {
+          if (!actor_name) {
             try {
-              const { data: prof } = await supabase
-                .from('profiles')
-                .select('full_name')
-                .eq('id', actor)
-                .maybeSingle();
-              if (prof?.full_name) {
-                actor_name = prof.full_name;
-              }
+              const meta = await fetchUserMeta([actor]);
+              actor_name = meta[actor]?.label ?? meta[actor]?.email ?? null;
             } catch (e) {
               console.error("Failed to fetch actor display name for notification", e);
             }
           }
-          if (!actor_name) {
-            actor_name = 'Someone';
-          }
+          if (!actor_name) actor_name = 'Someone';
 
           const res = await fetch('/api/notifications/fanout', {
             method: 'POST',
@@ -653,15 +646,21 @@ export default function MessagePanel({ threadId, workspaceId, title: titleProp, 
               workspaceId,
               threadId,
               messageId: msg.id,
-              meta: { actor_name, snippet: (msg.body || '').slice(0, 140) },
+              meta: {
+                actor_name,
+                snippet: (msg.body || '').slice(0, 140),
+                thread_title: (titleProp ?? threadTitle) || null,
+              },
             }),
           });
           
           if (!res.ok) {
-            await res.json().catch(() => null)
+            const errorBody = await res.json().catch(() => null);
+            console.error('Failed to send message notification', errorBody);
           }
         }
-      } catch {
+      } catch (e) {
+        console.error('Message notification fanout failed', e);
         // Notification fanout should not block the sent message.
       }
     },
