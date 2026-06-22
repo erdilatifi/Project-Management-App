@@ -660,7 +660,7 @@ export default function LandingPage() {
 
             <div className="grid grid-cols-1 md:grid-cols-[1.1fr_1fr] gap-12 md:gap-[60px] items-center mt-[70px]">
               <Reveal className="relative h-[420px] border border-[var(--lp-border)] rounded-[20px] overflow-hidden" style={{ background: "radial-gradient(ellipse at center, rgba(255,93,74,0.06), transparent 65%), rgba(255,255,255,0.012)" }}>
-                <div className="absolute inset-y-0 left-1/2 -translate-x-1/2 w-[800px] h-full origin-center scale-[0.42] min-[375px]:scale-[0.48] min-[480px]:scale-[0.58] min-[640px]:scale-[0.78] md:scale-100 transition-transform">
+                <div className="absolute inset-y-0 left-1/2 -translate-x-1/2 w-[100%] min-w-[320px] max-w-[800px] h-full origin-center transition-transform">
                   <svg className="absolute inset-0 w-full h-full pointer-events-none z-0" preserveAspectRatio="none">
                   <defs>
                     <radialGradient id="problem-line-fade" cx="50%" cy="50%" r="50%">
@@ -689,35 +689,42 @@ export default function LandingPage() {
                     />
                   ))}
                 </svg>
-                {/* Center hub — opaque disc so the lines visually terminate at the outer ring */}
-                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[90px] h-[90px] rounded-full z-10 flex items-center justify-center animate-[center-pulse_3s_ease-in-out_infinite]" style={{ background: "var(--lp-bg)", boxShadow: "0 0 0 1px rgba(255,93,74,0.25), 0 0 40px rgba(255,93,74,0.18)" }}>
-                  <div className="w-[58px] h-[58px] rounded-full border border-dashed border-[#ff5d4a]/40 flex items-center justify-center">
-                    <span className="font-serif italic text-[24px] text-[#ff5d4a] opacity-70 leading-none">?</span>
+                {/* Center hub */}
+                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[70px] h-[70px] sm:w-[90px] sm:h-[90px] rounded-full z-10 flex items-center justify-center animate-[center-pulse_3s_ease-in-out_infinite]" style={{ background: "var(--lp-bg)", boxShadow: "0 0 0 1px rgba(255,93,74,0.25), 0 0 40px rgba(255,93,74,0.18)" }}>
+                  <div className="w-[46px] h-[46px] sm:w-[58px] sm:h-[58px] rounded-full border border-dashed border-[#ff5d4a]/40 flex items-center justify-center">
+                    <span className="font-serif italic text-[20px] sm:text-[24px] text-[#ff5d4a] opacity-70 leading-none">?</span>
                   </div>
                 </div>
-                <div className="absolute top-[8%] left-[5%] border border-[var(--lp-border-strong)] bg-[#0f1215]/90 backdrop-blur-md rounded-[12px] p-[10px_14px] shadow-lg flex flex-col gap-[6px] animate-[node-drift_7s_ease-in-out_infinite_reverse] z-10">
-                  <div className="font-mono text-[11px] text-[var(--lp-ink-faint)] flex items-center gap-[7px]"><span className="w-[6px] h-[6px] rounded-full bg-[#ffb84d] shrink-0"></span>Trello</div>
-                  <div className="text-[10px] text-[var(--lp-ink)] font-medium">Where is the Q3 roadmap?</div>
+                
+                {/* Nodes - Positioned using percentages and shifted to center on points */}
+                <div className="absolute top-[15%] left-[13%] -translate-x-1/2 -translate-y-1/2 border border-[var(--lp-border-strong)] bg-[#0f1215]/90 backdrop-blur-md rounded-[10px] sm:rounded-[12px] p-[6px_8px] sm:p-[10px_14px] shadow-lg flex flex-col gap-[4px] sm:gap-[6px] animate-[node-drift_7s_ease-in-out_infinite_reverse] z-10 whitespace-nowrap">
+                  <div className="font-mono text-[9px] sm:text-[11px] text-[var(--lp-ink-faint)] flex items-center gap-[5px] sm:gap-[7px]"><span className="w-[5px] h-[5px] sm:w-[6px] sm:h-[6px] rounded-full bg-[#ffb84d] shrink-0"></span>Trello</div>
+                  <div className="text-[8px] sm:text-[10px] text-[var(--lp-ink)] font-medium">Where is the Q3 roadmap?</div>
                 </div>
-                <div className="absolute top-[12%] right-[5%] border border-[var(--lp-border-strong)] bg-[#0f1215]/90 backdrop-blur-md rounded-[12px] p-[10px_14px] shadow-lg flex flex-col gap-[6px] animate-[node-drift_5s_ease-in-out_infinite] delay-100 z-10">
-                  <div className="font-mono text-[11px] text-[var(--lp-ink-faint)] flex items-center gap-[7px]"><span className="w-[6px] h-[6px] rounded-full bg-[var(--lp-red)] shrink-0 animate-pulse"></span>Slack</div>
-                  <div className="text-[10px] text-[#ff5d4a] font-medium">42 unread in #design-sync</div>
+                
+                <div className="absolute top-[18%] left-[87%] -translate-x-1/2 -translate-y-1/2 border border-[var(--lp-border-strong)] bg-[#0f1215]/90 backdrop-blur-md rounded-[10px] sm:rounded-[12px] p-[6px_8px] sm:p-[10px_14px] shadow-lg flex flex-col gap-[4px] sm:gap-[6px] animate-[node-drift_5s_ease-in-out_infinite] delay-100 z-10 whitespace-nowrap">
+                  <div className="font-mono text-[9px] sm:text-[11px] text-[var(--lp-ink-faint)] flex items-center gap-[5px] sm:gap-[7px]"><span className="w-[5px] h-[5px] sm:w-[6px] sm:h-[6px] rounded-full bg-[var(--lp-red)] shrink-0 animate-pulse"></span>Slack</div>
+                  <div className="text-[8px] sm:text-[10px] text-[#ff5d4a] font-medium">42 unread in #design</div>
                 </div>
-                <div className="absolute bottom-[16%] left-[6%] border border-[var(--lp-border-strong)] bg-[#0f1215]/90 backdrop-blur-md rounded-[12px] p-[10px_14px] shadow-lg flex flex-col gap-[6px] animate-[node-drift_6s_ease-in-out_infinite_reverse] delay-300 z-10">
-                  <div className="font-mono text-[11px] text-[var(--lp-ink-faint)] flex items-center gap-[7px]"><span className="w-[6px] h-[6px] rounded-full bg-[var(--lp-violet)] shrink-0"></span>Notion</div>
-                  <div className="text-[10px] text-[var(--lp-ink-dim)] font-medium">Document is out of date</div>
+                
+                <div className="absolute top-[82%] left-[13%] -translate-x-1/2 -translate-y-1/2 border border-[var(--lp-border-strong)] bg-[#0f1215]/90 backdrop-blur-md rounded-[10px] sm:rounded-[12px] p-[6px_8px] sm:p-[10px_14px] shadow-lg flex flex-col gap-[4px] sm:gap-[6px] animate-[node-drift_6s_ease-in-out_infinite_reverse] delay-300 z-10 whitespace-nowrap">
+                  <div className="font-mono text-[9px] sm:text-[11px] text-[var(--lp-ink-faint)] flex items-center gap-[5px] sm:gap-[7px]"><span className="w-[5px] h-[5px] sm:w-[6px] sm:h-[6px] rounded-full bg-[var(--lp-violet)] shrink-0"></span>Notion</div>
+                  <div className="text-[8px] sm:text-[10px] text-[var(--lp-ink-dim)] font-medium">Doc is out of date</div>
                 </div>
-                <div className="absolute bottom-[12%] right-[8%] border border-[var(--lp-border-strong)] bg-[#0f1215]/90 backdrop-blur-md rounded-[12px] p-[10px_14px] shadow-lg flex flex-col gap-[6px] animate-[node-drift_8s_ease-in-out_infinite] delay-200 z-10">
-                  <div className="font-mono text-[11px] text-[var(--lp-ink-faint)] flex items-center gap-[7px]"><span className="w-[6px] h-[6px] rounded-full bg-[var(--lp-ink-faint)] shrink-0"></span>Email</div>
-                  <div className="text-[10px] text-[var(--lp-ink)] font-medium">Re: Re: Re: Final assets V4</div>
+                
+                <div className="absolute top-[88%] left-[84%] -translate-x-1/2 -translate-y-1/2 border border-[var(--lp-border-strong)] bg-[#0f1215]/90 backdrop-blur-md rounded-[10px] sm:rounded-[12px] p-[6px_8px] sm:p-[10px_14px] shadow-lg flex flex-col gap-[4px] sm:gap-[6px] animate-[node-drift_8s_ease-in-out_infinite] delay-200 z-10 whitespace-nowrap">
+                  <div className="font-mono text-[9px] sm:text-[11px] text-[var(--lp-ink-faint)] flex items-center gap-[5px] sm:gap-[7px]"><span className="w-[5px] h-[5px] sm:w-[6px] sm:h-[6px] rounded-full bg-[var(--lp-ink-faint)] shrink-0"></span>Email</div>
+                  <div className="text-[8px] sm:text-[10px] text-[var(--lp-ink)] font-medium">Re: Final assets V4</div>
                 </div>
-                <div className="absolute top-[42%] left-[2%] border border-[var(--lp-border-strong)] bg-[#0f1215]/90 backdrop-blur-md rounded-[12px] p-[10px_14px] shadow-lg flex flex-col gap-[6px] animate-[node-drift_5s_ease-in-out_infinite_reverse] delay-500 z-10">
-                  <div className="font-mono text-[11px] text-[var(--lp-ink-faint)] flex items-center gap-[7px]"><span className="w-[6px] h-[6px] rounded-full bg-[#8fc92a] shrink-0"></span>Sheets</div>
-                  <div className="text-[10px] text-[var(--lp-ink-dim)] font-medium">Request access to view</div>
+                
+                <div className="absolute top-[48%] left-[10%] -translate-x-1/2 -translate-y-1/2 border border-[var(--lp-border-strong)] bg-[#0f1215]/90 backdrop-blur-md rounded-[10px] sm:rounded-[12px] p-[6px_8px] sm:p-[10px_14px] shadow-lg flex flex-col gap-[4px] sm:gap-[6px] animate-[node-drift_5s_ease-in-out_infinite_reverse] delay-500 z-10 whitespace-nowrap">
+                  <div className="font-mono text-[9px] sm:text-[11px] text-[var(--lp-ink-faint)] flex items-center gap-[5px] sm:gap-[7px]"><span className="w-[5px] h-[5px] sm:w-[6px] sm:h-[6px] rounded-full bg-[#8fc92a] shrink-0"></span>Sheets</div>
+                  <div className="text-[8px] sm:text-[10px] text-[var(--lp-ink-dim)] font-medium">Request access to view</div>
                 </div>
-                <div className="absolute top-[48%] right-[0%] border border-[var(--lp-border-strong)] bg-[#0f1215]/90 backdrop-blur-md rounded-[12px] p-[10px_14px] shadow-lg flex flex-col gap-[6px] animate-[node-drift_7s_ease-in-out_infinite] delay-700 z-10">
-                  <div className="font-mono text-[11px] text-[var(--lp-ink-faint)] flex items-center gap-[7px]"><span className="w-[6px] h-[6px] rounded-full bg-[#5a4fc4] shrink-0"></span>Zoom</div>
-                  <div className="text-[10px] text-[var(--lp-ink-dim)] font-medium">Recording expired</div>
+                
+                <div className="absolute top-[54%] left-[90%] -translate-x-1/2 -translate-y-1/2 border border-[var(--lp-border-strong)] bg-[#0f1215]/90 backdrop-blur-md rounded-[10px] sm:rounded-[12px] p-[6px_8px] sm:p-[10px_14px] shadow-lg flex flex-col gap-[4px] sm:gap-[6px] animate-[node-drift_7s_ease-in-out_infinite] delay-700 z-10 whitespace-nowrap">
+                  <div className="font-mono text-[9px] sm:text-[11px] text-[var(--lp-ink-faint)] flex items-center gap-[5px] sm:gap-[7px]"><span className="w-[5px] h-[5px] sm:w-[6px] sm:h-[6px] rounded-full bg-[#5a4fc4] shrink-0"></span>Zoom</div>
+                  <div className="text-[8px] sm:text-[10px] text-[var(--lp-ink-dim)] font-medium">Recording expired</div>
                 </div>
                 </div>
               </Reveal>
