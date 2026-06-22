@@ -80,72 +80,76 @@ export default function MessagePanel({ threadId, workspaceId, title: titleProp, 
     async (userIds: string[]): Promise<Record<string, UserMeta>> => {
       const unique = Array.from(new Set(userIds.filter((id) => !!id)));
       if (!unique.length) return {};
+      
+      const meta: Record<string, UserMeta> = {};
+      
       try {
-        const { data: profs } = await supabase
+        const { data: profs, error } = await supabase
           .from("profiles")
           .select("id, email, avatar_url, full_name, username")
           .in("id", unique);
-        const meta: Record<string, UserMeta> = {};
-        ((profs ?? []) as any[]).forEach((row) => {
-          const id = String(row.id);
-          const username = (row.username as string | null) ?? null;
-          const fullName = (row.full_name as string | null) ?? null;
-          const email = (row.email as string | null) ?? null;
           
-          // Use getUserDisplayName for consistent display logic
-          const label = getUserDisplayName({
-            full_name: fullName,
-            username: username,
-            email: email,
-            id,
+        if (!error && profs) {
+          profs.forEach((row) => {
+            const id = String(row.id);
+            const username = (row.username as string | null) ?? null;
+            const fullName = (row.full_name as string | null) ?? null;
+            const email = (row.email as string | null) ?? null;
+            
+            // Use getUserDisplayName for consistent display logic
+            const label = getUserDisplayName({
+              full_name: fullName,
+              username: username,
+              email: email,
+              id,
+            });
+            
+            meta[id] = {
+              label,
+              email: email?.trim() ?? null,
+              avatar_url: (row.avatar_url as string | null) ?? null,
+            };
           });
-          
-          meta[id] = {
-            label,
-            email: email?.trim() ?? null,
-            avatar_url: (row.avatar_url as string | null) ?? null,
-          };
-        });
-        return meta;
-      } catch {
-        const { data: profs } = await supabase
-          .from("profiles")
-          .select("id, email, avatar_url, username")
-          .in("id", unique);
-        const meta: Record<string, UserMeta> = {};
-        (profs ?? []).forEach((row: any) => {
-          const id = String(row.id);
-          const email = (row.email as string | null) ?? null;
-          const username = (row.username as string | null) ?? null;
-          meta[id] = {
-            label: getUserDisplayName({ username, email, id }),
-            email: email?.trim() ?? null,
-            avatar_url: (row.avatar_url as string | null) ?? null,
-          };
-        });
-        
-        // Use auth metadata fallback for missing profiles
-        const missingIds = unique.filter((uid) => !meta[uid])
-        if (missingIds.length) {
-          try {
-            const query = encodeURIComponent(missingIds.join(','))
-            const res = await fetch(`/api/users/by-ids?ids=${query}`, { cache: 'no-store' })
-            if (res.ok) {
-              const data: Array<{ id: string; email: string; full_name?: string; username?: string }> = await res.json()
-              data.forEach((entry) => {
-                meta[entry.id] = {
-                  label: getUserDisplayName({ full_name: entry.full_name, username: entry.username, email: entry.email, id: entry.id }),
-                  email: entry.email,
-                  avatar_url: null,
-                }
-              })
-            }
-          } catch {}
         }
-        
-        return meta;
+      } catch {
+        try {
+          const { data: profs } = await supabase
+            .from("profiles")
+            .select("id, email, avatar_url, username")
+            .in("id", unique);
+          (profs ?? []).forEach((row: any) => {
+            const id = String(row.id);
+            const email = (row.email as string | null) ?? null;
+            const username = (row.username as string | null) ?? null;
+            meta[id] = {
+              label: getUserDisplayName({ username, email, id }),
+              email: email?.trim() ?? null,
+              avatar_url: (row.avatar_url as string | null) ?? null,
+            };
+          });
+        } catch (e) {}
       }
-
+      
+      // Use auth metadata fallback for missing profiles
+      const missingIds = unique.filter((uid) => !meta[uid]);
+      if (missingIds.length) {
+        try {
+          const query = encodeURIComponent(missingIds.join(','));
+          const res = await fetch(`/api/users/by-ids?ids=${query}`, { cache: 'no-store' });
+          if (res.ok) {
+            const data: Array<{ id: string; email: string; full_name?: string; username?: string }> = await res.json();
+            data.forEach((entry) => {
+              meta[entry.id] = {
+                label: getUserDisplayName({ full_name: entry.full_name, username: entry.username, email: entry.email, id: entry.id }),
+                email: entry.email,
+                avatar_url: null,
+              };
+            });
+          }
+        } catch {}
+      }
+      
+      return meta;
     },
     [supabase]
   );

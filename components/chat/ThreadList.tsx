@@ -13,6 +13,7 @@ import { Plus, MessageSquare, Trash2, Search, Loader2, ArrowLeft } from 'lucide-
 import { toast } from 'sonner'
 import UserSelectionDialog from './UserSelectionDialog'
 import { useRouter } from 'next/navigation'
+import { getUserDisplayName } from '@/utils/userDisplay'
 
 type Props = {
   workspaceId: string
@@ -69,10 +70,17 @@ export default function ThreadList({ workspaceId, onSelect, activeThreadId }: Pr
       if (uid) {
         const { data: prof } = await supabase
           .from('profiles')
-          .select('full_name')
+          .select('full_name, username, email')
           .eq('id', uid)
           .maybeSingle()
-        setUserName(prof?.full_name ?? 'Someone')
+        
+        const displayName = getUserDisplayName({
+          full_name: prof?.full_name ?? null,
+          username: prof?.username ?? null,
+          email: prof?.email ?? data.user?.email ?? null,
+          id: uid
+        })
+        setUserName(displayName)
       }
     }
     init()
