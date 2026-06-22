@@ -73,12 +73,7 @@ export async function POST(req: Request) {
           title,
           body: bodyText,
           workspace_id: body.workspaceId ?? null,
-          project_id: body.projectId ?? null,
-          task_id: body.taskId ?? null,
-          thread_id: body.threadId ?? null,
-          message_id: body.messageId ?? null,
           ref_id,
-          meta,
           is_read: false,
         }
 
