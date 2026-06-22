@@ -4,6 +4,7 @@ export type NotificationType =
   | 'workspace_member_left'
   | 'message_new'
   | 'message_mention'
+  | 'thread_added'
   | 'task_created'
   | 'task_assigned'
   | 'task_update'
@@ -25,6 +26,7 @@ export function iconByType(type: NotificationType): 'message' | 'user' | 'check'
       return 'user'
     case 'message_new':
     case 'message_mention':
+    case 'thread_added':
       return 'message'
     case 'task_created':
     case 'task_assigned':
@@ -47,6 +49,8 @@ export function titleByType(type: NotificationType, meta?: Record<string, any>):
       return `${meta?.actor_name ?? 'Someone'} sent a new message`
     case 'message_mention':
       return `${meta?.actor_name ?? 'Someone'} mentioned you`
+    case 'thread_added':
+      return `You were added to '${meta?.thread_name ?? 'a conversation'}'`
     case 'task_created': {
       const t = meta?.task_title ?? 'a task'
       if (meta?.assignee_is_actor) return `You created '${t}' (assigned to you)`
@@ -67,6 +71,8 @@ export function subtitleByType(type: NotificationType, meta?: Record<string, any
     case 'message_new':
     case 'message_mention':
       return meta?.snippet ? String(meta.snippet) : null
+    case 'thread_added':
+      return meta?.actor_name ? `Added by ${meta.actor_name}` : null
     case 'workspace_invite':
       return meta?.inviter_name ? `Invited by ${meta.inviter_name}` : null
     case 'task_created':
@@ -86,6 +92,7 @@ export function hrefByType(params: LinkParams): string | null {
       return workspaceId ? `/workspaces/${workspaceId}` : '/workspaces'
     case 'message_new':
     case 'message_mention':
+    case 'thread_added':
       return workspaceId && threadId
         ? `/workspaces/${workspaceId}/messages?thread=${threadId}${messageId ? `&m=${messageId}` : ''}`
         : workspaceId

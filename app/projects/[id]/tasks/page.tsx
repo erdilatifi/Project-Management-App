@@ -885,8 +885,8 @@ export default function ProjectTasksBoardPage() {
     <div className="min-h-screen pt-12 w-full bg-[radial-gradient(80rem_40rem_at_50%_-10%,rgba(0,0,0,0.06),transparent)]">
       <div className="mx-auto max-w-[1200px] px-6 lg:px-10 py-10">
         {/* Header with Create Task Dialog */}
-        <div className="mb-6 flex items-center justify-between">
-          <div className="flex items-center gap-3">
+        <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
+          <div className="flex items-center gap-2 sm:gap-3">
             <Button
               size="icon"
               variant="ghost"
@@ -899,7 +899,7 @@ export default function ProjectTasksBoardPage() {
             <span className="brand-chip h-11 w-11 shrink-0">
               <LayoutGrid className="h-5 w-5" />
             </span>
-            <h1 className="text-3xl font-bold tracking-tight">Tasks Board</h1>
+            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Tasks Board</h1>
           </div>
           {canCreate && workspaceId && (
             <CreateTaskDialog

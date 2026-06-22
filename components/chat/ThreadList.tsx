@@ -24,6 +24,7 @@ export default function ThreadList({ workspaceId, onSelect, activeThreadId }: Pr
   const router = useRouter()
   const supabase = useMemo(() => createClient(), [])
   const [userId, setUserId] = useState<string | null>(null)
+  const [userName, setUserName] = useState<string | null>(null)
   const [search, setSearch] = useState('')
   const [newOpen, setNewOpen] = useState(false)
   const [newTitle, setNewTitle] = useState('')
@@ -63,7 +64,16 @@ export default function ThreadList({ workspaceId, onSelect, activeThreadId }: Pr
   useEffect(() => {
     const init = async () => {
       const { data } = await supabase.auth.getUser()
-      setUserId(data.user?.id ?? null)
+      const uid = data.user?.id ?? null
+      setUserId(uid)
+      if (uid) {
+        const { data: prof } = await supabase
+          .from('profiles')
+          .select('full_name')
+          .eq('id', uid)
+          .maybeSingle()
+        setUserName(prof?.full_name ?? 'Someone')
+      }
     }
     init()
   }, [supabase])
@@ -502,6 +512,30 @@ export default function ThreadList({ workspaceId, onSelect, activeThreadId }: Pr
               title: newTitle.trim(), 
               userIds 
             })
+            
+            // Fanout thread_added notification
+            if (t && userIds.length > 0 && userId) {
+              try {
+                await fetch('/api/notifications/fanout', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    type: 'thread_added',
+                    actorId: userId,
+                    recipients: userIds,
+                    workspaceId,
+                    threadId: (t as MessageThread).id,
+                    meta: { 
+                      thread_name: newTitle.trim() || 'a conversation', 
+                      actor_name: userName || 'Someone' 
+                    }
+                  }),
+                });
+              } catch (e) {
+                console.error('Failed to send thread_added notification', e);
+              }
+            }
+
             // Invalidate queries to refresh thread list
             await queryClient.invalidateQueries({ queryKey: ['threads', workspaceId] })
             if (t) {

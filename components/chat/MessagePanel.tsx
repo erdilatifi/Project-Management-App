@@ -599,7 +599,16 @@ export default function MessagePanel({ threadId, workspaceId, title: titleProp, 
         const actor = userId;
         if (!actor) return
         
-        let recipients = participants.map((p) => p.id).filter((id) => id && id !== actor);
+        let currentParticipantsRows: Array<{user_id: string}> = [];
+        try {
+          currentParticipantsRows = await getThreadParticipants(supabase, threadId);
+        } catch (e) {
+          console.error("Failed to fetch fresh participants for fanout", e);
+        }
+        
+        let recipients = currentParticipantsRows
+          .map((r: any) => String(r.user_id))
+          .filter((id) => id && id !== actor);
         
         // If no participants, notify all workspace members
         if (!recipients.length) {
@@ -614,6 +623,26 @@ export default function MessagePanel({ threadId, workspaceId, title: titleProp, 
         
         if (recipients.length) {
           const type = /@\w+/.test(msg.body) ? 'message_mention' : 'message_new';
+          const actorInfo = participants.find(p => p.id === actor);
+          let actor_name = actorInfo?.email || null;
+          if (!actor_name && actor) {
+            try {
+              const { data: prof } = await supabase
+                .from('profiles')
+                .select('full_name')
+                .eq('id', actor)
+                .maybeSingle();
+              if (prof?.full_name) {
+                actor_name = prof.full_name;
+              }
+            } catch (e) {
+              console.error("Failed to fetch actor display name for notification", e);
+            }
+          }
+          if (!actor_name) {
+            actor_name = 'Someone';
+          }
+
           const res = await fetch('/api/notifications/fanout', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -624,7 +653,7 @@ export default function MessagePanel({ threadId, workspaceId, title: titleProp, 
               workspaceId,
               threadId,
               messageId: msg.id,
-              meta: { actor_name: null, snippet: (msg.body || '').slice(0, 140) },
+              meta: { actor_name, snippet: (msg.body || '').slice(0, 140) },
             }),
           });
           
