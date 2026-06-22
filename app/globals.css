@@ -291,20 +291,12 @@ html {
   100% { left: 100%; opacity: 0; }
 }
 @keyframes step-line-fill-v {
-  0%, 4% { height: 0; }
-  28% { height: 0; }
-  36% { height: 50%; }
-  60% { height: 50%; }
-  68% { height: 100%; }
-  92%, 100% { height: 100%; }
+  0% { height: 0; }
+  100% { height: 100%; }
 }
 @keyframes step-line-fill-h {
-  0%, 4% { width: 0; }
-  28% { width: 0; }
-  36% { width: 50%; }
-  60% { width: 50%; }
-  68% { width: 100%; }
-  92%, 100% { width: 100%; }
+  0% { width: 0; }
+  100% { width: 100%; }
 }
 @keyframes step-node-glow {
   0%, 22%, 100% {
