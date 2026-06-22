@@ -179,80 +179,117 @@ const HOW_IT_WORKS_STEPS = [
 ];
 
 function HowItWorksTimeline() {
+  const [timeline, setTimeline] = useState({ progress: 0, activeStep: 1 });
+
+  useEffect(() => {
+    const duration = 9600;
+    let raf = 0;
+
+    const tick = (now: number) => {
+      const p = (now % duration) / duration;
+      let progress = 0;
+      let activeStep = 1;
+
+      if (p < 0.2) {
+        progress = 0;
+        activeStep = 1;
+      } else if (p < 0.44) {
+        progress = ((p - 0.2) / 0.24) * 0.5;
+        activeStep = 0;
+      } else if (p < 0.6) {
+        progress = 0.5;
+        activeStep = 2;
+      } else if (p < 0.84) {
+        progress = 0.5 + ((p - 0.6) / 0.24) * 0.5;
+        activeStep = 0;
+      } else {
+        progress = 1;
+        activeStep = 3;
+      }
+
+      setTimeline({ progress, activeStep });
+      raf = requestAnimationFrame(tick);
+    };
+
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, []);
+
+  const stepState = (num: number) => timeline.activeStep === num;
+
   return (
-    <Reveal className="mt-[72px]">
-      {/* Desktop: line sits above cards, connected by short stems */}
+    <Reveal className="mt-[56px] sm:mt-[72px]">
       <div className="hidden lg:block">
-        <div className="relative grid grid-cols-3 gap-[24px]">
-          {/* Connector line — above the cards, through step nodes only */}
-          <div className="absolute left-[calc(16.666%-4px)] right-[calc(16.666%-4px)] top-[18px] h-[2px] rounded-full bg-[var(--lp-border-strong)] overflow-visible pointer-events-none">
+        <div className="relative grid grid-cols-3 gap-[24px] xl:gap-[32px] pt-[2px]">
+          <div className="absolute left-[calc(16.666%-2px)] right-[calc(16.666%-2px)] top-[20px] h-[2px] rounded-full bg-white/[0.08] pointer-events-none overflow-hidden">
             <div
-              className="absolute left-0 top-0 h-full rounded-full origin-left animate-[step-line-fill-h_10s_ease-in-out_infinite]"
+              className="absolute left-0 top-0 h-full rounded-full transition-[width] duration-75 ease-linear"
               style={{
-                background: "linear-gradient(90deg, rgba(201,255,61,0.12), rgba(201,255,61,0.55), rgba(201,255,61,0.12))",
-                boxShadow: "0 0 14px rgba(201,255,61,0.35)",
+                width: `${timeline.progress * 100}%`,
+                background: "linear-gradient(90deg, rgba(201,255,61,0.18), rgba(201,255,61,0.95))",
+                boxShadow: "0 0 18px rgba(201,255,61,0.5)",
               }}
             />
           </div>
 
-          {HOW_IT_WORKS_STEPS.map((step) => (
-            <div key={step.num} className="flex flex-col items-center">
-              <div
-                className="relative z-10 flex items-center justify-center w-[38px] h-[38px] rounded-full border-[3px] font-mono text-[13.5px] font-bold bg-[#050607] animate-[step-node-glow_10s_ease-in-out_infinite]"
-                style={{ animationDelay: `${(step.num - 1) * 3.33}s` }}
-              >
-                {step.num}
+          {HOW_IT_WORKS_STEPS.map((step) => {
+            const active = stepState(step.num);
+            return (
+              <div key={step.num} className="relative flex flex-col items-center">
+                <div
+                  className={`relative z-10 flex h-[42px] w-[42px] items-center justify-center rounded-full border-[2px] font-mono text-[13.5px] font-bold transition-all duration-200 ${active ? "border-[var(--lp-accent)] bg-[var(--lp-accent)] text-[#06140a] shadow-[0_0_0_6px_rgba(201,255,61,0.12),0_0_28px_rgba(201,255,61,0.45)]" : "border-white/20 bg-[#080a0c] text-[var(--lp-ink-dim)]"}`}
+                >
+                  {step.num}
+                </div>
+                <div className={`mt-[8px] h-[28px] w-px transition-colors duration-200 ${active ? "bg-[var(--lp-accent)]" : "bg-white/12"}`} />
+                <div
+                  className={`w-full min-h-[190px] rounded-[18px] border px-[24px] py-[28px] text-center transition-all duration-200 ${active ? "border-[var(--lp-accent-line)] bg-[rgba(201,255,61,0.055)] shadow-[0_26px_70px_-48px_rgba(201,255,61,0.65)]" : "border-[var(--lp-border)] bg-white/[0.025]"}`}
+                >
+                  <h3 className="text-[18px] font-semibold leading-[1.25] tracking-tight text-[var(--lp-ink)]">{step.title}</h3>
+                  <p className="mx-auto mt-[11px] max-w-[280px] text-[14.5px] leading-[1.7] text-[var(--lp-ink-dim)]">{step.desc}</p>
+                </div>
               </div>
-              <div className="w-[1px] h-[28px] bg-gradient-to-b from-[var(--lp-border-strong)] to-[var(--lp-border)] mt-[2px]" />
-              <div
-                className="w-full text-center px-[18px] py-[26px] rounded-[18px] border border-[var(--lp-border)] bg-white/[0.02] animate-[step-card-glow_10s_ease-in-out_infinite]"
-                style={{ animationDelay: `${(step.num - 1) * 3.33}s` }}
-              >
-                <h3 className="text-[18px] font-semibold text-[var(--lp-ink)] tracking-tight">{step.title}</h3>
-                <p className="text-[14.5px] text-[var(--lp-ink-dim)] mt-[10px] leading-[1.65]">{step.desc}</p>
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </div>
 
-      {/* Mobile: nodes + line on the left, cards separate on the right */}
-      <div className="lg:hidden relative max-w-[540px] mx-auto">
-        {/* Connector line — vertical, through step nodes */}
-        <div className="absolute left-[19px] top-[19px] bottom-[19px] w-[2px] rounded-full bg-[var(--lp-border-strong)] overflow-visible pointer-events-none z-0">
+      <div className="lg:hidden relative mx-auto max-w-[560px] pl-[2px]">
+        <div className="absolute left-[21px] top-[21px] bottom-[21px] z-0 w-[2px] rounded-full bg-white/[0.08] overflow-hidden pointer-events-none">
           <div
-            className="absolute inset-x-0 top-0 w-full rounded-full origin-top animate-[step-line-fill-v_10s_ease-in-out_infinite]"
+            className="absolute left-0 top-0 w-full rounded-full transition-[height] duration-75 ease-linear"
             style={{
-              background: "linear-gradient(180deg, rgba(201,255,61,0.12), rgba(201,255,61,0.55), rgba(201,255,61,0.12))",
-              boxShadow: "0 0 14px rgba(201,255,61,0.35)",
+              height: `${timeline.progress * 100}%`,
+              background: "linear-gradient(180deg, rgba(201,255,61,0.18), rgba(201,255,61,0.95))",
+              boxShadow: "0 0 18px rgba(201,255,61,0.5)",
             }}
           />
         </div>
 
-        {HOW_IT_WORKS_STEPS.map((step, i) => (
-          <div key={step.num} className={`flex gap-[16px] ${i < HOW_IT_WORKS_STEPS.length - 1 ? "pb-[20px]" : ""}`}>
-            <div className="flex flex-col items-center w-[40px] shrink-0">
+        {HOW_IT_WORKS_STEPS.map((step, i) => {
+          const active = stepState(step.num);
+          return (
+            <div key={step.num} className={`relative flex gap-[16px] sm:gap-[20px] ${i < HOW_IT_WORKS_STEPS.length - 1 ? "pb-[22px] sm:pb-[26px]" : ""}`}>
+              <div className="flex w-[42px] shrink-0 justify-center">
+                <div
+                  className={`relative z-10 flex h-[42px] w-[42px] items-center justify-center rounded-full border-[2px] font-mono text-[13.5px] font-bold transition-all duration-200 ${active ? "border-[var(--lp-accent)] bg-[var(--lp-accent)] text-[#06140a] shadow-[0_0_0_6px_rgba(201,255,61,0.12),0_0_28px_rgba(201,255,61,0.45)]" : "border-white/20 bg-[#080a0c] text-[var(--lp-ink-dim)]"}`}
+                >
+                  {step.num}
+                </div>
+              </div>
               <div
-                className="relative z-10 flex items-center justify-center w-[38px] h-[38px] rounded-full border-[3px] font-mono text-[13.5px] font-bold bg-[#050607] animate-[step-node-glow_10s_ease-in-out_infinite]"
-                style={{ animationDelay: `${(step.num - 1) * 3.33}s` }}
+                className={`min-h-[146px] flex-1 rounded-[16px] border px-[18px] py-[19px] sm:px-[22px] sm:py-[22px] transition-all duration-200 ${active ? "border-[var(--lp-accent-line)] bg-[rgba(201,255,61,0.055)] shadow-[0_22px_60px_-42px_rgba(201,255,61,0.6)]" : "border-[var(--lp-border)] bg-white/[0.025]"}`}
               >
-                {step.num}
+                <h3 className="text-[17px] font-semibold leading-[1.3] tracking-tight text-[var(--lp-ink)]">{step.title}</h3>
+                <p className="mt-[8px] text-[14px] leading-[1.65] text-[var(--lp-ink-dim)]">{step.desc}</p>
               </div>
             </div>
-            <div
-              className={`flex-1 rounded-[16px] border border-[var(--lp-border)] bg-white/[0.02] px-[18px] py-[18px] animate-[step-card-glow_10s_ease-in-out_infinite]`}
-              style={{ animationDelay: `${(step.num - 1) * 3.33}s` }}
-            >
-              <h3 className="text-[17px] font-semibold text-[var(--lp-ink)] tracking-tight">{step.title}</h3>
-              <p className="text-[14px] text-[var(--lp-ink-dim)] mt-[8px] leading-[1.65]">{step.desc}</p>
-            </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
     </Reveal>
   );
 }
-
 /* ═══════════════════════════════════════════════════════════════════════════
    TestimonialCarousel – Auto-rotating quotes with crossfade + progress bar
    ═══════════════════════════════════════════════════════════════════════════ */
@@ -659,22 +696,22 @@ export default function LandingPage() {
             </Reveal>
 
             <div className="grid grid-cols-1 md:grid-cols-[1.1fr_1fr] gap-12 md:gap-[60px] items-center mt-[70px]">
-              <Reveal className="relative h-[420px] border border-[var(--lp-border)] rounded-[20px] overflow-hidden" style={{ background: "radial-gradient(ellipse at center, rgba(255,93,74,0.06), transparent 65%), rgba(255,255,255,0.012)" }}>
-                <div className="absolute inset-y-0 left-1/2 -translate-x-1/2 w-[100%] min-w-[320px] max-w-[800px] h-full origin-center transition-transform">
-                  <svg className="absolute inset-0 w-full h-full pointer-events-none z-0" preserveAspectRatio="none">
+              <Reveal className="relative min-h-[430px] sm:min-h-[460px] rounded-[20px] border border-[var(--lp-border)] overflow-hidden bg-[#07090b] shadow-[0_30px_100px_-70px_rgba(0,0,0,0.9)]" style={{ background: "radial-gradient(circle at 50% 50%, rgba(255,93,74,0.085), transparent 34%), radial-gradient(circle at 18% 18%, rgba(201,255,61,0.045), transparent 32%), rgba(255,255,255,0.012)" }}>
+                <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.035)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.035)_1px,transparent_1px)] bg-[size:48px_48px] opacity-45" />
+                <svg className="absolute inset-0 h-full w-full pointer-events-none" preserveAspectRatio="none" aria-hidden>
                   <defs>
-                    <radialGradient id="problem-line-fade" cx="50%" cy="50%" r="50%">
-                      <stop offset="0%" stopColor="rgba(255,93,74,0.4)" />
-                      <stop offset="100%" stopColor="rgba(255,93,74,0.12)" />
+                    <radialGradient id="problem-line-fade" cx="50%" cy="50%" r="60%">
+                      <stop offset="0%" stopColor="rgba(255,93,74,0.42)" />
+                      <stop offset="100%" stopColor="rgba(255,93,74,0.1)" />
                     </radialGradient>
                   </defs>
                   {[
-                    { x: "13%", y: "15%" },
-                    { x: "87%", y: "18%" },
-                    { x: "13%", y: "82%" },
-                    { x: "84%", y: "88%" },
-                    { x: "10%", y: "48%" },
-                    { x: "90%", y: "54%" },
+                    { x: "24%", y: "18%" },
+                    { x: "76%", y: "24%" },
+                    { x: "20%", y: "55%" },
+                    { x: "79%", y: "57%" },
+                    { x: "27%", y: "82%" },
+                    { x: "74%", y: "82%" },
                   ].map((node, i) => (
                     <line
                       key={i}
@@ -683,52 +720,49 @@ export default function LandingPage() {
                       x2={node.x}
                       y2={node.y}
                       stroke="url(#problem-line-fade)"
-                      strokeWidth="1.25"
-                      strokeDasharray="3 6"
-                      className="animate-[dash-flow_1.6s_linear_infinite]"
+                      strokeWidth="1.2"
+                      strokeDasharray="3 7"
+                      className="animate-[dash-flow_1.8s_linear_infinite]"
                     />
                   ))}
                 </svg>
-                {/* Center hub */}
-                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[70px] h-[70px] sm:w-[90px] sm:h-[90px] rounded-full z-10 flex items-center justify-center animate-[center-pulse_3s_ease-in-out_infinite]" style={{ background: "var(--lp-bg)", boxShadow: "0 0 0 1px rgba(255,93,74,0.25), 0 0 40px rgba(255,93,74,0.18)" }}>
-                  <div className="w-[46px] h-[46px] sm:w-[58px] sm:h-[58px] rounded-full border border-dashed border-[#ff5d4a]/40 flex items-center justify-center">
-                    <span className="font-serif italic text-[20px] sm:text-[24px] text-[#ff5d4a] opacity-70 leading-none">?</span>
+
+                <div className="absolute left-1/2 top-1/2 z-20 flex h-[72px] w-[72px] -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-[#07090b] animate-[center-pulse_3s_ease-in-out_infinite] sm:h-[92px] sm:w-[92px]" style={{ boxShadow: "0 0 0 1px rgba(255,93,74,0.28), 0 0 52px rgba(255,93,74,0.22)" }}>
+                  <div className="flex h-[48px] w-[48px] items-center justify-center rounded-full border border-dashed border-[#ff5d4a]/45 sm:h-[60px] sm:w-[60px]">
+                    <span className="font-serif italic text-[22px] leading-none text-[#ff5d4a] opacity-80 sm:text-[26px]">?</span>
                   </div>
                 </div>
-                
-                {/* Nodes - Positioned using percentages and shifted to center on points */}
-                <div className="absolute top-[15%] left-[13%] -translate-x-1/2 -translate-y-1/2 border border-[var(--lp-border-strong)] bg-[#0f1215]/90 backdrop-blur-md rounded-[10px] sm:rounded-[12px] p-[6px_8px] sm:p-[10px_14px] shadow-lg flex flex-col gap-[4px] sm:gap-[6px] animate-[node-drift_7s_ease-in-out_infinite_reverse] z-10 whitespace-nowrap">
-                  <div className="font-mono text-[9px] sm:text-[11px] text-[var(--lp-ink-faint)] flex items-center gap-[5px] sm:gap-[7px]"><span className="w-[5px] h-[5px] sm:w-[6px] sm:h-[6px] rounded-full bg-[#ffb84d] shrink-0"></span>Trello</div>
-                  <div className="text-[8px] sm:text-[10px] text-[var(--lp-ink)] font-medium">Where is the Q3 roadmap?</div>
+
+                <div className="absolute left-[18px] top-[28px] z-10 w-[min(43vw,166px)] rounded-[12px] border border-white/12 bg-[#0e1115]/90 p-[10px_12px] shadow-[0_18px_50px_-34px_rgba(0,0,0,0.95)] backdrop-blur-md animate-[node-drift_7s_ease-in-out_infinite_reverse] sm:left-[34px] sm:top-[34px] sm:w-[170px] sm:p-[12px_14px]">
+                  <div className="flex items-center gap-[7px] font-mono text-[10px] text-[var(--lp-ink-faint)] sm:text-[11px]"><span className="h-[6px] w-[6px] shrink-0 rounded-full bg-[#ffb84d]"></span>Trello</div>
+                  <div className="mt-[6px] text-[10px] font-semibold leading-[1.35] text-[var(--lp-ink)] sm:text-[11px]">Where is the Q3 roadmap?</div>
                 </div>
-                
-                <div className="absolute top-[18%] left-[87%] -translate-x-1/2 -translate-y-1/2 border border-[var(--lp-border-strong)] bg-[#0f1215]/90 backdrop-blur-md rounded-[10px] sm:rounded-[12px] p-[6px_8px] sm:p-[10px_14px] shadow-lg flex flex-col gap-[4px] sm:gap-[6px] animate-[node-drift_5s_ease-in-out_infinite] delay-100 z-10 whitespace-nowrap">
-                  <div className="font-mono text-[9px] sm:text-[11px] text-[var(--lp-ink-faint)] flex items-center gap-[5px] sm:gap-[7px]"><span className="w-[5px] h-[5px] sm:w-[6px] sm:h-[6px] rounded-full bg-[var(--lp-red)] shrink-0 animate-pulse"></span>Slack</div>
-                  <div className="text-[8px] sm:text-[10px] text-[#ff5d4a] font-medium">42 unread in #design</div>
+
+                <div className="absolute right-[18px] top-[62px] z-10 w-[min(43vw,166px)] rounded-[12px] border border-white/12 bg-[#0e1115]/90 p-[10px_12px] shadow-[0_18px_50px_-34px_rgba(0,0,0,0.95)] backdrop-blur-md animate-[node-drift_5s_ease-in-out_infinite] sm:right-[34px] sm:top-[58px] sm:w-[170px] sm:p-[12px_14px]">
+                  <div className="flex items-center gap-[7px] font-mono text-[10px] text-[var(--lp-ink-faint)] sm:text-[11px]"><span className="h-[6px] w-[6px] shrink-0 rounded-full bg-[var(--lp-red)] animate-pulse"></span>Slack</div>
+                  <div className="mt-[6px] text-[10px] font-semibold leading-[1.35] text-[#ff5d4a] sm:text-[11px]">42 unread in #design</div>
                 </div>
-                
-                <div className="absolute top-[82%] left-[13%] -translate-x-1/2 -translate-y-1/2 border border-[var(--lp-border-strong)] bg-[#0f1215]/90 backdrop-blur-md rounded-[10px] sm:rounded-[12px] p-[6px_8px] sm:p-[10px_14px] shadow-lg flex flex-col gap-[4px] sm:gap-[6px] animate-[node-drift_6s_ease-in-out_infinite_reverse] delay-300 z-10 whitespace-nowrap">
-                  <div className="font-mono text-[9px] sm:text-[11px] text-[var(--lp-ink-faint)] flex items-center gap-[5px] sm:gap-[7px]"><span className="w-[5px] h-[5px] sm:w-[6px] sm:h-[6px] rounded-full bg-[var(--lp-violet)] shrink-0"></span>Notion</div>
-                  <div className="text-[8px] sm:text-[10px] text-[var(--lp-ink-dim)] font-medium">Doc is out of date</div>
+
+                <div className="absolute left-[10px] top-[190px] z-10 w-[min(40vw,156px)] rounded-[12px] border border-white/12 bg-[#0e1115]/90 p-[10px_12px] shadow-[0_18px_50px_-34px_rgba(0,0,0,0.95)] backdrop-blur-md animate-[node-drift_5s_ease-in-out_infinite_reverse] sm:left-[28px] sm:top-[205px] sm:w-[164px] sm:p-[12px_14px]">
+                  <div className="flex items-center gap-[7px] font-mono text-[10px] text-[var(--lp-ink-faint)] sm:text-[11px]"><span className="h-[6px] w-[6px] shrink-0 rounded-full bg-[#8fc92a]"></span>Sheets</div>
+                  <div className="mt-[6px] text-[10px] font-semibold leading-[1.35] text-[var(--lp-ink-dim)] sm:text-[11px]">Request access to view</div>
                 </div>
-                
-                <div className="absolute top-[88%] left-[84%] -translate-x-1/2 -translate-y-1/2 border border-[var(--lp-border-strong)] bg-[#0f1215]/90 backdrop-blur-md rounded-[10px] sm:rounded-[12px] p-[6px_8px] sm:p-[10px_14px] shadow-lg flex flex-col gap-[4px] sm:gap-[6px] animate-[node-drift_8s_ease-in-out_infinite] delay-200 z-10 whitespace-nowrap">
-                  <div className="font-mono text-[9px] sm:text-[11px] text-[var(--lp-ink-faint)] flex items-center gap-[5px] sm:gap-[7px]"><span className="w-[5px] h-[5px] sm:w-[6px] sm:h-[6px] rounded-full bg-[var(--lp-ink-faint)] shrink-0"></span>Email</div>
-                  <div className="text-[8px] sm:text-[10px] text-[var(--lp-ink)] font-medium">Re: Final assets V4</div>
+
+                <div className="absolute right-[10px] top-[218px] z-10 w-[min(40vw,156px)] rounded-[12px] border border-white/12 bg-[#0e1115]/90 p-[10px_12px] shadow-[0_18px_50px_-34px_rgba(0,0,0,0.95)] backdrop-blur-md animate-[node-drift_7s_ease-in-out_infinite] sm:right-[28px] sm:top-[224px] sm:w-[164px] sm:p-[12px_14px]">
+                  <div className="flex items-center gap-[7px] font-mono text-[10px] text-[var(--lp-ink-faint)] sm:text-[11px]"><span className="h-[6px] w-[6px] shrink-0 rounded-full bg-[#5a4fc4]"></span>Zoom</div>
+                  <div className="mt-[6px] text-[10px] font-semibold leading-[1.35] text-[var(--lp-ink-dim)] sm:text-[11px]">Recording expired</div>
                 </div>
-                
-                <div className="absolute top-[48%] left-[10%] -translate-x-1/2 -translate-y-1/2 border border-[var(--lp-border-strong)] bg-[#0f1215]/90 backdrop-blur-md rounded-[10px] sm:rounded-[12px] p-[6px_8px] sm:p-[10px_14px] shadow-lg flex flex-col gap-[4px] sm:gap-[6px] animate-[node-drift_5s_ease-in-out_infinite_reverse] delay-500 z-10 whitespace-nowrap">
-                  <div className="font-mono text-[9px] sm:text-[11px] text-[var(--lp-ink-faint)] flex items-center gap-[5px] sm:gap-[7px]"><span className="w-[5px] h-[5px] sm:w-[6px] sm:h-[6px] rounded-full bg-[#8fc92a] shrink-0"></span>Sheets</div>
-                  <div className="text-[8px] sm:text-[10px] text-[var(--lp-ink-dim)] font-medium">Request access to view</div>
+
+                <div className="absolute bottom-[64px] left-[22px] z-10 w-[min(42vw,166px)] rounded-[12px] border border-white/12 bg-[#0e1115]/90 p-[10px_12px] shadow-[0_18px_50px_-34px_rgba(0,0,0,0.95)] backdrop-blur-md animate-[node-drift_6s_ease-in-out_infinite_reverse] sm:bottom-[58px] sm:left-[42px] sm:w-[170px] sm:p-[12px_14px]">
+                  <div className="flex items-center gap-[7px] font-mono text-[10px] text-[var(--lp-ink-faint)] sm:text-[11px]"><span className="h-[6px] w-[6px] shrink-0 rounded-full bg-[var(--lp-violet)]"></span>Notion</div>
+                  <div className="mt-[6px] text-[10px] font-semibold leading-[1.35] text-[var(--lp-ink-dim)] sm:text-[11px]">Document is out of date</div>
                 </div>
-                
-                <div className="absolute top-[54%] left-[90%] -translate-x-1/2 -translate-y-1/2 border border-[var(--lp-border-strong)] bg-[#0f1215]/90 backdrop-blur-md rounded-[10px] sm:rounded-[12px] p-[6px_8px] sm:p-[10px_14px] shadow-lg flex flex-col gap-[4px] sm:gap-[6px] animate-[node-drift_7s_ease-in-out_infinite] delay-700 z-10 whitespace-nowrap">
-                  <div className="font-mono text-[9px] sm:text-[11px] text-[var(--lp-ink-faint)] flex items-center gap-[5px] sm:gap-[7px]"><span className="w-[5px] h-[5px] sm:w-[6px] sm:h-[6px] rounded-full bg-[#5a4fc4] shrink-0"></span>Zoom</div>
-                  <div className="text-[8px] sm:text-[10px] text-[var(--lp-ink-dim)] font-medium">Recording expired</div>
-                </div>
+
+                <div className="absolute bottom-[34px] right-[18px] z-10 w-[min(45vw,180px)] rounded-[12px] border border-white/12 bg-[#0e1115]/90 p-[10px_12px] shadow-[0_18px_50px_-34px_rgba(0,0,0,0.95)] backdrop-blur-md animate-[node-drift_8s_ease-in-out_infinite] sm:bottom-[34px] sm:right-[34px] sm:w-[188px] sm:p-[12px_14px]">
+                  <div className="flex items-center gap-[7px] font-mono text-[10px] text-[var(--lp-ink-faint)] sm:text-[11px]"><span className="h-[6px] w-[6px] shrink-0 rounded-full bg-[var(--lp-ink-faint)]"></span>Email</div>
+                  <div className="mt-[6px] truncate text-[10px] font-semibold leading-[1.35] text-[var(--lp-ink)] sm:text-[11px]">Re: Re: Final assets V4</div>
                 </div>
               </Reveal>
-
               <Reveal className="flex flex-col mt-0 md:mt-[36px]">
                 <div className="flex gap-[18px] py-[22px] border-t border-[var(--lp-border)]">
                   <div className="font-mono text-[13px] text-[var(--lp-ink-faint)] pt-[2px]">01</div>

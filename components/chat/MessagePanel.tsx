@@ -6,12 +6,13 @@ import { createClient } from "@/utils/supabase/client";
 import type { Message } from "@/types/workspaces";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { X, Pencil, Trash2, MoreVertical, LogOut } from "lucide-react";
+import { X, Pencil, Trash2, MoreVertical, LogOut, UserPlus } from "lucide-react";
 import { toast } from "sonner";
 import { formatTimeAgo } from "@/lib/time";
 import { ConfirmationDialog } from "@/components/ui/confirmation-dialog";
 import { getUserDisplayName } from "@/utils/userDisplay";
-import { getThreadParticipants, markThreadRead } from "@/lib/chatAccess";
+import { getThreadParticipants, markThreadRead, addThreadParticipants } from "@/lib/chatAccess";
+import UserSelectionDialog from "@/components/chat/UserSelectionDialog";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -57,6 +58,7 @@ export default function MessagePanel({ threadId, workspaceId, title: titleProp, 
   const [removeParticipantDialogOpen, setRemoveParticipantDialogOpen] = useState(false);
   const [participantToRemove, setParticipantToRemove] = useState<{ id: string; name: string } | null>(null);
   const [messageToDelete, setMessageToDelete] = useState<string | null>(null);
+  const [addParticipantOpen, setAddParticipantOpen] = useState(false);
 
   const [participants, setParticipants] = useState<
     Array<{ id: string; email: string | null; avatar_url: string | null; is_admin: boolean }>
@@ -707,6 +709,56 @@ export default function MessagePanel({ threadId, workspaceId, title: titleProp, 
     },
   });
 
+  // Add participants mutation — adds to thread and fires thread_added notifications
+  const addParticipantsMutation = useMutation({
+    mutationFn: async (userIds: string[]) => {
+      const newParticipants = userIds
+        .filter((id) => id && id !== userId && !participants.some((p) => p.id === id))
+        .map((id) => ({ user_id: id, is_admin: false }));
+      if (!newParticipants.length) return [];
+
+      await addThreadParticipants(supabase, threadId, newParticipants);
+
+      // Send thread_added notifications to the newly added users
+      const recipients = newParticipants.map((p) => p.user_id);
+      if (recipients.length && userId) {
+        try {
+          const actorMeta = await fetchUserMeta([userId]);
+          const actorName = actorMeta[userId]?.label ?? actorMeta[userId]?.email ?? 'Someone';
+          await fetch('/api/notifications/fanout', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              type: 'thread_added',
+              actorId: userId,
+              recipients,
+              workspaceId,
+              threadId,
+              meta: {
+                actor_name: actorName,
+                thread_title: threadTitle || null,
+              },
+            }),
+          });
+        } catch (e) {
+          console.error('Failed to send thread_added notification for added participants', e);
+        }
+      }
+
+      return recipients;
+    },
+    onSuccess: (addedIds) => {
+      if (addedIds && addedIds.length > 0) {
+        toast.success(`Added ${addedIds.length} participant${addedIds.length > 1 ? 's' : ''}`);
+      }
+      // Reload participants list to reflect the new additions
+      loadParticipants();
+    },
+    onError: (e: any) => {
+      toast.error(e?.message ?? 'Failed to add participants');
+    },
+  });
+
   const removeParticipant = (uid: string) => {
     // If user is leaving their own thread
     if (userId === uid) {
@@ -892,6 +944,16 @@ export default function MessagePanel({ threadId, workspaceId, title: titleProp, 
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
+              {canManage && (
+                <DropdownMenuItem
+                  className="cursor-pointer"
+                  onClick={() => setAddParticipantOpen(true)}
+                >
+                  <UserPlus className="mr-2 h-4 w-4" />
+                  Add Participants
+                </DropdownMenuItem>
+              )}
+              {canManage && <DropdownMenuSeparator />}
               {creatorId === userId ? (
                 <DropdownMenuItem
                   className="text-destructive focus:text-destructive cursor-pointer"
@@ -1079,6 +1141,17 @@ export default function MessagePanel({ threadId, workspaceId, title: titleProp, 
           className="h-11 rounded-xl border-border bg-background focus-visible:ring-2 focus-visible:ring-ring"
         />
       </div>
+
+      {/* Add Participants Dialog */}
+      <UserSelectionDialog
+        open={addParticipantOpen}
+        onOpenChange={setAddParticipantOpen}
+        workspaceId={workspaceId}
+        excludeUserIds={participants.map((p) => p.id)}
+        onUsersSelected={(userIds) => {
+          addParticipantsMutation.mutate(userIds);
+        }}
+      />
 
       {/* Confirmation Dialogs */}
       <ConfirmationDialog

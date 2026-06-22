@@ -26,6 +26,7 @@ type Props = {
   workspaceId: string
   onUsersSelected: (userIds: string[]) => void
   selectedUserIds?: string[]
+  excludeUserIds?: string[]
 }
 
 export default function UserSelectionDialog({ 
@@ -33,7 +34,8 @@ export default function UserSelectionDialog({
   onOpenChange, 
   workspaceId, 
   onUsersSelected,
-  selectedUserIds = []
+  selectedUserIds = [],
+  excludeUserIds = [],
 }: Props) {
   const supabase = useMemo(() => createClient(), [])
   const [users, setUsers] = useState<User[]>([])
@@ -106,7 +108,9 @@ export default function UserSelectionDialog({
         }
 
         // Merge: every member gets an entry, even without a profile
-        const merged: User[] = userIds.map((uid) => {
+        const merged: User[] = userIds
+          .filter((uid) => !excludeUserIds.includes(uid)) // hide already-added participants
+          .map((uid) => {
           const row = profileMap.get(uid)
           const displayName = getUserDisplayName({
             full_name: row?.full_name ?? null,
