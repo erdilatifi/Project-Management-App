@@ -323,6 +323,7 @@ export default function NotificationBell() {
         case 'message':
         case 'message_new':
         case 'message_mention':
+        case 'thread_added':
           // Try multiple fields to find the thread ID (ref_id, thread_id)
           const threadId = n.ref_id || n.thread_id
           const workspaceId = n.workspace_id
@@ -385,6 +386,7 @@ export default function NotificationBell() {
       case 'message':
       case 'message_new':
       case 'message_mention':
+      case 'thread_added':
         return <MessageSquareText className="w-4 h-4" />
       case 'task_assigned':
       case 'task_update':

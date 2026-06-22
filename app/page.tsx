@@ -4,6 +4,7 @@ import React, { useEffect, useRef, useState, useCallback } from "react";
 import Link from "next/link";
 import { useInView } from "framer-motion";
 import { Workflow } from "lucide-react";
+import { useAuth } from '@/app/context/ContextApiProvider';
 
 // Helper for revealing elements on scroll. When `spotlight` is set, the element
 // also gets a cursor-following accent glow + lift on hover for a premium feel.
@@ -192,13 +193,6 @@ function HowItWorksTimeline() {
                 boxShadow: "0 0 14px rgba(201,255,61,0.35)",
               }}
             />
-            <div
-              className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-[12px] h-[12px] rounded-full animate-[step-light-travel-h_10s_ease-in-out_infinite]"
-              style={{
-                background: "radial-gradient(circle, #eaffb0 0%, #c9ff3d 50%, transparent 72%)",
-                boxShadow: "0 0 14px rgba(201,255,61,0.95), 0 0 28px rgba(201,255,61,0.35)",
-              }}
-            />
           </div>
 
           {HOW_IT_WORKS_STEPS.map((step) => (
@@ -224,8 +218,19 @@ function HowItWorksTimeline() {
 
       {/* Mobile: nodes + line on the left, cards separate on the right */}
       <div className="lg:hidden relative max-w-[540px] mx-auto">
+        {/* Connector line — vertical, through step nodes */}
+        <div className="absolute left-[19px] top-[19px] bottom-[19px] w-[2px] rounded-full bg-[var(--lp-border-strong)] overflow-visible pointer-events-none z-0">
+          <div
+            className="absolute inset-x-0 top-0 w-full rounded-full origin-top animate-[step-line-fill-v_10s_ease-in-out_infinite]"
+            style={{
+              background: "linear-gradient(180deg, rgba(201,255,61,0.12), rgba(201,255,61,0.55), rgba(201,255,61,0.12))",
+              boxShadow: "0 0 14px rgba(201,255,61,0.35)",
+            }}
+          />
+        </div>
+
         {HOW_IT_WORKS_STEPS.map((step, i) => (
-          <div key={step.num} className="flex gap-[16px]">
+          <div key={step.num} className={`flex gap-[16px] ${i < HOW_IT_WORKS_STEPS.length - 1 ? "pb-[20px]" : ""}`}>
             <div className="flex flex-col items-center w-[40px] shrink-0">
               <div
                 className="relative z-10 flex items-center justify-center w-[38px] h-[38px] rounded-full border-[3px] font-mono text-[13.5px] font-bold bg-[#050607] animate-[step-node-glow_10s_ease-in-out_infinite]"
@@ -233,31 +238,9 @@ function HowItWorksTimeline() {
               >
                 {step.num}
               </div>
-              {i < HOW_IT_WORKS_STEPS.length - 1 && (
-                <div className="relative flex-1 w-[2px] min-h-[48px] my-[6px] rounded-full bg-[var(--lp-border-strong)] overflow-visible">
-                  <div
-                    className="absolute inset-x-0 top-0 w-full rounded-full origin-top animate-[step-line-fill-v_10s_ease-in-out_infinite]"
-                    style={{
-                      height: i === 0 ? "100%" : "0%",
-                      animationDelay: `${i * 3.33}s`,
-                      background: "linear-gradient(180deg, rgba(201,255,61,0.15), rgba(201,255,61,0.55))",
-                      boxShadow: "0 0 10px rgba(201,255,61,0.3)",
-                    }}
-                  />
-                  {i === 0 && (
-                    <div
-                      className="absolute left-1/2 -translate-x-1/2 -translate-y-1/2 w-[10px] h-[10px] rounded-full animate-[step-light-travel-v_10s_ease-in-out_infinite]"
-                      style={{
-                        background: "radial-gradient(circle, #eaffb0 0%, #c9ff3d 50%, transparent 72%)",
-                        boxShadow: "0 0 12px rgba(201,255,61,0.9)",
-                      }}
-                    />
-                  )}
-                </div>
-              )}
             </div>
             <div
-              className={`flex-1 rounded-[16px] border border-[var(--lp-border)] bg-white/[0.02] px-[18px] py-[18px] animate-[step-card-glow_10s_ease-in-out_infinite] ${i < HOW_IT_WORKS_STEPS.length - 1 ? "mb-[20px]" : ""}`}
+              className={`flex-1 rounded-[16px] border border-[var(--lp-border)] bg-white/[0.02] px-[18px] py-[18px] animate-[step-card-glow_10s_ease-in-out_infinite]`}
               style={{ animationDelay: `${(step.num - 1) * 3.33}s` }}
             >
               <h3 className="text-[17px] font-semibold text-[var(--lp-ink)] tracking-tight">{step.title}</h3>
@@ -402,6 +385,7 @@ function TestimonialCarousel() {
 
 export default function LandingPage() {
   const [scrolled, setScrolled] = useState(false);
+  const { user } = useAuth();
 
   useEffect(() => {
     const handleScroll = () => {
@@ -458,8 +442,14 @@ export default function LandingPage() {
               <a href="#faq" className="hover:text-[var(--lp-ink)] transition-colors">FAQ</a>
             </div>
             <div className="flex items-center gap-3 sm:gap-[18px]">
-              <Link href="/login" className="hidden sm:inline-flex items-center gap-2 px-4 py-[9px] sm:px-[20px] sm:py-[10px] rounded-[9px] text-[12.5px] sm:text-[13.5px] font-semibold text-[var(--lp-ink-dim)] border border-[var(--lp-border)] bg-white/5 hover:bg-white/10 hover:text-[var(--lp-ink)] hover:border-[var(--lp-border-strong)] transition-all">Sign in</Link>
-              <Link href="/register" className="inline-flex items-center gap-2 px-4 py-[9px] sm:px-[20px] sm:py-[10px] rounded-[9px] text-[12.5px] sm:text-[13.5px] font-semibold text-[#06140a] bg-[var(--lp-accent)] hover:-translate-y-[2px] hover:shadow-[0_8px_28px_rgba(201,255,61,0.28)] transition-all">Get started</Link>
+              {user ? (
+                <Link href="/workspaces" className="inline-flex items-center gap-2 px-4 py-[9px] sm:px-[20px] sm:py-[10px] rounded-[9px] text-[12.5px] sm:text-[13.5px] font-semibold text-[#06140a] bg-[var(--lp-accent)] hover:-translate-y-[2px] hover:shadow-[0_8px_28px_rgba(201,255,61,0.28)] transition-all">Return to Workspace</Link>
+              ) : (
+                <>
+                  <Link href="/login" className="hidden sm:inline-flex items-center gap-2 px-4 py-[9px] sm:px-[20px] sm:py-[10px] rounded-[9px] text-[12.5px] sm:text-[13.5px] font-semibold text-[var(--lp-ink-dim)] border border-[var(--lp-border)] bg-white/5 hover:bg-white/10 hover:text-[var(--lp-ink)] hover:border-[var(--lp-border-strong)] transition-all">Sign in</Link>
+                  <Link href="/register" className="inline-flex items-center gap-2 px-4 py-[9px] sm:px-[20px] sm:py-[10px] rounded-[9px] text-[12.5px] sm:text-[13.5px] font-semibold text-[#06140a] bg-[var(--lp-accent)] hover:-translate-y-[2px] hover:shadow-[0_8px_28px_rgba(201,255,61,0.28)] transition-all">Get started</Link>
+                </>
+              )}
             </div>
           </div>
         </nav>
@@ -479,7 +469,11 @@ export default function LandingPage() {
                 Create a workspace, build boards, assign the work, and talk it through — all in one place. Drag a task and your whole team watches it move in real time, so everyone always knows exactly what&apos;s happening.
               </p>
               <div className="flex flex-col sm:flex-row items-center justify-center gap-[14px] mt-[38px] px-1 sm:px-0">
-                <Link href="/register" className="w-full sm:w-auto inline-flex justify-center items-center gap-2 px-[26px] py-[14px] rounded-[10px] text-[14.5px] font-semibold text-[#06140a] bg-[var(--lp-accent)] hover:-translate-y-[2px] hover:shadow-[0_8px_28px_rgba(201,255,61,0.28)] transition-all">Get started <span className="opacity-70">→</span></Link>
+                {user ? (
+                  <Link href="/workspaces" className="w-full sm:w-auto inline-flex justify-center items-center gap-2 px-[26px] py-[14px] rounded-[10px] text-[14.5px] font-semibold text-[#06140a] bg-[var(--lp-accent)] hover:-translate-y-[2px] hover:shadow-[0_8px_28px_rgba(201,255,61,0.28)] transition-all">Go to workspace <span className="opacity-70">→</span></Link>
+                ) : (
+                  <Link href="/register" className="w-full sm:w-auto inline-flex justify-center items-center gap-2 px-[26px] py-[14px] rounded-[10px] text-[14.5px] font-semibold text-[#06140a] bg-[var(--lp-accent)] hover:-translate-y-[2px] hover:shadow-[0_8px_28px_rgba(201,255,61,0.28)] transition-all">Get started <span className="opacity-70">→</span></Link>
+                )}
                 <a href="#how" className="w-full sm:w-auto inline-flex justify-center items-center gap-2 px-[26px] py-[14px] rounded-[10px] text-[14.5px] font-semibold text-[var(--lp-ink-dim)] border border-[var(--lp-border)] bg-white/5 hover:bg-white/10 hover:text-[var(--lp-ink)] hover:border-[var(--lp-border-strong)] transition-all">See how it works</a>
               </div>
               <div className="flex items-center justify-center gap-2.5 mt-[22px] text-[12.5px] text-[var(--lp-ink-faint)] font-mono flex-wrap">
@@ -666,7 +660,8 @@ export default function LandingPage() {
 
             <div className="grid grid-cols-1 md:grid-cols-[1.1fr_1fr] gap-12 md:gap-[60px] items-center mt-[70px]">
               <Reveal className="relative h-[420px] border border-[var(--lp-border)] rounded-[20px] overflow-hidden" style={{ background: "radial-gradient(ellipse at center, rgba(255,93,74,0.06), transparent 65%), rgba(255,255,255,0.012)" }}>
-                <svg className="absolute inset-0 w-full h-full pointer-events-none z-0" preserveAspectRatio="none">
+                <div className="absolute inset-y-0 left-1/2 -translate-x-1/2 w-[800px] h-full origin-center scale-[0.42] min-[375px]:scale-[0.48] min-[480px]:scale-[0.58] min-[640px]:scale-[0.78] md:scale-100 transition-transform">
+                  <svg className="absolute inset-0 w-full h-full pointer-events-none z-0" preserveAspectRatio="none">
                   <defs>
                     <radialGradient id="problem-line-fade" cx="50%" cy="50%" r="50%">
                       <stop offset="0%" stopColor="rgba(255,93,74,0.4)" />
@@ -723,6 +718,7 @@ export default function LandingPage() {
                 <div className="absolute top-[48%] right-[0%] border border-[var(--lp-border-strong)] bg-[#0f1215]/90 backdrop-blur-md rounded-[12px] p-[10px_14px] shadow-lg flex flex-col gap-[6px] animate-[node-drift_7s_ease-in-out_infinite] delay-700 z-10">
                   <div className="font-mono text-[11px] text-[var(--lp-ink-faint)] flex items-center gap-[7px]"><span className="w-[6px] h-[6px] rounded-full bg-[#5a4fc4] shrink-0"></span>Zoom</div>
                   <div className="text-[10px] text-[var(--lp-ink-dim)] font-medium">Recording expired</div>
+                </div>
                 </div>
               </Reveal>
 
@@ -896,7 +892,11 @@ export default function LandingPage() {
             <h2 className="font-serif font-normal text-[clamp(2.2rem,5vw,3.6rem)] tracking-tight leading-[1.08]">Ready to find your flow?</h2>
             <p className="text-[16px] text-[var(--lp-ink-dim)] mt-[20px] mx-auto max-w-[440px]">Bring your team, your boards, and every client update into one calm, real-time workspace.</p>
             <div className="flex flex-col sm:flex-row items-center justify-center gap-[14px] mt-[38px]">
-              <Link href="/register" className="w-full sm:w-auto inline-flex justify-center items-center gap-2 px-[26px] py-[14px] rounded-[10px] text-[14.5px] font-semibold text-[#06140a] bg-[var(--lp-accent)] hover:-translate-y-[2px] hover:shadow-[0_8px_28px_rgba(201,255,61,0.28)] transition-all">Get started <span className="opacity-70">→</span></Link>
+              {user ? (
+                <Link href="/workspaces" className="w-full sm:w-auto inline-flex justify-center items-center gap-2 px-[26px] py-[14px] rounded-[10px] text-[14.5px] font-semibold text-[#06140a] bg-[var(--lp-accent)] hover:-translate-y-[2px] hover:shadow-[0_8px_28px_rgba(201,255,61,0.28)] transition-all">Go to workspace <span className="opacity-70">→</span></Link>
+              ) : (
+                <Link href="/register" className="w-full sm:w-auto inline-flex justify-center items-center gap-2 px-[26px] py-[14px] rounded-[10px] text-[14.5px] font-semibold text-[#06140a] bg-[var(--lp-accent)] hover:-translate-y-[2px] hover:shadow-[0_8px_28px_rgba(201,255,61,0.28)] transition-all">Get started <span className="opacity-70">→</span></Link>
+              )}
             </div>
             <div className="flex items-center justify-center gap-[22px] mt-[30px] flex-wrap">
               <span className="flex items-center gap-[7px] text-[12.5px] text-[var(--lp-ink-faint)] font-mono"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" className="text-[var(--lp-accent)]"><path d="M20 6L9 17l-5-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg> Real-time boards</span>
