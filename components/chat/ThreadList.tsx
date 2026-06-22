@@ -154,6 +154,28 @@ export default function ThreadList({ workspaceId, onSelect, activeThreadId }: Pr
         await addThreadParticipants(supabase, threadId, participantsParam)
       }
 
+      // Notify the added participants (everyone except the creator) that they
+      // were added to a new conversation.
+      const recipients = userIds.filter((participantId) => participantId && participantId !== userId)
+      if (recipients.length && userId) {
+        try {
+          await fetch('/api/notifications/fanout', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              type: 'thread_added',
+              actorId: userId,
+              recipients,
+              workspaceId,
+              threadId,
+              meta: { thread_title: trimmedTitle || null },
+            }),
+          })
+        } catch {
+          // Notification fanout should not block thread creation.
+        }
+      }
+
       return thread
     },
     onSettled: () => { queryClient.invalidateQueries({ queryKey: ['threads', workspaceId, userId] }) },
