@@ -1,12 +1,12 @@
 # Flowfoundry - Project Management Application
 
-![Flowfoundry Banner](public/FlowFoundry.png)
+![Flowfoundry Banner](docs/banner.png)
 
-A modern, **100% free and open-source** project management application built with Next.js 16, Supabase, and TypeScript. Features real-time collaboration, drag-and-drop task management, workspace chat, and a beautiful theme-aware interface.
+A modern project management application built with Next.js 16, Supabase, and TypeScript. Features real-time collaboration, drag-and-drop task management, workspace chat, and a beautiful theme-aware interface.
 
 
 
-## ✨ Features
+## Features
 
 ### Core Functionality
 - **User Authentication** - Secure sign-up, login, and password recovery with Supabase Auth
@@ -91,7 +91,7 @@ A modern, **100% free and open-source** project management application built wit
   - People → Workspaces  
   - Tasks → Projects
 
-## 🛠️ Tech Stack
+## Tech Stack
 
 ### Frontend
 - **Framework**: Next.js 16 (App Router)
@@ -175,7 +175,7 @@ Project-Management-App/
 
 1. Clone the repository:
 ```bash
-git clone <repository-url>
+git clone https://github.com/erdilatifi/Project-Management-App.git
 cd Project-Management-App
 ```
 
@@ -185,9 +185,9 @@ npm install
 ```
 
 3. Set up environment variables:
-Copy `env.example` to `.env.local` and fill in your Supabase credentials:
+Copy `.env.example` to `.env.local` and fill in your Supabase credentials:
 ```bash
-cp env.example .env.local
+cp .env.example .env.local
 ```
 Then edit `.env.local` with your actual values from your Supabase project settings.
 
@@ -198,7 +198,7 @@ npm run dev
 
 5. Open [http://localhost:3000](http://localhost:3000) in your browser.
 
-## 🔑 Key Features Explained
+## Key Features Explained
 
 ### Authentication & Security
 - **Supabase Auth** - Enterprise-grade authentication
@@ -296,7 +296,7 @@ npm run dev
 - **WCAG AA Compliant** - Proper contrast ratios
 - **Smooth Transitions** - Animated theme changes
 
-## 💻 Development
+## Development
 
 ### Code Style
 - **TypeScript** - Strict mode enabled for type safety
@@ -340,15 +340,8 @@ npm run build
 
 3. Deploy using your platform's CLI or dashboard
 
+## License
 
-## 📄 License
+Copyright (c) 2025-2026 Erdi Latifi.
 
-MIT License - See [LICENSE](LICENSE) file for details.
-
-## 🤝 Contributing
-
-Contributions are welcome! Please feel free to submit a Pull Request.
-
-## 📧 Contact
-
-For questions or support, please open an issue on GitHub.
+This project is source-available under the [PolyForm Noncommercial License 1.0.0](LICENSE). You may use, study and modify it for personal, educational and other noncommercial purposes. Commercial use is not permitted without written permission from the author.

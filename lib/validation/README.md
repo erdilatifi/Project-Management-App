@@ -161,24 +161,24 @@ withErrorHandling(handler)
 ## Security Features
 
 ### SQL Injection Prevention
-- ✅ Parameterized queries (via Supabase)
-- ✅ Input validation with Zod
-- ✅ Search query sanitization
-- ✅ UUID format validation
-- ✅ SQL keyword removal
+- Parameterized queries (via Supabase)
+- Input validation with Zod
+- Search query sanitization
+- UUID format validation
+- SQL keyword removal
 
 ### XSS Prevention
-- ✅ HTML sanitization
-- ✅ Script tag removal
-- ✅ Event handler removal
-- ✅ Protocol validation
+- HTML sanitization
+- Script tag removal
+- Event handler removal
+- Protocol validation
 
 ### Other Protections
-- ✅ Path traversal prevention
-- ✅ Prototype pollution prevention
-- ✅ CSRF protection (via Supabase)
-- ✅ Rate limiting
-- ✅ File upload validation
+- Path traversal prevention
+- Prototype pollution prevention
+- CSRF protection (via Supabase)
+- Rate limiting
+- File upload validation
 
 ## Examples
 
